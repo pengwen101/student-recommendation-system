@@ -5,3 +5,4 @@ from backend.students import routers
 app = FastAPI()
 
 app.include_router(routers.topics_router)
+app.include_router(routers.recommendations_router)

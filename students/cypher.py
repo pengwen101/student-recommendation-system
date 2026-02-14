@@ -3,7 +3,7 @@ from backend.database import Neo4jConnection
 async def read_student_topics(student_id: str):
     query = """
         MATCH (s:Student {student_id: $student_id})-[r:INTERESTED_IN]->(t:Topic)
-        RETURN t.topic_id as topic_id, t.description as topic_description
+        RETURN t.topic_id as topic_id, t.description as topic_description, r.weight as weight
     """
     params = {"student_id": student_id}
     response = await Neo4jConnection.query(query, params)
@@ -18,25 +18,74 @@ async def student_exists(student_id: str):
     response = await Neo4jConnection.query(query, params)
     return response[0]['exists'] if response else False
     
-async def create_student_topics(student_id: str, topic_ids: list[str]):
+async def create_student_topics(student_id: str, topic_list: list):
     query = """
         MATCH (s:Student {student_id: $student_id})
-        UNWIND $topic_ids as tid
-        MATCH (t:Topic {topic_id: tid})
+        UNWIND $topics as topic
+        MATCH (t:Topic {topic_id: topic.topic_id})
         MERGE (s)-[r:INTERESTED_IN]->(t)
+        SET r.weight = topic.weight
     """
-    params = {"student_id": student_id, "topic_ids": topic_ids}
+    params = {"student_id": student_id, "topics": topic_list}
     await Neo4jConnection.query(query, params)
 
-async def update_student_topics(student_id: str, topic_ids: list[str]):
+async def update_student_topics(student_id: str, topic_list: list):
     query = """
         MATCH (s:Student {student_id: $student_id})
         OPTIONAL MATCH (s)-[r:INTERESTED_IN]->(:Topic)
         DELETE r
         WITH s
-        UNWIND $topic_ids as tid
-        MATCH (t:Topic {topic_id: tid})
-        MERGE (s)-[:INTERESTED_IN]->(t)
+        UNWIND $topics as topic
+        MATCH (t:Topic {topic_id: topic.topic_id})
+        MERGE (s)-[r:INTERESTED_IN]->(t)
+        SET r.weight = topic.weight
     """
-    params = {"student_id": student_id, "topic_ids": topic_ids}
+    params = {"student_id": student_id, "topics": topic_list}
     await Neo4jConnection.query(query, params)
+    
+async def get_student_recommendations(student_id: str):
+    query = """
+        MATCH (s:Student {student_id: $student_id})
+        OPTIONAL MATCH (s)-[rl:LACK]->(:Quality)
+        WITH s, sum(coalesce(rl.lack_value, 0)) as total_lack_weight
+        OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(:Topic)
+        WITH s, total_lack_weight, sum(coalesce(ri.weight, 0)) as total_interest_weight
+
+        MATCH (e:Event)
+        OPTIONAL MATCH (s)-[rl:LACK]->(q:Quality)<-[rp:SUPPORTS]-(e)
+        WITH s, e, total_lack_weight, total_interest_weight,
+            sum(
+                CASE 
+                    WHEN rl IS NULL OR rp IS NULL THEN 0.0
+                    WHEN rl.lack_value < rp.weight
+                    THEN rl.lack_value
+                    ELSE rp.weight
+                END
+            ) as quality_intersection
+
+        OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(t:Topic)<-[rt:TAGGED_WITH]-(e)
+        WITH s, e, total_lack_weight, total_interest_weight, quality_intersection,
+            sum(
+                CASE 
+                    WHEN ri IS NULL OR rt IS NULL THEN 0.0
+                    WHEN ri.weight < rt.weight 
+                    THEN ri.weight
+                    ELSE rt.weight
+                END
+            ) as topic_intersection
+
+        RETURN e.event_id as event_id, 
+            e.name as event_name,
+            (0.6 * (CASE WHEN total_lack_weight > 0 
+                    THEN quality_intersection / total_lack_weight 
+                    ELSE 0.0 END) 
+            ) + (0.4 *
+            (CASE WHEN total_interest_weight > 0 
+                    THEN topic_intersection / total_interest_weight 
+                    ELSE 0.0 END))
+            as probability_score
+        ORDER BY probability_score DESC
+        LIMIT 10
+    """
+    params = {"student_id": student_id}
+    return await Neo4jConnection.query(query, params)
