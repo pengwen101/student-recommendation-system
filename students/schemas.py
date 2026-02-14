@@ -2,11 +2,11 @@ from pydantic import BaseModel
 from typing import List, Dict, Set
 
 class StudentTopicsResponse(BaseModel):
-    topic_id: str
-    name: str
+    topic_id: int
+    topic_description: str
 
 class StudentTopicsCreate(BaseModel):
-    topic_ids: List[str]
+    topic_ids: List[int]
     
 class StudentTopicsUpdate(BaseModel):
-    topic_ids: List[str]
+    topic_ids: List[int]
