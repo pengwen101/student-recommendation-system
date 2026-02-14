@@ -6,19 +6,17 @@ async def read_student_topics(student_id: str):
         RETURN t.topic_id as topic_id, t.description as topic_description
     """
     params = {"student_id": student_id}
-    response_df = Neo4jConnection.query(query, params)
-    response = response_df.to_dict(orient='records')
-    
+    response = await Neo4jConnection.query(query, params)
     return response
 
 async def student_exists(student_id: str):
     query = """
     MATCH (s: Student {student_id: $student_id})
-    RETURN s
+    RETURN count(s) > 0 as exists
     """
     params = {"student_id": student_id}
-    response_df = Neo4jConnection.query(query, params)
-    return not response_df.empty
+    response = await Neo4jConnection.query(query, params)
+    return response[0]['exists'] if response else False
     
 async def create_student_topics(student_id: str, topic_ids: list[str]):
     query = """
@@ -28,7 +26,7 @@ async def create_student_topics(student_id: str, topic_ids: list[str]):
         MERGE (s)-[r:INTERESTED_IN]->(t)
     """
     params = {"student_id": student_id, "topic_ids": topic_ids}
-    Neo4jConnection.query(query, params)
+    await Neo4jConnection.query(query, params)
 
 async def update_student_topics(student_id: str, topic_ids: list[str]):
     query = """
@@ -41,4 +39,4 @@ async def update_student_topics(student_id: str, topic_ids: list[str]):
         MERGE (s)-[:INTERESTED_IN]->(t)
     """
     params = {"student_id": student_id, "topic_ids": topic_ids}
-    Neo4jConnection.query(query, params)
+    await Neo4jConnection.query(query, params)
