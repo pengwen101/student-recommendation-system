@@ -13,7 +13,7 @@ class Neo4jConnection:
     @classmethod
     async def close_driver(cls):
         if cls._driver is not None:
-            cls._driver.close()
+            await cls._driver.close()
             cls._driver = None
             
     @classmethod

@@ -15,6 +15,9 @@ class StudentTopicsInput(BaseModel):
     topic_id: int
     weight: float
     
+class StudentTopicsInputBatch(BaseModel):
+    topics: List[StudentTopicsInput]
+    
 class StudentRecommendation(BaseModel):
     event_id: str
     event_name: str
@@ -24,3 +27,21 @@ class StudentRecommendationsResponse(BaseModel):
     message: str
     count: int
     recommendations: List[StudentRecommendation]
+    
+    
+class StudentQualitiesResponse(BaseModel):
+    quality_id: str
+    quality_description: str
+    lack_value: float
+    
+class QualityActionResponse(BaseModel):
+    message: str
+    count: int
+    qualities: List[StudentQualitiesResponse]
+    
+class StudentQualitiesInput(BaseModel):
+    quality_id: str
+    lack_value: float
+    
+class StudentQualitiesInputBatch(BaseModel):
+    qualities: List[StudentQualitiesInput]

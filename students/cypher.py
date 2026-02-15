@@ -43,6 +43,41 @@ async def update_student_topics(student_id: str, topic_list: list):
     params = {"student_id": student_id, "topics": topic_list}
     await Neo4jConnection.query(query, params)
     
+    
+async def read_student_qualities(student_id: str):
+    query = """
+        MATCH (s:Student {student_id: $student_id})-[r:LACK]->(q:Quality)
+        RETURN q.quality_id as quality_id, q.description as quality_description, r.lack_value as lack_value
+    """
+    params = {"student_id": student_id}
+    response = await Neo4jConnection.query(query, params)
+    return response
+    
+async def create_student_qualities(student_id: str, quality_list: list):
+    query = """
+        MATCH (s:Student {student_id: $student_id})
+        UNWIND $qualities as quality
+        MATCH (q:Quality {quality_id: quality.quality_id})
+        MERGE (s)-[r:LACK]->(q)
+        SET r.lack_value = quality.lack_value
+    """
+    params = {"student_id": student_id, "qualities": quality_list}
+    await Neo4jConnection.query(query, params)
+
+async def update_student_qualities(student_id: str, quality_list: list):
+    query = """
+        MATCH (s:Student {student_id: $student_id})
+        OPTIONAL MATCH (s)-[r:LACK]->(q:Quality)
+        DELETE r
+        WITH s
+        UNWIND $qualities as quality
+        MATCH (q:Quality {quality_id: quality.quality_id})
+        MERGE (s)-[r:LACK]->(q)
+        SET r.lack_value = quality.lack_value
+    """
+    params = {"student_id": student_id, "qualities": quality_list}
+    await Neo4jConnection.query(query, params)
+    
 async def get_student_recommendations(student_id: str):
     query = """
         MATCH (s:Student {student_id: $student_id})
