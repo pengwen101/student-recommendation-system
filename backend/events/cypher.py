@@ -14,15 +14,15 @@ async def read_events():
     query = """
     MATCH (e:Event)
     RETURN e.event_id as event_id, 
-           e.name as event_name,
+           e.name,
            [(e)-[rs:SUPPORTS]->(q:Quality) | {
                 quality_id: q.quality_id,
-                quality_description: q.description, 
+                name: q.name, 
                 weight: toFloat(rs.weight)
            }] as qualities,
            [(e)-[rc:COVERS]->(t:Topic) | {
                 topic_id: t.topic_id, 
-                topic_description: t.description, 
+                name: t.name, 
                 weight: toFloat(rc.weight)
            }] as topics
     """
@@ -34,15 +34,15 @@ async def read_event_details(event_id: str):
     query = """
     MATCH (e:Event {event_id: $event_id})
     RETURN e.event_id as event_id, 
-           e.name as event_name,
+           e.name,
            [(e)-[rs:SUPPORTS]->(q:Quality) | {
                 quality_id: q.quality_id,
-                quality_description: q.description, 
+                name: q.name, 
                 weight: toFloat(rs.weight)
            }] as qualities,
            [(e)-[rc:COVERS]->(t:Topic) | {
                 topic_id: t.topic_id, 
-                topic_description: t.description, 
+                name: t.name, 
                 weight: toFloat(rc.weight)
            }] as topics
     """
@@ -53,7 +53,7 @@ async def read_event_details(event_id: str):
 async def create_event(event_id: str, data: dict):
     query = """
     MERGE (e:Event {event_id: $event_id})
-    SET e.name = $event_name
+    SET e.name = $name
     WITH e
     UNWIND $topics as topic
     MATCH (t:Topic {topic_id: topic.topic_id})
@@ -66,14 +66,14 @@ async def create_event(event_id: str, data: dict):
     SET rs.weight = quality.weight
     """
     
-    params = {"event_id": event_id, "event_name": data['event_name'], "topics": data['topics'], "qualities": data['qualities']}
+    params = {"event_id": event_id, "name": data['name'], "topics": data['topics'], "qualities": data['qualities']}
     await Neo4jConnection.query(query, params)
 
 async def update_event(event_id: str, data: dict):
     
     query = """
     MATCH (e:Event {event_id: $event_id})
-    SET e.name = $event_name
+    SET e.name = $name
     WITH e
     OPTIONAL MATCH (e)-[old_rc:COVERS]->(:Topic)
     DELETE old_rc
@@ -92,5 +92,5 @@ async def update_event(event_id: str, data: dict):
     SET rs.weight = quality.weight
     """
     
-    params = {"event_id": event_id, "event_name": data['event_name'], "topics": data['topics'], "qualities": data['qualities']}
+    params = {"event_id": event_id, "name": data['name'], "topics": data['topics'], "qualities": data['qualities']}
     await Neo4jConnection.query(query, params)

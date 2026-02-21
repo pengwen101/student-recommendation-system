@@ -8,7 +8,7 @@ class SubCPLQualitiesInput(BaseModel):
 
 class SubCPLQualitiesResponse(BaseModel):
     subcpl_id: str
-    subcpl_description: str
+    name: str
     weight: float
     
 class QualityDetails(BaseModel):

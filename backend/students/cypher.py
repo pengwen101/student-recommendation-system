@@ -3,7 +3,7 @@ from backend.database import Neo4jConnection
 async def read_student_topics(student_id: str):
     query = """
         MATCH (s:Student {student_id: $student_id})-[r:INTERESTED_IN]->(t:Topic)
-        RETURN t.topic_id as topic_id, t.description as topic_description, r.weight as weight
+        RETURN t.topic_id as topic_id, t.name as name, r.weight as weight
     """
     params = {"student_id": student_id}
     response = await Neo4jConnection.query(query, params)
@@ -46,8 +46,8 @@ async def update_student_topics(student_id: str, topic_list: list):
     
 async def read_student_qualities(student_id: str):
     query = """
-        MATCH (s:Student {student_id: $student_id})-[r:LACK]->(q:Quality)
-        RETURN q.quality_id as quality_id, q.description as quality_description, r.lack_value as lack_value
+        MATCH (s:Student {student_id: $student_id})-[r:LACKS]->(q:Quality)
+        RETURN q.quality_id as quality_id, q.name as name, r.weight as weight
     """
     params = {"student_id": student_id}
     response = await Neo4jConnection.query(query, params)
@@ -58,8 +58,8 @@ async def create_student_qualities(student_id: str, quality_list: list):
         MATCH (s:Student {student_id: $student_id})
         UNWIND $qualities as quality
         MATCH (q:Quality {quality_id: quality.quality_id})
-        MERGE (s)-[r:LACK]->(q)
-        SET r.lack_value = quality.lack_value
+        MERGE (s)-[r:LACKS]->(q)
+        SET r.weight = quality.weight
     """
     params = {"student_id": student_id, "qualities": quality_list}
     await Neo4jConnection.query(query, params)
@@ -67,13 +67,13 @@ async def create_student_qualities(student_id: str, quality_list: list):
 async def update_student_qualities(student_id: str, quality_list: list):
     query = """
         MATCH (s:Student {student_id: $student_id})
-        OPTIONAL MATCH (s)-[r:LACK]->(q:Quality)
+        OPTIONAL MATCH (s)-[r:LACKS]->(q:Quality)
         DELETE r
         WITH s
         UNWIND $qualities as quality
         MATCH (q:Quality {quality_id: quality.quality_id})
-        MERGE (s)-[r:LACK]->(q)
-        SET r.lack_value = quality.lack_value
+        MERGE (s)-[r:LACKS]->(q)
+        SET r.weight = quality.weight
     """
     params = {"student_id": student_id, "qualities": quality_list}
     await Neo4jConnection.query(query, params)
@@ -81,19 +81,19 @@ async def update_student_qualities(student_id: str, quality_list: list):
 async def get_student_recommendations(student_id: str):
     query = """
         MATCH (s:Student {student_id: $student_id})
-        OPTIONAL MATCH (s)-[rl:LACK]->(:Quality)
-        WITH s, sum(coalesce(rl.lack_value, 0)) as total_lack_weight
+        OPTIONAL MATCH (s)-[rl:LACKS]->(:Quality)
+        WITH s, sum(coalesce(rl.weight, 0)) as total_lack_weight
         OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(:Topic)
         WITH s, total_lack_weight, sum(coalesce(ri.weight, 0)) as total_interest_weight
 
         MATCH (e:Event)
-        OPTIONAL MATCH (s)-[rl:LACK]->(q:Quality)<-[rp:SUPPORTS]-(e)
+        OPTIONAL MATCH (s)-[rl:LACKS]->(q:Quality)<-[rp:SUPPORTS]-(e)
         WITH s, e, total_lack_weight, total_interest_weight,
             sum(
                 CASE 
                     WHEN rl IS NULL OR rp IS NULL THEN 0.0
-                    WHEN rl.lack_value < rp.weight
-                    THEN rl.lack_value
+                    WHEN rl.weight < rp.weight
+                    THEN rl.weight
                     ELSE rp.weight
                 END
             ) as quality_intersection
@@ -110,7 +110,7 @@ async def get_student_recommendations(student_id: str):
             ) as topic_intersection
 
         RETURN e.event_id as event_id, 
-            e.name as event_name,
+            e.name,
             (0.6 * (CASE WHEN total_lack_weight > 0 
                     THEN quality_intersection / total_lack_weight 
                     ELSE 0.0 END) 

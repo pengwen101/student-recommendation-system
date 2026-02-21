@@ -3,7 +3,7 @@ from typing import List, Dict, Set
 
 class StudentTopicsResponse(BaseModel):
     topic_id: int
-    topic_description: str
+    name: str
     weight: float
     
 class TopicActionResponse(BaseModel):
@@ -20,7 +20,7 @@ class StudentTopicsInputBatch(BaseModel):
     
 class StudentRecommendation(BaseModel):
     event_id: str
-    event_name: str
+    name: str
     probability_score: float
 
 class StudentRecommendationsResponse(BaseModel):
@@ -31,8 +31,8 @@ class StudentRecommendationsResponse(BaseModel):
     
 class StudentQualitiesResponse(BaseModel):
     quality_id: str
-    quality_description: str
-    lack_value: float
+    name: str
+    weight: float
     
 class QualityActionResponse(BaseModel):
     message: str
@@ -41,7 +41,7 @@ class QualityActionResponse(BaseModel):
     
 class StudentQualitiesInput(BaseModel):
     quality_id: str
-    lack_value: float
+    weight: float
     
 class StudentQualitiesInputBatch(BaseModel):
     qualities: List[StudentQualitiesInput]

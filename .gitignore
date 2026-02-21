@@ -1,3 +1,5 @@
 .env
 final-project
 credentials
+*__pycache__
+data
