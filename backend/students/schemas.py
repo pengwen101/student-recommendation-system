@@ -3,6 +3,7 @@ from typing import List, Dict, Set
 
 class StudentTopicsResponse(BaseModel):
     topic_id: int
+    code: str
     name: str
     weight: float
     
@@ -31,6 +32,7 @@ class StudentRecommendationsResponse(BaseModel):
     
 class StudentQualitiesResponse(BaseModel):
     quality_id: str
+    code: str
     name: str
     weight: float
     

@@ -3,7 +3,7 @@ from backend.database import Neo4jConnection
 async def read_student_topics(student_id: str):
     query = """
         MATCH (s:Student {student_id: $student_id})-[r:INTERESTED_IN]->(t:Topic)
-        RETURN t.topic_id as topic_id, t.name as name, r.weight as weight
+        RETURN t.topic_id as topic_id, t.code as code, t.name as name, r.weight as weight
     """
     params = {"student_id": student_id}
     response = await Neo4jConnection.query(query, params)
@@ -47,7 +47,7 @@ async def update_student_topics(student_id: str, topic_list: list):
 async def read_student_qualities(student_id: str):
     query = """
         MATCH (s:Student {student_id: $student_id})-[r:LACKS]->(q:Quality)
-        RETURN q.quality_id as quality_id, q.name as name, r.weight as weight
+        RETURN q.quality_id as quality_id, q.code as code, q.name as name, r.weight as weight
     """
     params = {"student_id": student_id}
     response = await Neo4jConnection.query(query, params)

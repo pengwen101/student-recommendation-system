@@ -14,14 +14,16 @@ async def read_events():
     query = """
     MATCH (e:Event)
     RETURN e.event_id as event_id, 
-           e.name,
+           e.name as name,
            [(e)-[rs:SUPPORTS]->(q:Quality) | {
                 quality_id: q.quality_id,
+                code: q.code,
                 name: q.name, 
                 weight: toFloat(rs.weight)
            }] as qualities,
            [(e)-[rc:COVERS]->(t:Topic) | {
                 topic_id: t.topic_id, 
+                code: t.code,
                 name: t.name, 
                 weight: toFloat(rc.weight)
            }] as topics
@@ -34,14 +36,16 @@ async def read_event_details(event_id: str):
     query = """
     MATCH (e:Event {event_id: $event_id})
     RETURN e.event_id as event_id, 
-           e.name,
+           e.name as name,
            [(e)-[rs:SUPPORTS]->(q:Quality) | {
                 quality_id: q.quality_id,
+                code: q.code,
                 name: q.name, 
                 weight: toFloat(rs.weight)
            }] as qualities,
            [(e)-[rc:COVERS]->(t:Topic) | {
                 topic_id: t.topic_id, 
+                code: t.code,
                 name: t.name, 
                 weight: toFloat(rc.weight)
            }] as topics

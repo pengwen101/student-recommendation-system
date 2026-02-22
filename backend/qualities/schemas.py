@@ -3,17 +3,19 @@ from typing import List, Dict, Set
 
 
 class SubCPLQualitiesInput(BaseModel):
-    subcpl_id: str
+    sub_cpl_id: str
     weight: float
 
 class SubCPLQualitiesResponse(BaseModel):
-    subcpl_id: str
+    sub_cpl_id: str
+    code: str
     name: str
     weight: float
     
 class QualityDetails(BaseModel):
     quality_id: str
-    quality_description: str
+    code: str
+    name: str
     subcpls: List[SubCPLQualitiesResponse]
 
 class QualityDetailsResponse(BaseModel):
@@ -21,7 +23,8 @@ class QualityDetailsResponse(BaseModel):
     quality_details: QualityDetails
     
 class QualityDetailsInput(BaseModel):
-    quality_description: str
+    code: str
+    name: str
     subcpls: List[SubCPLQualitiesInput]
     
 class AllQualitiesResponse(BaseModel):

@@ -19,10 +19,10 @@ async def create_quality(data: QualityDetailsInput):
     new_quality_id = str(uuid.uuid4())
     data_dict = data.model_dump()
     for subcpl in data_dict['subcpls']:
-        subcpl_id = subcpl['subcpl_id']
-        subcpl_exists = await subcpl_cypher.subcpl_exists(subcpl_id)
+        sub_cpl_id = subcpl['sub_cpl_id']
+        subcpl_exists = await subcpl_cypher.subcpl_exists(sub_cpl_id)
         if not subcpl_exists:
-            raise HTTPException(status_code=404, detail=f"SubCPL ID {subcpl_id} not found")
+            raise HTTPException(status_code=404, detail=f"SubCPL ID {sub_cpl_id} not found")
     await quality_cypher.create_quality(new_quality_id, data_dict)
     return await quality_cypher.read_quality_details(new_quality_id)
 
@@ -32,9 +32,9 @@ async def update_quality(quality_id: str, data: QualityDetailsInput):
         raise HTTPException(status_code=404, detail=f"Quality ID {quality_id} not found")
     data_dict = data.model_dump()
     for subcpl in data_dict['subcpls']:
-        subcpl_id = subcpl['subcpl_id']
-        subcpl_exists = await subcpl_cypher.subcpl_exists(subcpl_id)
+        sub_cpl_id = subcpl['sub_cpl_id']
+        subcpl_exists = await subcpl_cypher.subcpl_exists(sub_cpl_id)
         if not subcpl_exists:
-            raise HTTPException(status_code=404, detail=f"SubCPL ID {subcpl_id} not found")
+            raise HTTPException(status_code=404, detail=f"SubCPL ID {sub_cpl_id} not found")
     await quality_cypher.update_quality(quality_id, data_dict)
     return await quality_cypher.read_quality_details(quality_id)

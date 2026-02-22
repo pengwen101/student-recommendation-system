@@ -12,11 +12,13 @@ class EventTopicsInput(BaseModel):
 
 class EventQualitiesResponse(BaseModel):
     quality_id: str
+    code: str
     name: str
     weight: float
     
 class EventTopicsResponse(BaseModel):
     topic_id: int
+    code: str
     name: str
     weight: float
     

@@ -1,11 +1,11 @@
 from backend.database import Neo4jConnection
 
-async def subcpl_exists(subcpl_id: str):
+async def subcpl_exists(sub_cpl_id: str):
     query = """
-    MATCH (s: SubCPL {sub_cpl_id: $subcpl_id})
+    MATCH (s: SubCpl {sub_cpl_id: $sub_cpl_id})
     RETURN count(s) > 0 as exists
     """
-    params = {"subcpl_id": subcpl_id}
+    params = {"sub_cpl_id": sub_cpl_id}
     response = await Neo4jConnection.query(query, params)
     return response[0]['exists'] if response else False
 

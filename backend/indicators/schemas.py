@@ -8,12 +8,13 @@ class QualityIndicatorsInput(BaseModel):
 
 class QualityIndicatorsResponse(BaseModel):
     quality_id: str
-    quality_description: str
+    code: str
+    name: str
     weight: float
     
 class IndicatorDetails(BaseModel):
     indicator_id: str
-    indicator_description: str
+    name: str
     qualities: List[QualityIndicatorsResponse]
 
 class IndicatorDetailsResponse(BaseModel):
