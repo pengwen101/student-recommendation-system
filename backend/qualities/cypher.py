@@ -82,3 +82,14 @@ async def update_quality(quality_id: str, data: dict):
     
     params = {"quality_id": quality_id, "name": data['name'], "code": data['code'], "subcpls": data['subcpls']}
     await Neo4jConnection.query(query, params)
+
+
+async def delete_quality(quality_id: str):
+    
+    query = """
+    MATCH (q:Quality {quality_id: $quality_id})
+    DETACH DELETE q
+    """
+    
+    params = {"quality_id": quality_id}
+    await Neo4jConnection.query(query, params)

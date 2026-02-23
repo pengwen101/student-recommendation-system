@@ -24,3 +24,8 @@ async def create_quality(data: QualityDetailsInput):
 async def update_quality(quality_id: str, data: QualityDetailsInput):
     quality_details = await services.update_quality(quality_id, data)
     return {"message": "Quality successfully updated.", "quality_details": quality_details}
+
+@qualities_router.delete("/{quality_id}")
+async def delete_quality(quality_id: str):
+    await services.delete_quality(quality_id)
+    return {"message": "Quality successfully deleted."}

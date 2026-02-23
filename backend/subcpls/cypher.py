@@ -8,4 +8,3 @@ async def subcpl_exists(sub_cpl_id: str):
     params = {"sub_cpl_id": sub_cpl_id}
     response = await Neo4jConnection.query(query, params)
     return response[0]['exists'] if response else False
-

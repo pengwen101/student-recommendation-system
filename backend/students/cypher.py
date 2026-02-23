@@ -1,37 +1,37 @@
 from backend.database import Neo4jConnection
 
-async def read_student_topics(student_id: str):
+async def read_student_topics(nrp: str):
     query = """
-        MATCH (s:Student {student_id: $student_id})-[r:INTERESTED_IN]->(t:Topic)
+        MATCH (s:Student {nrp: $nrp})-[r:INTERESTED_IN]->(t:Topic)
         RETURN t.topic_id as topic_id, t.code as code, t.name as name, r.weight as weight
     """
-    params = {"student_id": student_id}
+    params = {"nrp": nrp}
     response = await Neo4jConnection.query(query, params)
     return response
 
-async def student_exists(student_id: str):
+async def student_exists(nrp: str):
     query = """
-    MATCH (s: Student {student_id: $student_id})
+    MATCH (s: Student {nrp: $nrp})
     RETURN count(s) > 0 as exists
     """
-    params = {"student_id": student_id}
+    params = {"nrp": nrp}
     response = await Neo4jConnection.query(query, params)
     return response[0]['exists'] if response else False
     
-async def create_student_topics(student_id: str, topic_list: list):
+async def create_student_topics(nrp: str, topic_list: list):
     query = """
-        MATCH (s:Student {student_id: $student_id})
+        MATCH (s:Student {nrp: $nrp})
         UNWIND $topics as topic
         MATCH (t:Topic {topic_id: topic.topic_id})
         MERGE (s)-[r:INTERESTED_IN]->(t)
         SET r.weight = topic.weight
     """
-    params = {"student_id": student_id, "topics": topic_list}
+    params = {"nrp": nrp, "topics": topic_list}
     await Neo4jConnection.query(query, params)
 
-async def update_student_topics(student_id: str, topic_list: list):
+async def update_student_topics(nrp: str, topic_list: list):
     query = """
-        MATCH (s:Student {student_id: $student_id})
+        MATCH (s:Student {nrp: $nrp})
         OPTIONAL MATCH (s)-[r:INTERESTED_IN]->(:Topic)
         DELETE r
         WITH s
@@ -40,33 +40,33 @@ async def update_student_topics(student_id: str, topic_list: list):
         MERGE (s)-[r:INTERESTED_IN]->(t)
         SET r.weight = topic.weight
     """
-    params = {"student_id": student_id, "topics": topic_list}
+    params = {"nrp": nrp, "topics": topic_list}
     await Neo4jConnection.query(query, params)
     
     
-async def read_student_qualities(student_id: str):
+async def read_student_qualities(nrp: str):
     query = """
-        MATCH (s:Student {student_id: $student_id})-[r:LACKS]->(q:Quality)
+        MATCH (s:Student {nrp: $nrp})-[r:LACKS]->(q:Quality)
         RETURN q.quality_id as quality_id, q.code as code, q.name as name, r.weight as weight
     """
-    params = {"student_id": student_id}
+    params = {"nrp": nrp}
     response = await Neo4jConnection.query(query, params)
     return response
     
-async def create_student_qualities(student_id: str, quality_list: list):
+async def create_student_qualities(nrp: str, quality_list: list):
     query = """
-        MATCH (s:Student {student_id: $student_id})
+        MATCH (s:Student {nrp: $nrp})
         UNWIND $qualities as quality
         MATCH (q:Quality {quality_id: quality.quality_id})
         MERGE (s)-[r:LACKS]->(q)
         SET r.weight = quality.weight
     """
-    params = {"student_id": student_id, "qualities": quality_list}
+    params = {"nrp": nrp, "qualities": quality_list}
     await Neo4jConnection.query(query, params)
 
-async def update_student_qualities(student_id: str, quality_list: list):
+async def update_student_qualities(nrp: str, quality_list: list):
     query = """
-        MATCH (s:Student {student_id: $student_id})
+        MATCH (s:Student {nrp: $nrp})
         OPTIONAL MATCH (s)-[r:LACKS]->(q:Quality)
         DELETE r
         WITH s
@@ -75,12 +75,12 @@ async def update_student_qualities(student_id: str, quality_list: list):
         MERGE (s)-[r:LACKS]->(q)
         SET r.weight = quality.weight
     """
-    params = {"student_id": student_id, "qualities": quality_list}
+    params = {"nrp": nrp, "qualities": quality_list}
     await Neo4jConnection.query(query, params)
     
-async def get_student_recommendations(student_id: str):
+async def get_student_recommendations(nrp: str):
     query = """
-        MATCH (s:Student {student_id: $student_id})
+        MATCH (s:Student {nrp: $nrp})
         OPTIONAL MATCH (s)-[rl:LACKS]->(:Quality)
         WITH s, sum(coalesce(rl.weight, 0)) as total_lack_weight
         OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(:Topic)
@@ -122,5 +122,5 @@ async def get_student_recommendations(student_id: str):
         ORDER BY probability_score DESC
         LIMIT 10
     """
-    params = {"student_id": student_id}
+    params = {"nrp": nrp}
     return await Neo4jConnection.query(query, params)

@@ -38,3 +38,9 @@ async def update_quality(quality_id: str, data: QualityDetailsInput):
             raise HTTPException(status_code=404, detail=f"SubCPL ID {sub_cpl_id} not found")
     await quality_cypher.update_quality(quality_id, data_dict)
     return await quality_cypher.read_quality_details(quality_id)
+
+async def delete_quality(quality_id: str):
+    quality_exists = await quality_cypher.quality_exists(quality_id)
+    if not quality_exists:
+        raise HTTPException(status_code=404, detail=f"Quality ID {quality_id} not found")
+    await quality_cypher.delete_quality(quality_id)
