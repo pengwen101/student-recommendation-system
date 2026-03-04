@@ -10,10 +10,15 @@ const Navbar = () => {
     };
 
     return (
-        <nav style={{ padding: '1rem', background: '#f0f0f0', display: 'flex', gap: '20px' }}>
-            <Link to="/home"><strong>Home</strong> (Recommendations)</Link>
-            <Link to="/profile"><strong>Profile</strong></Link>
-            <button onClick={handleLogout} style={{ marginLeft: 'auto' }}>Logout</button>
+        <nav className= "py-4 px-8 w-screen bg-white flex justify-between gap-x-2">
+            <div className="flex gap-x-2">
+                <div className="flex items-center justify-center text-black text-2xl">Student Resource Recommendation</div>
+            </div>
+            <div className="flex gap-x-2">
+                <Link className="flex items-center justify-center" to="/home"><strong>Home</strong></Link>
+                <Link className="flex items-center justify-center mr-4" to="/profile"><strong>Profile</strong></Link>
+                <button onClick={handleLogout}>Logout</button>
+            </div>
         </nav>
     );
 };

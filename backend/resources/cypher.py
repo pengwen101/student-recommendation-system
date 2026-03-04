@@ -24,12 +24,10 @@ async def read_resources():
                sub_cpl_id: s.sub_cpl_id,
                code: s.code,
                name: s.name,
-               weight: toFloat(rt1.weight),
                qualities: [(r)-[rt2:TARGETS {sub_cpl_id: s.sub_cpl_id}]->(q:Quality) | {
                    quality_id: q.quality_id,
                    code: q.code,
-                   name: q.name,
-                   weight: toFloat(rt2.weight)
+                   name: q.name
                }]
            }] as subcpls,
            [(r)-[rc:COVERS]->(t:Topic) | {
@@ -55,7 +53,6 @@ async def read_resource_details(resource_id: str):
     RETURN r.resource_id as resource_id, 
            r.name as name,
            r.type as type,
-           r.name as name,
            r.description as description,
            r.start_datetime as start_datetime,
            r.end_datetime as end_datetime,
@@ -65,12 +62,10 @@ async def read_resource_details(resource_id: str):
                sub_cpl_id: s.sub_cpl_id,
                code: s.code,
                name: s.name,
-               weight: toFloat(rt1.weight),
                qualities: [(r)-[rt2:TARGETS {sub_cpl_id: s.sub_cpl_id}]->(q:Quality) | {
                    quality_id: q.quality_id,
                    code: q.code,
-                   name: q.name,
-                   weight: toFloat(rt2.weight)
+                   name: q.name
                }]
            }] as subcpls,
            [(r)-[rc:COVERS]->(t:Topic) | {
@@ -109,12 +104,10 @@ async def create_resource(resource_id: str, data: dict):
     UNWIND $subcpls as subcpl
     MATCH (s:SubCpl {sub_cpl_id: subcpl.sub_cpl_id})
     MERGE (r)-[rt1:TARGETS]->(s)
-    SET rt1.weight = subcpl.weight
-    WITH r, s, rt1, subcpl.qualities AS qualities
+    WITH r, s, rt1, subcpl, subcpl.qualities AS qualities
     UNWIND qualities as quality
     MATCH (q:Quality {quality_id: quality.quality_id})
     MERGE (r)-[rt2:TARGETS {sub_cpl_id: subcpl.sub_cpl_id}]->(q)
-    SET rt2.weight = quality.weight
     
     WITH DISTINCT r
     
@@ -122,14 +115,7 @@ async def create_resource(resource_id: str, data: dict):
     MATCH (r)-[rt2:TARGETS {sub_cpl_id: s.sub_cpl_id}]->(q:Quality)
     MATCH (s)-[sq:HAS_QUALITY]->(q)
     
-    WITH r, q, (rt1.weight * rt2.weight * 
-                CASE 
-                    WHEN sq.weight IS NULL THEN 1.0 
-                    WHEN isNaN(toFloat(sq.weight)) THEN 1.0 
-                    ELSE toFloat(sq.weight) 
-                END) AS calculated_weight
-    
-    WITH r, q, max(calculated_weight) as calculated_weight
+    WITH r, q, max(sq.weight) as calculated_weight
     
     MERGE (r)-[rs:SUPPORTS]->(q)
     SET rs.weight = calculated_weight
@@ -176,12 +162,10 @@ async def update_resource(resource_id: str, data: dict):
     UNWIND $subcpls as subcpl
     MATCH (s:SubCpl {sub_cpl_id: subcpl.sub_cpl_id})
     MERGE (r)-[rt1:TARGETS]->(s)
-    SET rt1.weight = subcpl.weight
     WITH r, s, rt1, subcpl.qualities AS qualities
     UNWIND qualities as quality
     MATCH (q:Quality {quality_id: quality.quality_id})
     MERGE (r)-[rt2:TARGETS {sub_cpl_id: subcpl.sub_cpl_id}]->(q)
-    SET rt2.weight = quality.weight
     
     WITH DISTINCT r
     
@@ -189,14 +173,9 @@ async def update_resource(resource_id: str, data: dict):
     MATCH (r)-[rt2:TARGETS {sub_cpl_id: s.sub_cpl_id}]->(q:Quality)
     MATCH (s)-[sq:HAS_QUALITY]->(q)
     
-    WITH r, q, (rt1.weight * rt2.weight * 
-                CASE 
-                    WHEN sq.weight IS NULL THEN 1.0 
-                    WHEN isNaN(toFloat(sq.weight)) THEN 1.0 
-                    ELSE toFloat(sq.weight) 
-                END) AS calculated_weight
+    WITH r, q, sq.weight
     
-    WITH r, q, max(calculated_weight) as calculated_weight
+    WITH r, q, max(sq.weight) as calculated_weight
     
     MERGE (r)-[rs:SUPPORTS]->(q)
     SET rs.weight = calculated_weight

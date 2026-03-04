@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Dict, Set
+from backend.resources.schemas import ResourceDetails
 
 class StudentTopicsResponse(BaseModel):
     topic_id: int
@@ -20,8 +21,7 @@ class StudentTopicsInputBatch(BaseModel):
     topics: List[StudentTopicsInput]
     
 class StudentRecommendation(BaseModel):
-    event_id: str
-    name: str
+    resource: ResourceDetails
     probability_score: float
 
 class StudentRecommendationsResponse(BaseModel):

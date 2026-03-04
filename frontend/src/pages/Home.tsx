@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
-import type { EventItem, User } from '../types';
+import type { ResourceRecommendations } from '../types';
+import ResourceCard from "../components/ResourceCard.tsx";
 
 const Home = () => {
-    const [events, setEvents] = useState<EventItem[]>([]);
+    const [recommendations, setRecommendations] = useState<ResourceRecommendations | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -15,13 +16,12 @@ const Home = () => {
                     window.location.href = '/login';
                     return;
                 }
-                const user: User = userRes.data.user;
 
                 // 2. Use ID to get Recommendations
-                const recRes = await api.get(`/student/recommendations/${user.student_id}`);
+                const recommendations = await api.get(`/student/recommendations/${userRes.data.user.nrp}`);
                 
                 // Assuming backend returns { recommendations: [...] }
-                setEvents(recRes.data.recommendations || []); 
+                setRecommendations(recommendations.data || null); 
             } catch (error) {
                 console.error("Failed to load home", error);
             } finally {
@@ -32,19 +32,20 @@ const Home = () => {
         fetchData();
     }, []);
 
-    if (loading) return <div>Loading Recommendations...</div>;
-
     return (
-        <div style={{ padding: '20px' }}>
-            <h1>Recommended Events for You</h1>
-            <div style={{ display: 'grid', gap: '15px' }}>
-                {events.map(event => (
-                    <div key={event.event_id} style={{ border: '1px solid #ccc', padding: '15px' }}>
-                        <h3>{event.event_name}</h3>
-                        <small>Match Score: {event.probability_score}%</small>
-                    </div>
-                ))}
-                {events.length === 0 && <p>No recommendations found yet.</p>}
+        <div className= "px-8 py-8">
+            <div className = "text-xl mb-4">Recommended resources for you</div>
+            <div className="flex gap-x-4">
+                {loading ? (
+                <div className="text-gray-500 animate-pulse">Loading Recommendations...</div>
+                ) : (
+                    recommendations?.recommendations?.map((rec, index) => (
+                        <ResourceCard 
+                            key={rec.resource.resource_id || index}
+                            resource={rec.resource} 
+                        />
+                    ))
+                )}
             </div>
         </div>
     );

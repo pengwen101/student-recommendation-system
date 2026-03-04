@@ -15,18 +15,21 @@ class ResourceStatus(str, Enum):
     
 class ResourceQualitiesInput(BaseModel):
     quality_id: str
-    weight: float
     
 class ResourceSubCplsInput(BaseModel):
     sub_cpl_id: str
-    weight: float
     qualities: List[ResourceQualitiesInput]
     
 class ResourceTopicsInput(BaseModel):
-    topic_id: int
+    topic_id: str
     weight: float
 
 class ResourceQualitiesResponse(BaseModel):
+    quality_id: str
+    code: str
+    name: str
+    
+class ResourceCalculatedQualitiesResponse(BaseModel):
     quality_id: str
     code: str
     name: str
@@ -36,11 +39,10 @@ class ResourceSubCplsResponse(BaseModel):
     sub_cpl_id: str
     code: str
     name: str
-    weight: float
     qualities: List[ResourceQualitiesResponse]
     
 class ResourceTopicsResponse(BaseModel):
-    topic_id: int
+    topic_id: str
     code: str
     name: str
     weight: float
@@ -56,7 +58,7 @@ class ResourceDetails(BaseModel):
     is_active: bool
     subcpls: List[ResourceSubCplsResponse]
     topics: List[ResourceTopicsResponse]
-    calculated_qualities: List[ResourceQualitiesResponse]
+    calculated_qualities: List[ResourceCalculatedQualitiesResponse]
 
 class ResourceDetailsResponse(BaseModel):
     message: str

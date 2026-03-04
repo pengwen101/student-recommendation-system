@@ -1,15 +1,16 @@
 const Login = () => {
     const handleGoogleLogin = () => {
-        // Redirect browser to FastAPI backend
         window.location.href = "http://localhost:8000/login";
     };
 
     return (
-        <div style={{ textAlign: 'center', marginTop: '100px' }}>
-            <h1>Welcome to Student Portal</h1>
-            <button onClick={handleGoogleLogin} style={{ padding: '10px 20px', cursor: 'pointer' }}>
-                Sign in with Google
-            </button>
+        <div className="h-screen flex justify-center items-center">
+            <div className="w-3/4 flex flex-col justify-center items-center gap-6 text-center">
+                <h1>Welcome to Student Resource Recommendation System</h1>
+                <button className="px-4 py-2 rounded-full cursor-pointer" onClick={handleGoogleLogin}>
+                    Sign in with Google
+                </button>
+            </div>
         </div>
     );
 };

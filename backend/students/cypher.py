@@ -86,9 +86,9 @@ async def get_student_recommendations(nrp: str):
         OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(:Topic)
         WITH s, total_lack_weight, sum(coalesce(ri.weight, 0)) as total_interest_weight
 
-        MATCH (e:Event)
-        OPTIONAL MATCH (s)-[rl:LACKS]->(q:Quality)<-[rp:SUPPORTS]-(e)
-        WITH s, e, total_lack_weight, total_interest_weight,
+        MATCH (r:Resource)
+        OPTIONAL MATCH (s)-[rl:LACKS]->(q:Quality)<-[rp:SUPPORTS]-(r)
+        WITH s, r, total_lack_weight, total_interest_weight,
             sum(
                 CASE 
                     WHEN rl IS NULL OR rp IS NULL THEN 0.0
@@ -98,8 +98,8 @@ async def get_student_recommendations(nrp: str):
                 END
             ) as quality_intersection
 
-        OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(t:Topic)<-[rt:TAGGED_WITH]-(e)
-        WITH s, e, total_lack_weight, total_interest_weight, quality_intersection,
+        OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(t:Topic)<-[rt:COVERS]-(r)
+        WITH s, r, total_lack_weight, total_interest_weight, quality_intersection,
             sum(
                 CASE 
                     WHEN ri IS NULL OR rt IS NULL THEN 0.0
@@ -109,8 +109,40 @@ async def get_student_recommendations(nrp: str):
                 END
             ) as topic_intersection
 
-        RETURN e.event_id as event_id, 
-            e.name,
+        RETURN {
+            resource_id: r.resource_id,
+            type: r.type,
+            name: r.name,
+            description: r.description,
+            start_datetime: r.start_datetime,
+            end_datetime: r.end_datetime,
+            status: r.status,
+            is_active: r.is_active,
+            subcpls: [(r)-[rt1:TARGETS]->(sc:SubCpl) | {
+                sub_cpl_id: sc.sub_cpl_id,
+                code: sc.code,
+                name: sc.name,
+                qualities: [
+                    (r)-[rt2:TARGETS {sub_cpl_id: sc.sub_cpl_id}]->(q:Quality) | {
+                        quality_id: q.quality_id,
+                        code: q.code,
+                        name: q.name
+                    }
+                ]
+            }],
+            topics: [(r)-[rc:COVERS]->(t:Topic) | {
+                topic_id: t.topic_id,
+                code: t.code,
+                name: t.name,
+                weight: rc.weight
+            }],
+            calculated_qualities: [(r)-[rs:SUPPORTS]->(q:Quality) | {
+                    quality_id: q.quality_id, 
+                    code: q.code,
+                    name: q.name,
+                    weight: rs.weight
+                }]
+            } as resource,
             (0.6 * (CASE WHEN total_lack_weight > 0 
                     THEN quality_intersection / total_lack_weight 
                     ELSE 0.0 END) 

@@ -4,6 +4,7 @@ from backend.resources import services
 from typing import List
 
 resources_router = APIRouter(prefix="/resource", tags=["resource"])
+recommendation_configs_router = APIRouter(prefix="/recommendation-config", tags=["config"])
 
 @resources_router.get("", response_model=AllResourcesResponse)
 async def read_resources():

@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Request
 from backend.students import routers as student_routers
-from backend.events import routers as event_routers
+from backend.resources import routers as resource_routers
 from backend.qualities import routers as quality_routers
 from backend.topics import routers as topic_routers
+from backend.subcpls import routers as subcpl_routers
 from contextlib import asynccontextmanager
 from backend.database import Neo4jConnection
 from fastapi.middleware.cors import CORSMiddleware
@@ -59,6 +60,8 @@ async def auth(request: Request):
 @app.get("/users/me")
 async def get_current_user(request: Request):
     user = request.session.get('user')
+    if user.get("hd") == "john.petra.ac.id":
+        user['nrp'] = user['email'].split("@")[0]
     if user:
         return {"authenticated": True, "user": user}
     return {"authenticated": False}
@@ -71,6 +74,7 @@ async def logout(request: Request):
 app.include_router(student_routers.topics_router)
 app.include_router(student_routers.recommendations_router)
 app.include_router(student_routers.qualities_router)
-app.include_router(event_routers.events_router)
+app.include_router(resource_routers.resources_router)
 app.include_router(quality_routers.qualities_router)
 app.include_router(topic_routers.topics_router)
+app.include_router(subcpl_routers.subcpls_router)

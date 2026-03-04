@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
-import type { User, Quality, Topic } from '../types';
+import type { User, CalculatedQuality, Topic } from '../types';
 
 const Profile = () => {
     const [user, setUser] = useState<User | null>(null);
-    const [qualities, setQualities] = useState<Quality[]>([]);
+    const [qualities, setQualities] = useState<CalculatedQuality[]>([]);
     const [topics, setTopics] = useState<Topic[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -22,8 +22,8 @@ const Profile = () => {
 
                 // 2. Fetch Qualities and Topics in Parallel (Fast)
                 const [qualitiesRes, topicsRes] = await Promise.all([
-                    api.get(`/student/qualities/${userData.student_id}`),
-                    api.get(`/student/topics/${userData.student_id}`)
+                    api.get(`/student/qualities/${userData.nrp}`),
+                    api.get(`/student/topics/${userData.nrp}`)
                 ]);
 
                 setQualities(qualitiesRes.data.qualities || []);
@@ -58,7 +58,7 @@ const Profile = () => {
                     <ul>
                         {qualities.map(q => (
                             <li key={q.quality_id}>
-                                <strong>{q.quality_description}</strong> (Score: {q.lack_value})
+                                <strong>{q.name}</strong> (Score: {q.weight})
                             </li>
                         ))}
                     </ul>
@@ -70,7 +70,7 @@ const Profile = () => {
                     <ul>
                         {topics.map(t => (
                             <li key={t.topic_id}>
-                                <strong>{t.topic_description}</strong> (Weight: {t.weight})
+                                <strong>{t.name}</strong> (Weight: {t.weight})
                             </li>
                         ))}
                     </ul>
