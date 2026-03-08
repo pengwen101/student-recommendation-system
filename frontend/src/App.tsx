@@ -1,25 +1,41 @@
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom';
-import Navbar from './components/Navbar';
-import Login from './pages/Login';
-import Home from './pages/Home';
-import Profile from './pages/Profile';
+import Navbar from './Student/components/Navbar';
+import StudentLogin from './Student/pages/Login';
+import AdminLogin from './Admin/pages/Login';
+import Home from './Student/pages/Home';
+import ResourceDetails from './Student/pages/ResourceDetails';
+import Profile from './Student/pages/Profile';
+import Resources from './Admin/pages/Resources';
+import ResourceForm from './Admin/pages/ResourceForm';
+import Layout from './Admin/components/Layout';
+import { Toaster } from "react-hot-toast";
 
-// Layout Component: Renders Navbar + Current Page
+
 const MainLayout = () => {
   return (
     <div>
-      <Navbar />
+      <Navbar/>
       <Outlet />
     </div>
+  );
+};
+
+const AdminMainLayout = () => {
+  return (
+      <Layout>
+        <Outlet />
+      </Layout>
   );
 };
 
 function App() {
   return (
     <BrowserRouter>
+      <Toaster position="top-right" reverseOrder={false} />
       <Routes>
         {/* Public Route */}
-        <Route path="/login" element={<Login />} />
+        <Route path="/student/login" element={<StudentLogin />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
 
         {/* Protected Routes (Wrapped in Layout) */}
         <Route element={<MainLayout />}>
@@ -27,7 +43,14 @@ function App() {
            <Route path="/" element={<Navigate to="/home" replace />} />
            
            <Route path="/home" element={<Home />} />
+           <Route path="/resource/:resource_id" element={<ResourceDetails />} />
            <Route path="/profile" element={<Profile />} />
+        </Route>
+
+        <Route element={<AdminMainLayout />}>
+          <Route path="/admin" element={<Navigate to="/resource" replace />} />
+          <Route path="/resource" element={<Resources/>}></Route>
+          <Route path="/resource/edit/:resource_id" element={<ResourceForm/>}></Route>
         </Route>
       </Routes>
     </BrowserRouter>

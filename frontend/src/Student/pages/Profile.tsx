@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import api from '../api/axios';
-import type { User, CalculatedQuality, Topic } from '../types';
+import api from '../../api/axios';
+import type { User, CalculatedQuality, Topic } from '../../types';
 
 const Profile = () => {
     const [user, setUser] = useState<User | null>(null);

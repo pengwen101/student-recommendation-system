@@ -162,7 +162,7 @@ async def update_resource(resource_id: str, data: dict):
     UNWIND $subcpls as subcpl
     MATCH (s:SubCpl {sub_cpl_id: subcpl.sub_cpl_id})
     MERGE (r)-[rt1:TARGETS]->(s)
-    WITH r, s, rt1, subcpl.qualities AS qualities
+    WITH r, s, rt1, subcpl, subcpl.qualities AS qualities
     UNWIND qualities as quality
     MATCH (q:Quality {quality_id: quality.quality_id})
     MERGE (r)-[rt2:TARGETS {sub_cpl_id: subcpl.sub_cpl_id}]->(q)
@@ -172,8 +172,6 @@ async def update_resource(resource_id: str, data: dict):
     MATCH (r)-[rt1:TARGETS]->(s:SubCpl)
     MATCH (r)-[rt2:TARGETS {sub_cpl_id: s.sub_cpl_id}]->(q:Quality)
     MATCH (s)-[sq:HAS_QUALITY]->(q)
-    
-    WITH r, q, sq.weight
     
     WITH r, q, max(sq.weight) as calculated_weight
     

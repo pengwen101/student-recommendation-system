@@ -42,8 +42,15 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
-@app.get("/login")
-async def login(request: Request):
+@app.get("/student/login")
+async def student_login(request: Request):
+    request.session['login_intent'] = 'student'
+    redirect_uri = request.url_for('auth')
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+@app.get("/admin/login")
+async def admin_login(request: Request):
+    request.session['login_intent'] = 'admin'
     redirect_uri = request.url_for('auth')
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
@@ -52,19 +59,45 @@ async def auth(request: Request):
     try:
         token = await oauth.google.authorize_access_token(request)
         user = token.get('userinfo')
-        request.session['user'] = user
-        return RedirectResponse(url='http://localhost:5173')
+        print(user)
+        email = user.get('email')
+        
+        intent = request.session.pop('login_intent', 'student')
+        
+        if intent == 'student':
+            if not email.endswith("@john.petra.ac.id"):
+                return RedirectResponse(url='http://localhost:5173/login?error=invalid_domain')
+            
+            nrp = email.split("@")[0]
+            await Neo4jConnection.query("MERGE (s:Student {email: $email}) ON CREATE SET s.nrp = $nrp, s.name = $name", {
+                "email": email,
+                "nrp": nrp,
+                "name": user.get("name")
+            })
+            request.session['user'] = {**user, "nrp": nrp, "role": "student"}
+            return RedirectResponse(url='http://localhost:5173')
+        elif intent == 'admin':
+            is_root_admin = email == os.getenv("ROOT_ADMIN_EMAIL")
+            if is_root_admin:
+                request.session['user'] = {**user, "role": "admin"}
+                return RedirectResponse(url='http://localhost:5173/admin')
+            else:
+                await Neo4jConnection.query("MERGE (a:Admin {email: $email}) ON CREATE SET a.admin_id = randomUUID(), a.name = $name, a.approved = false", {
+                    "email": email,
+                    "name": user.get("name")
+                })
+                request.session['user'] = {**user, "role": "pending_admin"}
+                return RedirectResponse(url='http://localhost:5173/admin/login')
     except Exception as e:
         return {"error": str(e)}
 
 @app.get("/users/me")
 async def get_current_user(request: Request):
     user = request.session.get('user')
-    if user.get("hd") == "john.petra.ac.id":
-        user['nrp'] = user['email'].split("@")[0]
-    if user:
+    if not user:
+        return {"authenticated": False}
+    else:
         return {"authenticated": True, "user": user}
-    return {"authenticated": False}
 
 @app.get("/logout")
 async def logout(request: Request):

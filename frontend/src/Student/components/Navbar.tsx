@@ -1,12 +1,12 @@
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../api/axios';
+import api from '../../api/axios';
 
 const Navbar = () => {
     const navigate = useNavigate();
 
     const handleLogout = async () => {
         await api.get('/logout');
-        navigate('/login');
+        navigate('/student/login');
     };
 
     return (

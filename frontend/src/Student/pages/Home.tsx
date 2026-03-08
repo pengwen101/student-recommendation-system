@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import api from '../api/axios';
-import type { ResourceRecommendations } from '../types';
+import api from '../../api/axios.tsx';
+import type { ResourceRecommendations } from '../../types.ts';
 import ResourceCard from "../components/ResourceCard.tsx";
 
 const Home = () => {
@@ -10,17 +10,12 @@ const Home = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // 1. Get Current User to find their ID
                 const userRes = await api.get('/users/me');
                 if (!userRes.data.authenticated) {
-                    window.location.href = '/login';
+                    window.location.href = '/student/login';
                     return;
                 }
-
-                // 2. Use ID to get Recommendations
                 const recommendations = await api.get(`/student/recommendations/${userRes.data.user.nrp}`);
-                
-                // Assuming backend returns { recommendations: [...] }
                 setRecommendations(recommendations.data || null); 
             } catch (error) {
                 console.error("Failed to load home", error);
@@ -28,7 +23,6 @@ const Home = () => {
                 setLoading(false);
             }
         };
-
         fetchData();
     }, []);
 
@@ -39,9 +33,9 @@ const Home = () => {
                 {loading ? (
                 <div className="text-gray-500 animate-pulse">Loading Recommendations...</div>
                 ) : (
-                    recommendations?.recommendations?.map((rec, index) => (
+                    recommendations?.recommendations?.map((rec) => (
                         <ResourceCard 
-                            key={rec.resource.resource_id || index}
+                            key={rec.resource.resource_id}
                             resource={rec.resource} 
                         />
                     ))
