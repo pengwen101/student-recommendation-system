@@ -188,3 +188,27 @@ async def update_resource(resource_id: str, data: dict):
               "status": data.get("status", None),
               "topics": data['topics'], "subcpls": data['subcpls']}
     await Neo4jConnection.query(query, params)
+
+async def activate_resource(resource_id: str):
+    query = """
+    MATCH (r:Resource {resource_id: $resource_id})
+    SET r.is_active = true
+    """
+    params = {"resource_id": resource_id}
+    await Neo4jConnection.query(query, params)
+    
+async def archive_resource(resource_id: str):
+    query = """
+    MATCH (r:Resource {resource_id: $resource_id})
+    SET r.is_active = false
+    """
+    params = {"resource_id": resource_id}
+    await Neo4jConnection.query(query, params)
+
+async def delete_resource(resource_id: str):
+    query = """
+    MATCH (r:Resource {resource_id: $resource_id})
+    DETACH DELETE r
+    """
+    params = {"resource_id": resource_id}
+    await Neo4jConnection.query(query, params)

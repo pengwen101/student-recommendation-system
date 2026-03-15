@@ -69,6 +69,18 @@ async def update_student_qualities(nrp: str, qualities: List[StudentQualitiesInp
     await student_cypher.update_student_qualities(nrp, qualities_list)
     return await student_cypher.read_student_qualities(nrp)
 
+async def has_topics(nrp: str):
+    student_exists = await student_cypher.student_exists(nrp)
+    if not student_exists:
+        raise HTTPException(status_code=404, detail="Student not found")
+    return await student_cypher.has_topics(nrp)
+
+async def has_qualities(nrp: str):
+    student_exists = await student_cypher.student_exists(nrp)
+    if not student_exists:
+        raise HTTPException(status_code=404, detail="Student not found")
+    return await student_cypher.has_qualities(nrp)
+
 async def get_student_recommendations(nrp: str):
     student_exists = await student_cypher.student_exists(nrp)
     if not student_exists:

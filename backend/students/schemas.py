@@ -3,7 +3,7 @@ from typing import List, Dict, Set
 from backend.resources.schemas import ResourceDetails
 
 class StudentTopicsResponse(BaseModel):
-    topic_id: int
+    topic_id: str
     code: str
     name: str
     weight: float
@@ -14,7 +14,7 @@ class TopicActionResponse(BaseModel):
     topics: List[StudentTopicsResponse]
     
 class StudentTopicsInput(BaseModel):
-    topic_id: int
+    topic_id: str
     weight: float
     
 class StudentTopicsInputBatch(BaseModel):

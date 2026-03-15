@@ -45,6 +45,13 @@ const Navbar = () => {
                         >
                             Curriculum
                         </Link>
+
+                        <Link 
+                            to="/manage-admins" 
+                            className="px-4 py-2.5 rounded-lg text-gray-700 font-medium hover:bg-gray-100 hover:text-blue-600 transition-colors"
+                        >
+                            Manage Admins
+                        </Link>
                     </div>
                 </div>
                 <div className="pt-4 border-t border-gray-100">

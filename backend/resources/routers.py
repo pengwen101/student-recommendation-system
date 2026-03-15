@@ -25,3 +25,18 @@ async def create_resource(data: ResourceDetailsInput):
 async def update_resource(resource_id: str, data: ResourceDetailsInput):
     resource_details = await services.update_resource(resource_id, data)
     return {"message": "Resource successfully updated.", "resource_details": resource_details}
+
+@resources_router.put("/activate/{resource_id}", response_model=ResourceDetailsResponse)
+async def activate_resource(resource_id: str):
+    resource_details = await services.activate_resource(resource_id)
+    return {"message": "Resource successfully activated.", "resource_details": resource_details}
+
+@resources_router.put("/archive/{resource_id}", response_model=ResourceDetailsResponse)
+async def archive_resource(resource_id: str):
+    resource_details = await services.archive_resource(resource_id)
+    return {"message": "Resource successfully archived.", "resource_details": resource_details}
+
+@resources_router.delete("/{resource_id}", response_model=ResourceDetailsResponse)
+async def delete_resource(resource_id: str):
+    resource_details = await services.delete_resource(resource_id)
+    return {"message": "Resource successfully deleted.", "resource_details": resource_details}

@@ -78,6 +78,24 @@ async def update_student_qualities(nrp: str, quality_list: list):
     params = {"nrp": nrp, "qualities": quality_list}
     await Neo4jConnection.query(query, params)
     
+async def has_topics(nrp: str):
+    query = """
+        MATCH (s:Student {nrp: $nrp})-[ri:INTERESTED_IN]->(t:Topic)
+        RETURN count(ri) > 0 as has_topics
+    """
+    params = {"nrp": nrp}
+    response = await Neo4jConnection.query(query, params)
+    return response[0]['has_topics'] if response else False
+
+async def has_qualities(nrp: str):
+    query = """
+        MATCH (s:Student {nrp: $nrp})-[rl:LACKS]->(q:Quality)
+        RETURN count(rl) > 0 as has_qualities
+    """
+    params = {"nrp": nrp}
+    response = await Neo4jConnection.query(query, params)
+    return response[0]['has_qualities'] if response else False
+
 async def get_student_recommendations(nrp: str):
     query = """
         MATCH (s:Student {nrp: $nrp})

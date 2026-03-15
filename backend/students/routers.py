@@ -38,6 +38,14 @@ async def update_student_qualities(nrp: str, data: StudentQualitiesInputBatch):
     qualities = await services.update_student_qualities(nrp, data.qualities)
     return {"message": "Student qualities relations successfully updated.", "count": len(qualities), "qualities": qualities}
 
+@topics_router.get("/has_topics/{nrp}", response_model=bool)
+async def has_student_topics(nrp: str):
+    return await services.has_topics(nrp)
+
+@qualities_router.get("/has_qualities/{nrp}", response_model=bool)
+async def has_student_qualities(nrp: str):
+    return await services.has_qualities(nrp)
+
 @recommendations_router.get("/{nrp}", response_model=StudentRecommendationsResponse)
 async def get_student_recommendations(nrp: str):
     recommendations = await services.get_student_recommendations(nrp)

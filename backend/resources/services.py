@@ -59,3 +59,24 @@ async def update_resource(resource_id: str, data: ResourceDetailsInput):
             raise HTTPException(status_code=404, detail=f"Topic ID {topic_id} not found")
     await resource_cypher.update_resource(resource_id, data_dict)
     return await resource_cypher.read_resource_details(resource_id)
+
+async def archive_resource(resource_id: str):
+    resource_exists = await resource_cypher.resource_exists(resource_id)
+    if not resource_exists:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    await resource_cypher.archive_resource(resource_id)
+    return await resource_cypher.read_resource_details(resource_id)
+
+async def activate_resource(resource_id: str):
+    resource_exists = await resource_cypher.resource_exists(resource_id)
+    if not resource_exists:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    await resource_cypher.activate_resource(resource_id)
+    return await resource_cypher.read_resource_details(resource_id)
+
+async def delete_resource(resource_id: str):
+    resource_exists = await resource_cypher.resource_exists(resource_id)
+    if not resource_exists:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    await resource_cypher.delete_resource(resource_id)
+    return {"message": "Resource successfully deleted."}

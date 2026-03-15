@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import api from '../../api/axios';
-import type { User, CalculatedQuality, Topic } from '../../types';
+import type { Student, CalculatedQuality, Topic } from '../../types';
 
 const Profile = () => {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<Student | null>(null);
     const [qualities, setQualities] = useState<CalculatedQuality[]>([]);
     const [topics, setTopics] = useState<Topic[]>([]);
     const [loading, setLoading] = useState(true);
@@ -17,7 +17,7 @@ const Profile = () => {
                     window.location.href = '/login';
                     return;
                 }
-                const userData: User = userRes.data.user;
+                const userData: Student = userRes.data.user;
                 setUser(userData);
 
                 // 2. Fetch Qualities and Topics in Parallel (Fast)

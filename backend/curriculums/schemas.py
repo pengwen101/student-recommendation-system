@@ -1,11 +1,11 @@
 from pydantic import BaseModel
 from typing import List, Dict, Set
 
-class QuestionResponse:
+class QuestionResponse(BaseModel):
     question_id: str
     name: str
     
-class IndicatorResponse:
+class IndicatorResponse(BaseModel):
     indicator_id: str
     code: str
     name: str
@@ -33,7 +33,8 @@ class CPLResponse(BaseModel):
     cpl_id: str
     code: str
     name: str
-    subcpls: List[QualityResponse]
+    subcpls: List[SubCPLResponse]
 
 class CurriculumResponse(BaseModel):
-    cpls: List[CPLResponse]
+    message: str
+    curriculum: List[CPLResponse]

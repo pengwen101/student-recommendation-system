@@ -4,6 +4,10 @@ from backend.resources import routers as resource_routers
 from backend.qualities import routers as quality_routers
 from backend.topics import routers as topic_routers
 from backend.subcpls import routers as subcpl_routers
+from backend.curriculums import routers as curriculum_routers
+from backend.admins import routers as admin_routers
+from backend.admins import services as admin_services
+from backend.admins import schemas as admin_schemas
 from contextlib import asynccontextmanager
 from backend.database import Neo4jConnection
 from fastapi.middleware.cors import CORSMiddleware
@@ -63,6 +67,7 @@ async def auth(request: Request):
         email = user.get('email')
         
         intent = request.session.pop('login_intent', 'student')
+        print("Login Intent: " + intent)
         
         if intent == 'student':
             if not email.endswith("@john.petra.ac.id"):
@@ -80,13 +85,23 @@ async def auth(request: Request):
             is_root_admin = email == os.getenv("ROOT_ADMIN_EMAIL")
             if is_root_admin:
                 request.session['user'] = {**user, "role": "admin"}
+                admin_exists = await admin_services.admin_exists(email)
+                if not admin_exists:
+                    admin_details = await admin_services.create_admin(admin_schemas.AdminCreateInput(email=email, name=user.get("name")))
+                    await admin_services.approve_admin(admin_details['admin_id'])
                 return RedirectResponse(url='http://localhost:5173/admin')
             else:
-                await Neo4jConnection.query("MERGE (a:Admin {email: $email}) ON CREATE SET a.admin_id = randomUUID(), a.name = $name, a.approved = false", {
-                    "email": email,
-                    "name": user.get("name")
-                })
-                request.session['user'] = {**user, "role": "pending_admin"}
+                admin_exists = await admin_services.admin_exists(email)
+                if not admin_exists:
+                    await admin_services.create_admin(admin_schemas.AdminCreateInput(email=email, name=user.get("name")))
+                    request.session['user'] = {**user, "role": "pending_admin"}
+                else:
+                    admin_id = await admin_services.get_id_from_email(email)
+                    is_approved = admin_services.read_admin_details(admin_id)["admin_details"]["approved"]
+                    if is_approved:
+                        request.session['user'] = {**user, "role": "admin"}
+                    else:
+                        request.session['user'] = {**user, "role": "pending_admin"}
                 return RedirectResponse(url='http://localhost:5173/admin/login')
     except Exception as e:
         return {"error": str(e)}
@@ -111,3 +126,5 @@ app.include_router(resource_routers.resources_router)
 app.include_router(quality_routers.qualities_router)
 app.include_router(topic_routers.topics_router)
 app.include_router(subcpl_routers.subcpls_router)
+app.include_router(admin_routers.admins_router)
+app.include_router(curriculum_routers.curriculums_router)

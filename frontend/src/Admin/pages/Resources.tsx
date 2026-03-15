@@ -13,26 +13,43 @@ const Resources = () => {
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     };
     const [resources, setResources] = useState<Resource[]>([]);
+    const [loading, setLoading] = useState(true);
     const location = useLocation();
     useEffect(() => {
         if (location.state?.successMessage) {
             toast.success(location.state.successMessage);
             window.history.replaceState({}, document.title);
         }
-
-        const initializeResources = async () => {
-            const result = await api.get("/resource");
-            setResources(result.data.resources);
-        }
-
-        initializeResources();
     }, [location.state]);
+
+     useEffect(() => {
+        const initializeResources = async () => {
+            try {
+                const result = await api.get("/resource");
+                setResources(result.data.resources);
+            }
+            catch (error){
+                let errorMessage = "An unknown error occurred";
+                if (error instanceof Error) {
+                    errorMessage = error.message;
+                }
+                else if (typeof error === 'string') {
+                    errorMessage = error;
+                }
+                toast.error(errorMessage);
+            }
+            finally {
+                setLoading(false);
+            }
+        }
+        initializeResources();
+    }, []);
 
     return (
         <>
         <div className="text-2xl mb-4">Resources</div>
-        <button className="bg-blue-500 text-white">Add Resource</button>
-
+        <Link to="/resource/create"><button className="bg-blue-500 text-white">Add Resource</button></Link>
+        {loading ? (<div className="text-sm text-gray-500 mt-4 animate-pulse">Loading resources...</div>) : (
         <div className="overflow-x-auto bg-white rounded-lg shadow-md border border-gray-200 m-8">
             <table className="table-auto w-full text-left border-collapse">
                 <thead className="bg-gray-50 border-b border-gray-200 text-gray-700 uppercase text-xs font-bold tracking-wider">
@@ -53,7 +70,8 @@ const Resources = () => {
                     ))}
                 </tbody>
             </table>
-        </div>
+        </div>)
+        }
         </>
     )
 }
