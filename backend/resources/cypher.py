@@ -132,12 +132,13 @@ async def create_resource(resource_id: str, data: dict):
         r.status = $status,
         r.is_active = true
     WITH r
-    FOREACH (session IN $sessions |
+    
+    CALL (r) {
+        UNWIND $sessions AS session
         MERGE (r)-[hs:HAS_SESSION]->(ss:Session {session_id: session.session_id})
         SET ss.start_datetime = session.start_datetime, ss.end_datetime = session.end_datetime
-    )
-    
-    WITH r
+    }
+
     CALL (r) {
         UNWIND $topics AS topic
         MATCH (t:Topic {topic_id: topic.topic_id})
@@ -163,7 +164,7 @@ async def create_resource(resource_id: str, data: dict):
               "description": data["description"],
               "scale": data.get('scale', None),
               "speaker_degree": data.get('speaker_degree', None),
-              "sessions": data.get('sessions', []),
+              "sessions": data.get('sessions', None),
               "status": data.get("status", None),
               "topics": data['topics'], 
               "subcpls": data['subcpls']}
@@ -196,12 +197,13 @@ async def update_resource(resource_id: str, data: dict):
     OPTIONAL MATCH (r)-[old_hs:HAS_SESSION]->(:Session)
     DELETE old_hs
     WITH r
-    FOREACH (session IN $sessions |
+
+    CALL (r) {
+        UNWIND $sessions AS session
         MERGE (r)-[hs:HAS_SESSION]->(ss:Session {session_id: session.session_id})
         SET ss.start_datetime = session.start_datetime, ss.end_datetime = session.end_datetime
-    )
-    
-    WITH r
+    }
+
     CALL (r) {
         UNWIND $topics AS topic
         MATCH (t:Topic {topic_id: topic.topic_id})
@@ -227,7 +229,7 @@ async def update_resource(resource_id: str, data: dict):
               "description": data["description"],
               "scale": data.get('scale', None),
               "speaker_degree": data.get('speaker_degree', None),
-              "sessions": data.get('sessions', []),
+              "sessions": data.get('sessions', None),
               "status": data.get("status", None),
               "topics": data['topics'], 
               "subcpls": data['subcpls']}
