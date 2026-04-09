@@ -1,5 +1,5 @@
 from backend.resources import cypher as resource_cypher
-from backend.qualities import cypher as quality_cypher
+from backend.indicators import cypher as indicator_cypher
 from backend.topics import cypher as topic_cypher
 from backend.subcpls import cypher as subcpl_cypher
 from fastapi import HTTPException
@@ -19,16 +19,19 @@ async def read_resource_details(resource_id: str):
 async def create_resource(data: ResourceDetailsInput):
     new_resource_id = str(uuid.uuid4())
     data_dict = data.model_dump(mode='json')
+    for idx, session in enumerate(data_dict['sessions']):
+        data_dict['sessions'][idx]['session_id'] = str(uuid.uuid4())
+    print(data_dict)
     for subcpl in data_dict['subcpls']:
         sub_cpl_id = subcpl['sub_cpl_id']
         subcpl_exists = await subcpl_cypher.subcpl_exists(sub_cpl_id)
         if not subcpl_exists:
             raise HTTPException(status_code=404, detail=f"Sub-CPL ID {sub_cpl_id} not found")
-        for quality in subcpl['qualities']:
-            quality_id = quality['quality_id']
-            quality_exists = await quality_cypher.quality_exists(quality_id)
-            if not quality_exists:
-                raise HTTPException(status_code=404, detail=f"Quality ID {quality_id} not found")
+        for indicator in subcpl['indicators']:
+            indicator_id = indicator['indicator_id']
+            indicator_exists = await indicator_cypher.indicator_exists(indicator_id)
+            if not indicator_exists:
+                raise HTTPException(status_code=404, detail=f"Indicator ID {indicator_id} not found")
     for topic in data_dict['topics']:
         topic_id = topic['topic_id']
         topic_exists = await topic_cypher.topic_exists(topic_id)
@@ -42,16 +45,19 @@ async def update_resource(resource_id: str, data: ResourceDetailsInput):
     if not resource_exists:
         raise HTTPException(status_code=404, detail="Resource not found")
     data_dict = data.model_dump(mode='json')
+    for idx, session in enumerate(data_dict['sessions']):
+        if data_dict['sessions'][idx]['session_id'] is None:
+            data_dict['sessions'][idx]['session_id'] = str(uuid.uuid4())
     for subcpl in data_dict['subcpls']:
         sub_cpl_id = subcpl['sub_cpl_id']
         subcpl_exists = await subcpl_cypher.subcpl_exists(sub_cpl_id)
         if not subcpl_exists:
             raise HTTPException(status_code=404, detail=f"Sub-CPL ID {sub_cpl_id} not found")
-        for quality in subcpl['qualities']:
-            quality_id = quality['quality_id']
-            quality_exists = await quality_cypher.quality_exists(quality_id)
-            if not quality_exists:
-                raise HTTPException(status_code=404, detail=f"Quality ID {quality_id} not found")
+        for indicator in subcpl['indicators']:
+            indicator_id = indicator['indicator_id']
+            indicator_exists = await indicator_cypher.indicator_exists(indicator_id)
+            if not indicator_exists:
+                raise HTTPException(status_code=404, detail=f"Indicator ID {indicator_id} not found")
     for topic in data_dict['topics']:
         topic_id = topic['topic_id']
         topic_exists = await topic_cypher.topic_exists(topic_id)
@@ -79,4 +85,3 @@ async def delete_resource(resource_id: str):
     if not resource_exists:
         raise HTTPException(status_code=404, detail="Resource not found")
     await resource_cypher.delete_resource(resource_id)
-    return {"message": "Resource successfully deleted."}

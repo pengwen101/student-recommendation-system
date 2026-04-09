@@ -82,26 +82,26 @@ async def auth(request: Request):
             request.session['user'] = {**user, "nrp": nrp, "role": "student"}
             return RedirectResponse(url='http://localhost:5173')
         elif intent == 'admin':
-            is_root_admin = email == os.getenv("ROOT_ADMIN_EMAIL")
-            if is_root_admin:
-                request.session['user'] = {**user, "role": "admin"}
-                admin_exists = await admin_services.admin_exists(email)
-                if not admin_exists:
-                    admin_details = await admin_services.create_admin(admin_schemas.AdminCreateInput(email=email, name=user.get("name")))
+            admin_id = await admin_services.get_id_from_email(email)
+            admin_exists = admin_id is not None
+            if admin_exists:
+                print(admin_id)
+                is_approved = (await admin_services.read_admin_details(admin_id))["approved"]
+                if is_approved:
+                    request.session['user'] = {**user, "role": "admin"}
+                else:
+                    request.session['user'] = {**user, "role": "pending_admin"}
+            else:
+                admin_details = await admin_services.create_admin(admin_schemas.AdminCreateInput(email=email, name=user.get("name")))
+                is_root_admin = email == os.getenv("ROOT_ADMIN_EMAIL")
+                if is_root_admin:
                     await admin_services.approve_admin(admin_details['admin_id'])
+                    request.session['user'] = {**user, "role": "admin"}
+                else:
+                    request.session['user'] = {**user, "role": "pending_admin"}
+            if request.session['user']['role'] == 'admin':
                 return RedirectResponse(url='http://localhost:5173/admin')
             else:
-                admin_exists = await admin_services.admin_exists(email)
-                if not admin_exists:
-                    await admin_services.create_admin(admin_schemas.AdminCreateInput(email=email, name=user.get("name")))
-                    request.session['user'] = {**user, "role": "pending_admin"}
-                else:
-                    admin_id = await admin_services.get_id_from_email(email)
-                    is_approved = admin_services.read_admin_details(admin_id)["admin_details"]["approved"]
-                    if is_approved:
-                        request.session['user'] = {**user, "role": "admin"}
-                    else:
-                        request.session['user'] = {**user, "role": "pending_admin"}
                 return RedirectResponse(url='http://localhost:5173/admin/login')
     except Exception as e:
         return {"error": str(e)}
@@ -121,7 +121,9 @@ async def logout(request: Request):
 
 app.include_router(student_routers.topics_router)
 app.include_router(student_routers.recommendations_router)
-app.include_router(student_routers.qualities_router)
+app.include_router(student_routers.indicators_router)
+app.include_router(student_routers.subcpls_router)
+app.include_router(student_routers.cpls_router)
 app.include_router(resource_routers.resources_router)
 app.include_router(quality_routers.qualities_router)
 app.include_router(topic_routers.topics_router)

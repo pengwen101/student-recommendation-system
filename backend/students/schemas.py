@@ -6,7 +6,6 @@ class StudentTopicsResponse(BaseModel):
     topic_id: str
     code: str
     name: str
-    weight: float
     
 class TopicActionResponse(BaseModel):
     message: str
@@ -15,7 +14,6 @@ class TopicActionResponse(BaseModel):
     
 class StudentTopicsInput(BaseModel):
     topic_id: str
-    weight: float
     
 class StudentTopicsInputBatch(BaseModel):
     topics: List[StudentTopicsInput]
@@ -30,20 +28,42 @@ class StudentRecommendationsResponse(BaseModel):
     recommendations: List[StudentRecommendation]
     
     
-class StudentQualitiesResponse(BaseModel):
-    quality_id: str
+class StudentIndicatorsResponse(BaseModel):
+    indicator_id: str
     code: str
     name: str
     weight: float
     
-class QualityActionResponse(BaseModel):
-    message: str
-    count: int
-    qualities: List[StudentQualitiesResponse]
-    
-class StudentQualitiesInput(BaseModel):
-    quality_id: str
+class StudentSubCplsResponse(BaseModel):
+    sub_cpl_id: str
+    code: str
+    name: str
     weight: float
     
-class StudentQualitiesInputBatch(BaseModel):
-    qualities: List[StudentQualitiesInput]
+class StudentCplsResponse(BaseModel):
+    cpl_id: str
+    code: str
+    name: str
+    weight: float
+    
+class IndicatorActionResponse(BaseModel):
+    message: str
+    count: int
+    indicators: List[StudentIndicatorsResponse]
+    
+class SubCplActionResponse(BaseModel):
+    message: str
+    count: int
+    subcpls: List[StudentSubCplsResponse]
+    
+class CplActionResponse(BaseModel):
+    message: str
+    count: int
+    cpls: List[StudentCplsResponse]
+    
+class StudentIndicatorsInput(BaseModel):
+    indicator_id: str
+    weight: float
+    
+class StudentIndicatorsInputBatch(BaseModel):
+    indicators: List[StudentIndicatorsInput]

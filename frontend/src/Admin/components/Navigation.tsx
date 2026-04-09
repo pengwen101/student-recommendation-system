@@ -1,8 +1,12 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Pane } from '../../components/Pane';
+import { Button } from '../../components/Button';
 import api from '../../api/axios';
 
 const Navbar = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const isActive = (path: string) => location.pathname === path;
 
     const handleLogout = async () => {
         await api.get('/logout');
@@ -10,59 +14,66 @@ const Navbar = () => {
     };
 
     return  (
-        <nav className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 flex flex-col justify-between py-6 px-4 shadow-sm z-50">
-                <div className="flex flex-col gap-y-8">
-                    <div className="px-2">
-                        <h2 className="text-xl font-extrabold text-gray-900 leading-tight">
-                            Student Resource<br/>Recommendation
-                        </h2>
-                    </div>
-                    <div className="flex flex-col gap-y-2">
-                        <Link 
-                            to="/home" 
-                            className="px-4 py-2.5 rounded-lg text-gray-700 font-medium hover:bg-gray-100 hover:text-blue-600 transition-colors"
+        <Pane className="fixed left-0 top-0 h-screen w-64 flex flex-col justify-between z-50 rounded-none border-y-0 border-l-0 border-r border-slate-200 bg-white p-6"> 
+
+            <div className="flex flex-col gap-y-10">
+                <div className="px-2">
+                    <h2 className="text-xl font-bold text-primary-800 leading-tight">
+                        Resource <br/>
+                        <span className="text-slate-500 font-medium text-base">Recommendation</span>
+                    </h2>
+                </div>
+                
+                <nav className="flex flex-col gap-y-1">
+                    <Link to="/home" className="w-full">
+                        <Button 
+                            variant={isActive("/home") ? "secondary" : "ghost"} 
+                            className={`w-full justify-start ${isActive("/home") ? "text-primary-800 font-semibold" : "text-slate-600"}`}
                         >
                             Home
-                        </Link>
-                        
-                        <Link 
-                            to="/profile" 
-                            className="px-4 py-2.5 rounded-lg text-gray-700 font-medium hover:bg-gray-100 hover:text-blue-600 transition-colors"
-                        >
-                            Profile
-                        </Link>
-                        
-                        <Link 
-                            to="/resources" 
-                            className="px-4 py-2.5 rounded-lg text-gray-700 font-medium hover:bg-gray-100 hover:text-blue-600 transition-colors"
+                        </Button>
+                    </Link>
+
+                    <Link to="/resource" className="w-full">
+                        <Button 
+                            variant={isActive("/resource") ? "secondary" : "ghost"} 
+                            className={`w-full justify-start ${isActive("/resource") ? "text-primary-800 font-semibold" : "text-slate-600"}`}
                         >
                             Resources
-                        </Link>
-                        
-                        <Link 
-                            to="/curriculum" 
-                            className="px-4 py-2.5 rounded-lg text-gray-700 font-medium hover:bg-gray-100 hover:text-blue-600 transition-colors"
+                        </Button>
+                    </Link>
+
+                    <Link to="/curriculum" className="w-full">
+                        <Button 
+                            variant={isActive("/curriculum") ? "secondary" : "ghost"} 
+                            className={`w-full justify-start ${isActive("/curriculum") ? "text-primary-800 font-semibold" : "text-slate-600"}`}
                         >
                             Curriculum
-                        </Link>
+                        </Button>
+                    </Link>
 
-                        <Link 
-                            to="/manage-admins" 
-                            className="px-4 py-2.5 rounded-lg text-gray-700 font-medium hover:bg-gray-100 hover:text-blue-600 transition-colors"
+                    <Link to="/manage-admins" className="w-full">
+                        <Button 
+                            variant={isActive("/manage-admins") ? "secondary" : "ghost"} 
+                            className={`w-full justify-start ${isActive("/manage-admins") ? "text-primary-800 font-semibold" : "text-slate-600"}`}
                         >
                             Manage Admins
-                        </Link>
-                    </div>
-                </div>
-                <div className="pt-4 border-t border-gray-100">
-                    <button 
-                        onClick={handleLogout} 
-                        className="w-full text-left px-4 py-2.5 rounded-lg text-red-600 font-semibold hover:bg-red-50 transition-colors cursor-pointer"
-                    >
-                        Logout
-                    </button>
-                </div>
-            </nav>
+                        </Button>
+                    </Link>
+               </nav>
+            </div>
+
+            <div className="pt-4 border-t border-slate-200">
+                <Button 
+                    onClick={handleLogout} 
+                    variant="ghost" 
+                    className="w-full justify-start text-slate-600 hover:text-danger-600 hover:bg-danger-50 transition-colors"
+                >
+                    Logout
+                </Button>
+            </div>
+            
+        </Pane>
     );
 };
 

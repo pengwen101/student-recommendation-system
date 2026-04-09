@@ -36,7 +36,7 @@ async def archive_resource(resource_id: str):
     resource_details = await services.archive_resource(resource_id)
     return {"message": "Resource successfully archived.", "resource_details": resource_details}
 
-@resources_router.delete("/{resource_id}", response_model=ResourceDetailsResponse)
+@resources_router.delete("/{resource_id}")
 async def delete_resource(resource_id: str):
-    resource_details = await services.delete_resource(resource_id)
-    return {"message": "Resource successfully deleted.", "resource_details": resource_details}
+    await services.delete_resource(resource_id)
+    return {"message": "Resource successfully deleted."}

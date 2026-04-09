@@ -7,11 +7,23 @@ class SubCPLQualitiesResponse(BaseModel):
     name: str
     weight: float
     
+class SubCPLIndicatorsResponse(BaseModel):
+    indicator_id: str
+    code: str
+    name: str
+    weight: float
+    
 class SubCplDetails(BaseModel):
     sub_cpl_id: str
     code: str
     name: str
     qualities: List[SubCPLQualitiesResponse]
+    
+class SubCplIndicators(BaseModel):
+    sub_cpl_id: str
+    code: str
+    name: str
+    indicators: List[SubCPLIndicatorsResponse]
 
 class SubCplDetailsResponse(BaseModel):
     message: str
@@ -21,3 +33,9 @@ class AllSubCplsResponse(BaseModel):
     message: str
     count: int
     subcpls: List[SubCplDetails]
+    
+    
+class AllSubCplIndicatorsResponse(BaseModel):
+    message: str
+    count: int
+    subcpls: List[SubCplIndicators]

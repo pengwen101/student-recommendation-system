@@ -7,7 +7,7 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
     return (
-        <div className="min-h-screen bg-[#242424]"> 
+        <div className="min-h-screen bg-white"> 
             <Navigation/>
             <main className="ml-64 flex-1 min-h-screen">
                 <div className="p-8">

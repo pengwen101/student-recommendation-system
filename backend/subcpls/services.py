@@ -7,6 +7,9 @@ import uuid
 async def read_subcpls():
     return await subcpl_cypher.read_subcpls()
 
+async def read_subcpl_indicators():
+    return await subcpl_cypher.read_subcpl_indicators()
+
 async def read_subcpl_details(sub_cpl_id: str):
     subcpl_exists = await subcpl_cypher.subcpl_exists(sub_cpl_id)
     if not subcpl_exists:

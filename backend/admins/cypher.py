@@ -1,11 +1,11 @@
 from backend.database import Neo4jConnection
 
-async def admin_exists(email: str):
+async def admin_exists(admin_id: str):
     query = """
-    MATCH (a: Admin {email: $email})
+    MATCH (a: Admin {admin_id: $admin_id})
     RETURN count(a) > 0 as exists
     """
-    params = {"email": email}
+    params = {"admin_id": admin_id}
     response = await Neo4jConnection.query(query, params)
     return response[0]['exists'] if response else False
 
@@ -16,6 +16,8 @@ async def get_id_from_email(email: str):
     """
     params = {"email": email}
     response = await Neo4jConnection.query(query, params)
+    if response is not None:
+        response = response[0]['admin_id']
     return response
 
 async def read_admins():

@@ -3,7 +3,14 @@ import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 
 import type { Resource, SubCpl, Topic } from "../../types";
+import { Input } from '../../components/Input';
+import { Button } from '../../components/Button';
+import { Select } from '../../components/Select';
+import { Pane } from '../../components/Pane';
+import { Textarea } from '../../components/Textarea';
 import api from "../../api/axios";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faTrash } from '@fortawesome/free-solid-svg-icons';
 
 function ResourceForm() {
   // Hooks
@@ -30,7 +37,7 @@ function ResourceForm() {
           return;
         }
 
-        const subcpls = await api.get("/subcpl");
+        const subcpls = await api.get("/subcpl/indicators");
         const topics = await api.get("/topic");
         setSubCpls(subcpls.data.subcpls);
         setTopics(topics.data.topics);  
@@ -44,8 +51,9 @@ function ResourceForm() {
             type: "event",
             name: "",
             description: "",
-            start_datetime: "2026-03-08T00:00:00Z",
-            end_datetime: "2026-03-09T00:00:00Z",
+            sessions: [],
+            scale: "university",
+            speaker_degree: "bachelor",
             status: "open",
             is_active: true,
             subcpls: [],
@@ -72,21 +80,53 @@ function ResourceForm() {
     return isoString.split('T')[1].substring(0, 5); 
   };
 
-  // Handle change functions
-  const handleDateChange = (type: 'start' | 'end', field: 'date' | 'time', value: string) => {
-    if (!resource) return;
-    
-    const targetField = type === 'start' ? 'start_datetime' : 'end_datetime';
-    const currentIso = resource[targetField] || "2026-01-01T00:00:00Z";
-    
-    let [currentDate, currentTime] = currentIso.split('T');
-    
-    if (field === 'date') currentDate = value;
-    if (field === 'time') currentTime = value + ":00Z";
+  const handleAddSession = () => {
+      setResource(prev => {
+        if (!prev) return prev;
+        
+        return {
+            ...prev,
+            sessions: [
+                ...(prev.sessions || []), 
+                { session_id: "", start_datetime: "", end_datetime: "" }
+            ]
+        };
+      });
+  };
 
-    setResource({
-      ...resource,
-      [targetField]: `${currentDate}T${currentTime}`
+  const handleRemoveSession = (indexToRemove: number) => {
+      setResource(prev => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          sessions: prev.sessions?.filter((_, index) => index !== indexToRemove)
+        };
+      });
+  };
+
+  const handleSessionChange = (index: number, field: string, type: string, value: string) => {
+    setResource(prev => {
+      if (!prev) return prev;
+        const updatedSessions = [...(prev?.sessions || [])];
+        const session = { ...updatedSessions[index] };
+      
+        const targetField = field === 'start' ? 'start_datetime' : 'end_datetime';
+      
+        const currentDate = getDateOnly(session[targetField]) || "";
+        const currentTime = getTimeOnly(session[targetField]) || "00:00";
+
+        let newDateTimeStr = "";
+        if (type === 'date') {
+            newDateTimeStr = value ? `${value}T${currentTime}:00` : "";
+        } else if (type === 'time') {
+            newDateTimeStr = currentDate ? `${currentDate}T${value}:00` : "";
+        }
+
+        session[targetField] = newDateTimeStr;
+        updatedSessions[index] = session;
+
+        return { ...prev, sessions: updatedSessions };
     });
   };
 
@@ -108,7 +148,7 @@ function ResourceForm() {
           sub_cpl_id: subCplId,
           code: masterSubCpl.code,
           name: masterSubCpl.name,
-          qualities: masterSubCpl.qualities
+          indicators: masterSubCpl.indicators
         }
       ];
     }
@@ -126,7 +166,7 @@ function ResourceForm() {
     });
   };
 
-  const handleQualityToggle = (subCplId: string, qualityId: string) => {
+  const handleIndicatorToggle = (subCplId: string, indicatorId: string) => {
     if (!resource) return;
     const existingSubCpls = resource.subcpls || [];
     
@@ -136,8 +176,8 @@ function ResourceForm() {
     if (!hasSubCpl) {
       const masterSubCpl = subCpls?.find(s => s.sub_cpl_id === subCplId);
       if (!masterSubCpl) return;
-      const masterQuality = masterSubCpl.qualities.find(q => q.quality_id === qualityId);
-      if (!masterQuality) return;
+      const masterIndicator = masterSubCpl.indicators.find(i => i.indicator_id === indicatorId);
+      if (!masterIndicator) return;
 
       newSubCpls = [
         ...existingSubCpls, 
@@ -145,30 +185,30 @@ function ResourceForm() {
            sub_cpl_id: subCplId, 
            code: masterSubCpl.code,
            name: masterSubCpl.name,
-           qualities: [masterQuality]
+           indicators: [masterIndicator]
         }
       ];
     } else {
       newSubCpls = existingSubCpls.map(subcpl => {
         if (subcpl.sub_cpl_id !== subCplId) return subcpl;
 
-        const hasQuality = subcpl.qualities.some(q => q.quality_id === qualityId);
-        let newQualities;
+        const hasindicator = subcpl.indicators.some(i => i.indicator_id === indicatorId);
+        let newindicators;
         
-        if (hasQuality) {
-           newQualities = subcpl.qualities.filter(q => q.quality_id !== qualityId);
+        if (hasindicator) {
+           newindicators = subcpl.indicators.filter(i => i.indicator_id !== indicatorId);
         } else {
            const masterSubCpl = subCpls?.find(s => s.sub_cpl_id === subCplId);
-           const masterQuality = masterSubCpl?.qualities.find(q => q.quality_id === qualityId);
+           const masterIndicator = masterSubCpl?.indicators.find(i => i.indicator_id === indicatorId);
            
-           if (masterQuality) {
-               newQualities = [...subcpl.qualities, masterQuality];
+           if (masterIndicator) {
+               newindicators = [...subcpl.indicators, masterIndicator];
            } else {
-               newQualities = subcpl.qualities;
+               newindicators = subcpl.indicators;
            }
         }
-        return { ...subcpl, qualities: newQualities };
-      }).filter(s => s.qualities.length > 0);
+        return { ...subcpl, indicators: newindicators };
+      }).filter(s => s.indicators.length > 0);
     }
 
     
@@ -193,21 +233,10 @@ function ResourceForm() {
           { 
               topic_id: topic_id, 
               code: masterTopic.code,
-              name: masterTopic.name,
-              weight: 1 
+              name: masterTopic.name
           }
       ]; 
     }
-    setResource({ ...resource, topics: newTopics });
-  };
-
-  const handleTopicWeightChange = (topic_id: string, newWeight: number) => {
-    if (!resource) return;
-    
-    const newTopics = (resource.topics || []).map(t =>
-      t.topic_id === topic_id ? { ...t, weight: newWeight } : t
-    );
-    
     setResource({ ...resource, topics: newTopics });
   };
 
@@ -222,20 +251,25 @@ function ResourceForm() {
       type: resource.type,
       name: resource.name,
       description: resource.description,
-      start_datetime: resource.start_datetime,
-      end_datetime: resource.end_datetime,
       status: resource.status,
+      scale: resource.scale,
+      speaker_degree: resource.speaker_degree,
+
+      sessions: resource.sessions?.map((session) => ({
+        ...(session.session_id ? { session_id: session.session_id } : {}),
+        start_datetime: session.start_datetime,
+        end_datetime: session.end_datetime
+      })),
 
       subcpls: resource.subcpls?.map((subcpl) => ({
         sub_cpl_id: subcpl.sub_cpl_id,
-        qualities: subcpl.qualities.map((quality) => ({
-            quality_id: quality.quality_id
+        indicators: subcpl.indicators.map((indicator) => ({
+            indicator_id: indicator.indicator_id
         }))
       })),
 
       topics: resource.topics?.map((topic) => ({
-        topic_id: topic.topic_id,
-        weight: topic.weight,
+        topic_id: topic.topic_id
       }))
     };
 
@@ -311,193 +345,313 @@ function ResourceForm() {
   if (loading) return <div>Loading...</div>;
 
   return (
-    <>
-      <div className="text-2xl mb-4">
+  <div className="max-w-4xl mx-auto pb-12">
+    {/* Header */}
+    <div className="mb-8">
+      <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
         {isEdit ? "Edit Resource" : "Create Resource"}
-      </div>
+      </h1>
+      <p className="text-sm text-slate-500 mt-1">
+        Configure the details, schedule, and curriculum mapping.
+      </p>
+    </div>
 
-      <form onSubmit={onSubmit}>
-        <div className="grid grid-cols-2 gap-4 w-5/6">
-
-          <label>Name</label>
-          <input
-            type="text"
-            name="name"
-            value={resource?.name || ""}
-            onChange={onChange}
-            className="border p-2"
-          />
-
-          <label>Type</label>
-          <select name="type" onChange={onChange} value={resource?.type || ""} className="border p-2 text-white bg-gray-900">
-            <option value="event">Event</option>
-            <option value="book">Book</option>
-            <option value="video">Video</option>
-          </select>
-
-          <label>Description</label>
-          <input
-            type="textarea"
-            name="description"
-            value={resource?.description || ""}
-            onChange={onChange}
-            className="border p-2"
-          />
-
-          <label>Start Date</label>
-          <input
-            type="date"
-            name="start_date"
-            value={getDateOnly(resource?.start_datetime) || ""}
-            onChange={(e) => handleDateChange('start', 'date', e.target.value)}
-            className="border p-2"
-          />
-
-          <label>Start Time</label>
-          <input
-            type="time"
-            name="start_time"
-            value={getTimeOnly(resource?.start_datetime) || ""}
-            onChange={(e) => handleDateChange('start', 'time', e.target.value)}
-            className="border p-2"
-          />
-
-          <label>End Date</label>
-          <input
-            type="date"
-            name="end_date"
-            value={getDateOnly(resource?.end_datetime) || ""}
-            onChange={(e) => handleDateChange('end', 'date', e.target.value)}
-            className="border p-2"
-          />
-
-          <label>End Time</label>
-          <input
-            type="time"
-            name="end_time"
-            value={getTimeOnly(resource?.end_datetime) || ""}
-            onChange={(e) => handleDateChange('end', 'time', e.target.value)}
-            className="border p-2"
-          />
-
-          <div className="col-span-2 p-4 border rounded shadow-sm bg-white">
-            <h3 className="text-lg text-gray-900 font-bold mb-4">Sub-CPLs & Qualities</h3>
-            <p className="text-sm text-gray-500 mb-4">Check a Sub-CPL to reveal its qualities.</p>
-            
-            <div className="space-y-4">
-              {subCpls?.map(subcpl => {
-                const isSubCplSelected = resource?.subcpls?.some(s => s.sub_cpl_id === subcpl.sub_cpl_id);
-
-                return (
-                  <div key={subcpl.sub_cpl_id} className={`border p-3 rounded transition-colors ${isSubCplSelected ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 hover:bg-gray-100'}`}>
-                    <label className="flex items-center gap-3 font-bold text-gray-800 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isSubCplSelected || false}
-                        onChange={() => handleSubCplToggle(subcpl.sub_cpl_id)}
-                        className="w-5 h-5 cursor-pointer text-blue-600 rounded"
-                      />
-                      {subcpl.code} | {subcpl.name}
-                    </label>
-
-                    {isSubCplSelected && (
-                      <div className="mt-4 ml-8 p-4 bg-white border border-blue-100 rounded shadow-inner">
-                        <h4 className="font-semibold text-sm text-blue-800 mb-3">Select Qualities:</h4>
-                        
-                        <div className="grid grid-cols-2 gap-3">
-                          {subcpl.qualities?.map(q => {
-                            const isQualityChecked = resource?.subcpls?.find(
-                              s => s.sub_cpl_id === subcpl.sub_cpl_id
-                            )?.qualities.some(resourceQ => resourceQ.quality_id === q.quality_id) || false;
-
-                            return (
-                              <label key={q.quality_id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
-                                <input
-                                   type="checkbox"
-                                   checked={isQualityChecked}
-                                   onChange={() => handleQualityToggle(subcpl.sub_cpl_id, q.quality_id)}
-                                   className="w-4 h-4 text-blue-500 cursor-pointer"
-                                />
-                                <span className="text-sm text-gray-700">{q.name}</span>
-                              </label>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+    <form onSubmit={onSubmit} className="flex flex-col gap-6">
+      
+      {/* SECTION 1: Basic Details */}
+      <Pane variant="shadow" className="p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-6 border-b border-slate-100 pb-2">Basic Details</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="flex flex-col gap-2 md:col-span-2">
+            <label className="text-sm font-semibold text-slate-700">Name</label>
+            <Input
+              type="text"
+              name="name"
+              placeholder="e.g. Intro to Advanced Robotics"
+              value={resource?.name || ""}
+              onChange={onChange}
+            />
           </div>
 
-          <div className="col-span-2 p-4 border rounded shadow-sm">
-            <h3 className="text-lg font-bold mb-4">Topics & Weights</h3>
-            
-            <div className="space-y-3">
-              {topics?.map(topic => {
-                const attachedTopic = resource?.topics?.find(t => t.topic_id === topic.topic_id);
-                const isSelected = !!attachedTopic;
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-slate-700">Type</label>
+            <Select name="type" onChange={onChange} value={resource?.type || ""}>
+              <option value="event">Event</option>
+              <option value="book">Book</option>
+              <option value="video">Video</option>
+            </Select>
+          </div>
 
-                return (
-                  <div key={topic.topic_id} className="flex items-center gap-4 p-3 border rounded">
-                    <input 
-                      type="checkbox" 
-                      checked={isSelected}
-                      onChange={() => handleTopicToggle(topic.topic_id)}
-                      className="w-5 h-5 cursor-pointer"
-                    />
-                    <span className="font-medium w-1/3">{topic.name}</span>
+          <div className="flex flex-col gap-2 md:col-span-3">
+            <label className="text-sm font-semibold text-slate-700">Description</label>
+            <Textarea
+              name="description"
+              placeholder="Provide a brief overview of this resource..."
+              value={resource?.description || ""}
+              onChange={onChange}
+            />
+          </div>
 
-                    {isSelected && attachedTopic && (
-                      <div className="flex-1 flex items-center gap-4">
-                        <span className="text-sm text-gray-500">Weight:</span>
-                        <input 
-                          type="range" 
-                          min="1" 
-                          max="10" 
-                          value={attachedTopic.weight*10}
-                          onChange={(e) => handleTopicWeightChange(topic.topic_id, parseFloat(e.target.value)/10)}
-                          className="flex-1 cursor-pointer"
-                        />
-                        <span className="font-bold text-blue-600 w-6 text-center">
-                          {attachedTopic.weight}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+          <div className="flex flex-col gap-2 md:col-span-3">
+            <label className="text-sm font-semibold text-slate-700">Scale</label>
+            <Select name="scale" value={resource?.scale || ""} onChange={onChange}>
+              <option value="university">University</option>
+              <option value="regional">Regional</option>
+              <option value="national">National</option>
+              <option value="international">International</option>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-2 md:col-span-3">
+            <label className="text-sm font-semibold text-slate-700">Speaker's Degree</label>
+            <Select name="speaker_degree" value={resource?.speaker_degree || ""} onChange={onChange}>
+              <option value="bachelor">Bachelor</option>
+              <option value="master">Master</option>
+              <option value="phd">Phd</option>
+            </Select>
           </div>
         </div>
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-4 bg-blue-500 px-4 py-2 rounded">
-          {submitting ? "Saving..." : "Save"}
-        </button>
-      </form>
 
-      <button onClick={onDelete} disabled={deleting}
-          className="mt-4 bg-red-500 px-4 py-2 rounded">
-          Delete
-      </button>
-      
-      {resource?.is_active ? (
-        <button onClick={onArchive} disabled={archiving}
-          className="mt-4 bg-red-500 px-4 py-2 rounded">
-          Archive
-        </button>
-        ) : (
-        <button onClick={onActivate} disabled={activating}
-          className="mt-4 bg-green-500 px-4 py-2 rounded">
-          Activate
-        </button>
-        )
-      }
-    </>
-  );
+        {/* Schedule Sub-grid (Multi-Session) */}
+        { resource?.type == 'event' && (
+          <div className="flex flex-col gap-4 mt-6 pt-6 border-t border-slate-100">
+          <div className="flex justify-between items-center mb-2">
+            <div>
+              <h4 className="text-base font-bold text-slate-900">Event Sessions</h4>
+              <p className="text-sm text-slate-500">Add multiple days or time blocks for this event.</p>
+            </div>
+            <Button 
+              type="button" 
+              onClick={handleAddSession} 
+              variant="outline" 
+              size="sm"
+              className="text-primary-700 border-primary-200 hover:bg-primary-50"
+            >
+              + Add Session
+            </Button>
+          </div>
+
+          {/* Map through the sessions array */}
+          {resource?.sessions?.map((session, index) => (
+            <div 
+              key={index} 
+              className="flex flex-col gap-4 p-4 border border-slate-200 rounded-xl bg-slate-50 relative group transition-all hover:border-slate-300"
+            >
+              <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                <span className="text-sm font-bold text-slate-700 uppercase tracking-wider">
+                  Session {index + 1}
+                </span>
+                
+                {/* Only show delete button if there is more than 1 session */}
+                {resource.sessions && resource.sessions.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveSession(index)}
+                    className="text-slate-400 hover:text-danger-600 transition-colors p-1"
+                    title="Remove Session"
+                  >
+                    <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-slate-600">Starts At</label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="date"
+                      className="flex-1 bg-white"
+                      value={getDateOnly(session.start_datetime) || ""}
+                      onChange={(e) => handleSessionChange(index, 'start', 'date', e.target.value)}
+                      required
+                    />
+                    <Input
+                      type="time"
+                      className="w-32 bg-white"
+                      value={getTimeOnly(session.start_datetime) || ""}
+                      onChange={(e) => handleSessionChange(index, 'start', 'time', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-slate-600">Ends At</label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="date"
+                      className="flex-1 bg-white"
+                      value={getDateOnly(session.end_datetime) || ""}
+                      onChange={(e) => handleSessionChange(index, 'end', 'date', e.target.value)}
+                      required
+                    />
+                    <Input
+                      type="time"
+                      className="w-32 bg-white"
+                      value={getTimeOnly(session.end_datetime) || ""}
+                      onChange={(e) => handleSessionChange(index, 'end', 'time', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        )}
+      </Pane>
+
+      {/* SECTION 2: Sub-CPLs & Indicators */}
+      <Pane variant="shadow" className="p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-1">Curriculum Mapping</h3>
+        <p className="text-sm text-slate-500 mb-6">Select a Sub-CPL to reveal and assign its indicators.</p>
+        
+        <div className="space-y-3">
+          {subCpls?.map(subcpl => {
+            const isSubCplSelected = resource?.subcpls?.some(s => s.sub_cpl_id === subcpl.sub_cpl_id);
+
+            return (
+              <div 
+                key={subcpl.sub_cpl_id} 
+                className={`border p-4 rounded-xl transition-all duration-200 ${
+                  isSubCplSelected 
+                    ? 'bg-primary-50/50 border-primary-200 shadow-sm' 
+                    : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                <label className="flex items-center gap-3 font-semibold text-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isSubCplSelected || false}
+                    onChange={() => handleSubCplToggle(subcpl.sub_cpl_id)}
+                    className="w-5 h-5 cursor-pointer text-primary-600 rounded border-slate-300 focus:ring-primary-500"
+                  />
+                  <span className="text-primary-800 bg-white px-2 py-0.5 rounded border border-primary-100 text-sm">
+                    {subcpl.code}
+                  </span>
+                  {subcpl.name}
+                </label>
+
+                {isSubCplSelected && (
+                  <div className="mt-4 ml-8 p-4 bg-white border border-primary-100 rounded-lg shadow-inner">
+                    <h4 className="font-semibold text-xs uppercase tracking-wider text-primary-700 mb-3">Target Indicators</h4>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                      {subcpl.indicators?.map(i => {
+                        const isIndicatorChecked = resource?.subcpls?.find(
+                          s => s.sub_cpl_id === subcpl.sub_cpl_id
+                        )?.indicators.some(resInd => resInd.indicator_id === i.indicator_id) || false;
+
+                        return (
+                          <label key={i.indicator_id} className="flex items-start gap-3 cursor-pointer hover:bg-slate-50 p-2 rounded-md transition-colors group">
+                            <input
+                               type="checkbox"
+                               checked={isIndicatorChecked}
+                               onChange={() => handleIndicatorToggle(subcpl.sub_cpl_id, i.indicator_id)}
+                               className="mt-0.5 w-4 h-4 text-primary-600 border-slate-300 rounded cursor-pointer focus:ring-primary-500"
+                            />
+                            <span className={`text-sm leading-tight ${isIndicatorChecked ? 'text-slate-900 font-medium' : 'text-slate-600 group-hover:text-slate-900'}`}>
+                              {i.name}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </Pane>
+
+      {/* SECTION 3: Topics */}
+      <Pane variant="shadow" className="p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-4">Topics & Weighting</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {topics?.map(topic => {
+            const attachedTopic = resource?.topics?.find(t => t.topic_id === topic.topic_id);
+            const isSelected = !!attachedTopic;
+
+            return (
+              <div 
+                key={topic.topic_id} 
+                className={`flex flex-col gap-3 p-4 border rounded-xl transition-all ${
+                  isSelected ? 'bg-white border-primary-200 shadow-sm' : 'bg-slate-50 border-slate-200 hover:bg-white'
+                }`}
+              >
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={isSelected}
+                    onChange={() => handleTopicToggle(topic.topic_id)}
+                    className="w-5 h-5 cursor-pointer text-primary-600 border-slate-300 rounded focus:ring-primary-500"
+                  />
+                  <span className={`font-medium ${isSelected ? 'text-slate-900' : 'text-slate-600'}`}>
+                    {topic.name}
+                  </span>
+                </label>
+              </div>
+            );
+          })}
+        </div>
+      </Pane>
+
+      {/* Actions */}
+      <div className="flex flex-col gap-3 mt-4">
+        <Button
+          type="submit"
+          isLoading={submitting}
+          size="lg"
+          variant="solid" 
+          className="w-full text-base"
+        >
+          {submitting ? "Saving Resource..." : "Save Resource"}
+        </Button>
+
+        {isEdit && (
+          <div className="flex w-full gap-3 pt-4 border-t border-slate-200">
+            <Button 
+              type="button" // Prevents accidentally submitting the form
+              onClick={onDelete} 
+              isLoading={deleting}
+              variant="danger" 
+              className="flex-1"
+            >
+              Delete Resource
+            </Button>
+            
+            {resource?.is_active ? (
+              <Button 
+                type="button"
+                onClick={onArchive} 
+                isLoading={archiving}
+                variant="outline" 
+                className="flex-1"
+              >
+                Deactivate
+              </Button>
+            ) : (
+              <Button 
+                type="button"
+                onClick={onActivate} 
+                isLoading={activating}
+                variant="secondary" 
+                className="flex-1"
+              >
+                Activate
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+    </form>
+  </div>
+);
 }
 
 export default ResourceForm;

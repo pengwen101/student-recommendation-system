@@ -1,12 +1,14 @@
 from fastapi import APIRouter, HTTPException, status
 from backend.students.schemas import (TopicActionResponse, StudentRecommendationsResponse,\
-                                    QualityActionResponse, StudentQualitiesInputBatch, StudentTopicsInputBatch)
+                                    IndicatorActionResponse, StudentIndicatorsInputBatch, StudentTopicsInputBatch, SubCplActionResponse, CplActionResponse)
 from backend.students import services
 from typing import List
 
 topics_router = APIRouter(prefix="/student/topics", tags=["student_topics"])
 recommendations_router = APIRouter(prefix="/student/recommendations", tags=["student_recommendations"])
-qualities_router = APIRouter(prefix="/student/qualities", tags=["student_qualities"])
+indicators_router = APIRouter(prefix="/student/indicators", tags=["student_indicators"])
+subcpls_router = APIRouter(prefix="/student/subcpls", tags=["student_subcpls"])
+cpls_router = APIRouter(prefix="/student/cpls", tags=["student_cpls"])
 
 @topics_router.get("/{nrp}", response_model=TopicActionResponse)
 async def read_student_topics(nrp: str):
@@ -23,28 +25,38 @@ async def update_student_topics(nrp: str, data: StudentTopicsInputBatch):
     topics = await services.update_student_topics(nrp, data.topics)
     return {"message": "Student topic relations successfully updated.", "count": len(topics), "topics": topics}
 
-@qualities_router.get("/{nrp}", response_model=QualityActionResponse)
-async def read_student_qualities(nrp: str):
-    qualities = await services.read_student_qualities(nrp)
-    return {"message": "Student qualities relations successfully retrieved.", "count": len(qualities), "qualities": qualities}
+@indicators_router.get("/{nrp}", response_model=IndicatorActionResponse)
+async def read_student_indicators(nrp: str):
+    indicators = await services.read_student_indicators(nrp)
+    return {"message": "Student indicators relations successfully retrieved.", "count": len(indicators), "indicators": indicators}
 
-@qualities_router.post("/{nrp}", response_model=QualityActionResponse)
-async def create_student_qualities(nrp: str, data: StudentQualitiesInputBatch):
-    qualities = await services.create_student_qualities(nrp, data.qualities)
-    return {"message": "Student qualities relations successfully added.", "count": len(qualities), "qualities": qualities}
+@subcpls_router.get("/{nrp}", response_model=SubCplActionResponse)
+async def read_student_subcpls(nrp: str):
+    subcpls = await services.read_student_subcpls(nrp)
+    return {"message": "Student subcpls relations successfully retrieved.", "count": len(subcpls), "subcpls": subcpls}
 
-@qualities_router.put("/{nrp}", response_model=QualityActionResponse)
-async def update_student_qualities(nrp: str, data: StudentQualitiesInputBatch):
-    qualities = await services.update_student_qualities(nrp, data.qualities)
-    return {"message": "Student qualities relations successfully updated.", "count": len(qualities), "qualities": qualities}
+@cpls_router.get("/{nrp}", response_model=CplActionResponse)
+async def read_student_cpls(nrp: str):
+    cpls = await services.read_student_cpls(nrp)
+    return {"message": "Student cpls relations successfully retrieved.", "count": len(cpls), "cpls": cpls}
+
+@indicators_router.post("/{nrp}", response_model=IndicatorActionResponse)
+async def create_student_indicators(nrp: str, data: StudentIndicatorsInputBatch):
+    indicators = await services.create_student_indicators(nrp, data.indicators)
+    return {"message": "Student indicators relations successfully added.", "count": len(indicators), "indicators": indicators}
+
+@indicators_router.put("/{nrp}", response_model=IndicatorActionResponse)
+async def update_student_indicators(nrp: str, data: StudentIndicatorsInputBatch):
+    indicators = await services.update_student_indicators(nrp, data.indicators)
+    return {"message": "Student indicators relations successfully updated.", "count": len(indicators), "indicators": indicators}
 
 @topics_router.get("/has_topics/{nrp}", response_model=bool)
 async def has_student_topics(nrp: str):
     return await services.has_topics(nrp)
 
-@qualities_router.get("/has_qualities/{nrp}", response_model=bool)
-async def has_student_qualities(nrp: str):
-    return await services.has_qualities(nrp)
+@indicators_router.get("/has_indicators/{nrp}", response_model=bool)
+async def has_student_indicators(nrp: str):
+    return await services.has_indicators(nrp)
 
 @recommendations_router.get("/{nrp}", response_model=StudentRecommendationsResponse)
 async def get_student_recommendations(nrp: str):

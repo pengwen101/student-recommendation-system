@@ -25,6 +25,21 @@ async def read_subcpls():
     response = await Neo4jConnection.query(query)
     return response
 
+async def read_subcpl_indicators():
+    query = """
+    MATCH (s:SubCpl)
+    RETURN s.sub_cpl_id as sub_cpl_id, 
+           s.code as code,
+           s.name as name,
+           [(i)<-[ri:HAS_INDICATOR]-(q)<-[rq:HAS_QUALITY]-(s:SubCpl) | {
+                indicator_id: i.indicator_id,
+                code: i.code,
+                name: i.name, 
+                weight: rq.weight
+           }] as indicators
+    """
+    response = await Neo4jConnection.query(query)
+    return response
 
 async def read_subcpl_details(sub_cpl_id: str):
     query = """

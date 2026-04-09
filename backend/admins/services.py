@@ -13,13 +13,13 @@ async def read_admin_details(admin_id: str):
         raise HTTPException(status_code=404, detail=f"Admin ID {admin_id} not found")
     return await admin_cypher.read_admin_details(admin_id)
 
-async def admin_exists(email: str):
-    admin_exists = await admin_cypher.admin_exists(email)
+async def admin_exists(admin_id: str):
+    admin_exists = await admin_cypher.admin_exists(admin_id)
     return admin_exists
 
 async def get_id_from_email(email: str):
-    admin_id = await admin_cypher.get_id_from_email(email)
-    return admin_id
+    result = await admin_cypher.get_id_from_email(email)
+    return result
 
 async def create_admin(data: AdminCreateInput):
     new_admin_id = str(uuid.uuid4())

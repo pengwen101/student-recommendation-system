@@ -29,18 +29,43 @@ export const ResourceStatus = {
     Ended: "ended"
 }
 
+export const ResourceScale = {
+    University: "university",
+    Regional: "regional",
+    National: "national",
+    International: "international"
+}
+
+export const SpeakerDegree = {
+    Bachelor: "bachelor",
+    Master: "master",
+    Phd: "phd"
+}
+
+export interface Session {
+    session_id: string;
+    start_datetime: string;
+    end_datetime: string;
+}
+
+export interface SessionInput {
+    start_datetime: string;
+    end_datetime: string;
+}
+
 export interface Resource {
     resource_id: string;
     type: typeof ResourceType[keyof typeof ResourceType];
     name: string;
     description: string;
-    start_datetime: string;
-    end_datetime: string;
+    sessions?: Session[],
     status: typeof ResourceStatus[keyof typeof ResourceStatus];
+    scale: typeof ResourceScale[keyof typeof ResourceScale];
+    speaker_degree: typeof SpeakerDegree[keyof typeof SpeakerDegree];
     is_active: boolean;
     subcpls?: SubCpl[];
     topics?: Topic[];
-    calculated_qualities?: CalculatedQuality[]
+    calculations?: ResourceSupportCalculations;
 }
 
 // For edit / create
@@ -49,9 +74,10 @@ export interface ResourceInput {
     type: typeof ResourceType[keyof typeof ResourceType];
     name: string;
     description: string;
-    start_datetime: string;
-    end_datetime: string;
+    sessions?: SessionInput[],
     status: typeof ResourceStatus[keyof typeof ResourceStatus];
+    scale: typeof ResourceScale[keyof typeof ResourceScale];
+    speaker_degree: typeof SpeakerDegree[keyof typeof SpeakerDegree];
     is_active: boolean;
     subcpls?: ResourceSubCpl[];
     topics?: ResourceTopic[];
@@ -63,11 +89,11 @@ export interface ResourceTopic {
 
 export interface ResourceSubCpl {
     sub_cpl_id: string;
-    qualities: ResourceQuality[];
+    indicators: ResourceIndicator[];
 }
 
-export interface ResourceQuality {
-    quality_id: string;
+export interface ResourceIndicator {
+    indicator_id: string;
 }
 
 export interface ResourceRecommendation{
@@ -81,11 +107,10 @@ export interface ResourceRecommendations{
     recommendations: ResourceRecommendation[]
 }
 
-export interface CalculatedQuality {
-    quality_id: string;
-    code: string;
-    name: string;
-    weight: number;
+export interface ResourceSupportCalculations{
+    indicators: IndicatorSupport[]
+    qualities: Quality[]
+    subcpls: SubCplSupport[]
 }
 
 // Curriculum
@@ -109,11 +134,32 @@ export interface Indicator {
     name: string;
 }
 
+export interface IndicatorSupport {
+    indicator_id: string;
+    code: string;
+    name: string;
+    weight: number;
+}
+
+export interface SubCplSupport {
+    sub_cpl_id: string;
+    code: string;
+    name: string;
+    weight: number;
+}
+
+export interface CplSupport {
+    cpl_id: string;
+    code: string;
+    name: string;
+    weight: number;
+}
+
 export interface SubCpl {
     sub_cpl_id: string;
     code: string;
     name: string;
-    qualities: Quality[];
+    indicators: Indicator[];
 }
 
 export interface CPL {
@@ -131,5 +177,4 @@ export interface Topic {
     topic_id: string;
     code: string;
     name: string;
-    weight: number;
 }

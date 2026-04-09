@@ -2,8 +2,8 @@ from backend.database import Neo4jConnection
 
 async def indicator_exists(indicator_id: str):
     query = """
-    MATCH (q: indicator {indicator_id: $indicator_id})
-    RETURN count(q) > 0 as exists
+    MATCH (i: Indicator {indicator_id: $indicator_id})
+    RETURN count(i) > 0 as exists
     """
     params = {"indicator_id": indicator_id}
     response = await Neo4jConnection.query(query, params)
