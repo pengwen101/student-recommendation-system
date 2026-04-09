@@ -88,7 +88,7 @@ class ResourceDetails(BaseModel):
     type: ResourceType
     name: str
     description: str
-    sessions: List[Session] | List
+    sessions: List[Session] | None = None
     status: ResourceStatus | None = None
     scale: ResourceScale | None = None
     speaker_degree: SpeakerDegree | None = None
@@ -98,9 +98,9 @@ class ResourceDetails(BaseModel):
     calculations: ResourceSupportCalculations
     @model_validator(mode="after")
     def check_sessions(self):
-        if self.type == 'event' and len(self.sessions) == 0:
+        if self.type == 'event' and not self.sessions:
             raise ValueError("Sessions must be provided when resource type is event.")
-        if self.type != 'event' and len(self.sessions) > 0:
+        if self.type != 'event' and self.sessions:
             raise ValueError(f"Sessions cannot be provided for resource type '{self.type}'.")
         return self
 
@@ -112,7 +112,7 @@ class ResourceDetailsInput(BaseModel):
     type: ResourceType
     name: str
     description: str
-    sessions: List[SessionInput] | List
+    sessions: List[SessionInput] | None = None
     status: ResourceStatus | None = None
     scale: ResourceScale | None = None
     speaker_degree: SpeakerDegree | None = None
@@ -120,9 +120,9 @@ class ResourceDetailsInput(BaseModel):
     topics: List[ResourceTopicsInput]
     @model_validator(mode="after")
     def check_sessions(self):
-        if self.type == 'event' and len(self.sessions) == 0:
+        if self.type == 'event' and not self.sessions:
             raise ValueError("Sessions must be provided when resource type is event.")
-        if self.type != 'event' and len(self.sessions) > 0:
+        if self.type != 'event' and self.sessions:
             raise ValueError(f"Sessions cannot be provided for resource type '{self.type}'.")
         return self
     

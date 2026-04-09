@@ -2,7 +2,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 
-import type { Resource, SubCpl, Topic } from "../../types";
+import type { ResourceInput, SubCpl, Topic } from "../../types";
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { Select } from '../../components/Select';
@@ -17,7 +17,7 @@ function ResourceForm() {
   const { resource_id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const [resource, setResource] = useState<Resource | null>(null);
+  const [resource, setResource] = useState<ResourceInput | null>(null);
   const [subCpls, setSubCpls] = useState<SubCpl[] | null>(null);
   const [topics, setTopics] = useState<Topic[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -25,6 +25,7 @@ function ResourceForm() {
   const [deleting, setDeleting] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [activating, setActivating] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const isEdit = location.pathname.includes("/edit");
 
    useEffect(() => {
@@ -54,11 +55,11 @@ function ResourceForm() {
             sessions: [],
             scale: "university",
             speaker_degree: "bachelor",
-            status: "open",
+            status: "",
             is_active: true,
             subcpls: [],
             topics: []
-          } as Resource);
+          } as ResourceInput);
         }
       } catch {
         toast.error("Failed to load resource");
@@ -139,16 +140,11 @@ function ResourceForm() {
     if (hasSubCpl) {
       newSubCpls = existingSubCpls.filter(s => s.sub_cpl_id !== subCplId);
     } else {
-      const masterSubCpl = subCpls?.find(s => s.sub_cpl_id === subCplId);
-      if (!masterSubCpl) return;
-      
       newSubCpls = [
         ...existingSubCpls,
         {
           sub_cpl_id: subCplId,
-          code: masterSubCpl.code,
-          name: masterSubCpl.name,
-          indicators: masterSubCpl.indicators
+          indicators: []
         }
       ];
     }
@@ -174,18 +170,11 @@ function ResourceForm() {
     let newSubCpls;
 
     if (!hasSubCpl) {
-      const masterSubCpl = subCpls?.find(s => s.sub_cpl_id === subCplId);
-      if (!masterSubCpl) return;
-      const masterIndicator = masterSubCpl.indicators.find(i => i.indicator_id === indicatorId);
-      if (!masterIndicator) return;
-
       newSubCpls = [
         ...existingSubCpls, 
         { 
-           sub_cpl_id: subCplId, 
-           code: masterSubCpl.code,
-           name: masterSubCpl.name,
-           indicators: [masterIndicator]
+           sub_cpl_id: subCplId,
+           indicators: [{indicator_id: indicatorId}]
         }
       ];
     } else {
@@ -198,14 +187,7 @@ function ResourceForm() {
         if (hasindicator) {
            newindicators = subcpl.indicators.filter(i => i.indicator_id !== indicatorId);
         } else {
-           const masterSubCpl = subCpls?.find(s => s.sub_cpl_id === subCplId);
-           const masterIndicator = masterSubCpl?.indicators.find(i => i.indicator_id === indicatorId);
-           
-           if (masterIndicator) {
-               newindicators = [...subcpl.indicators, masterIndicator];
-           } else {
-               newindicators = subcpl.indicators;
-           }
+          newindicators = [...subcpl.indicators, { indicator_id: indicatorId }];
         }
         return { ...subcpl, indicators: newindicators };
       }).filter(s => s.indicators.length > 0);
@@ -225,15 +207,10 @@ function ResourceForm() {
     if (hasTopic) {
       newTopics = existingTopics.filter(t => t.topic_id !== topic_id);
     } else {
-      const masterTopic = topics?.find(t => t.topic_id === topic_id);
-      if (!masterTopic) return;
-
       newTopics = [
           ...existingTopics, 
           { 
-              topic_id: topic_id, 
-              code: masterTopic.code,
-              name: masterTopic.name
+              topic_id: topic_id,
           }
       ]; 
     }
@@ -244,34 +221,88 @@ function ResourceForm() {
     event.preventDefault();
 
     if (!resource) return;
+    const newErrors: Record<string, string> = {};
 
+    if (!resource.name?.trim()) {
+      newErrors.name = "Name is required.";
+    }
+
+    if (!resource.description?.trim()) {
+      newErrors.description = "Description is required.";
+    }
+
+    if (resource.subcpls.length == 0 || resource.subcpls[0].indicators.length == 0) {
+      newErrors.subcpls = "At least one Sub-CPL and one Indicator must be selected.";
+    }
+
+    if (resource.topics.length == 0) {
+      newErrors.topics = "At least one topic must be selected.";
+    }
+
+    if (resource.type === 'event') {
+      if (!resource.sessions || resource.sessions.length === 0) {
+        newErrors.sessions = "Events must have at least one session.";
+      } else {
+        resource.sessions.forEach((session, index) => {
+          if (!session.start_datetime) {
+              newErrors[`session_${index}_start`] = "Start date and time required.";
+          }
+          if (!session.end_datetime) {
+              newErrors[`session_${index}_end`] = "End date and time required.";
+          } 
+          else if (session.start_datetime && new Date(session.end_datetime) <= new Date(session.start_datetime)) {
+              newErrors[`session_${index}_end`] = "End time must be after start time.";
+          }
+        });
+      }
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+        setErrors(newErrors);
+        toast.error("Please fix the highlighted errors in the form."); 
+        return; 
+    }
+
+    setErrors({});
     setSubmitting(true);
+
+    let computedStatus;
+
+    if (resource.type === 'event' && resource.sessions && resource.sessions.length > 0) {
+      const now = new Date().getTime();
+      const earliestStart = Math.min(...resource.sessions.map(s => new Date(s.start_datetime).getTime()));
+      const latestEnd = Math.max(...resource.sessions.map(s => new Date(s.end_datetime).getTime()));
+
+      if (now > latestEnd) {
+        computedStatus = "completed";
+      } else if (now >= earliestStart) {
+        computedStatus = "ongoing";
+      } else {
+        computedStatus = "open";
+      }
+    }
 
     const resource_input = {
       type: resource.type,
       name: resource.name,
       description: resource.description,
-      status: resource.status,
-      scale: resource.scale,
-      speaker_degree: resource.speaker_degree,
+      ...(resource.type === 'event' && computedStatus ? { status: computedStatus } : {}),
+      ...(resource.type === 'event' && resource.scale ? { scale: resource.scale } : {}),
+      ...(resource.type === 'event' && resource.speaker_degree ? { speaker_degree: resource.speaker_degree } : {}),
 
-      sessions: resource.sessions?.map((session) => ({
-        ...(session.session_id ? { session_id: session.session_id } : {}),
-        start_datetime: session.start_datetime,
-        end_datetime: session.end_datetime
-      })),
-
-      subcpls: resource.subcpls?.map((subcpl) => ({
-        sub_cpl_id: subcpl.sub_cpl_id,
-        indicators: subcpl.indicators.map((indicator) => ({
-            indicator_id: indicator.indicator_id
+      ...(resource.type === 'event' ? {
+        sessions: (resource.sessions || []).map((session) => ({
+          ...(session.session_id ? { session_id: session.session_id } : {}),
+          start_datetime: session.start_datetime,
+          end_datetime: session.end_datetime
         }))
-      })),
+      } : {}),
 
-      topics: resource.topics?.map((topic) => ({
-        topic_id: topic.topic_id
-      }))
+      subcpls: resource.subcpls,
+      topics: resource.topics
     };
+
+    console.log(resource_input);
 
     try {
       if (isEdit) {
@@ -372,6 +403,11 @@ function ResourceForm() {
               value={resource?.name || ""}
               onChange={onChange}
             />
+            {errors.name && (
+              <span className="text-xs font-medium text-red-600 mt-1">
+                {errors.name}
+              </span>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -381,6 +417,11 @@ function ResourceForm() {
               <option value="book">Book</option>
               <option value="video">Video</option>
             </Select>
+            {errors.type && (
+              <span className="text-xs font-medium text-red-600 mt-1">
+                {errors.type}
+              </span>
+            )}
           </div>
 
           <div className="flex flex-col gap-2 md:col-span-3">
@@ -391,8 +432,18 @@ function ResourceForm() {
               value={resource?.description || ""}
               onChange={onChange}
             />
+            {errors.description && (
+              <span className="text-xs font-medium text-red-600 mt-1">
+                {errors.description}
+              </span>
+            )}
           </div>
+        </div>
 
+        { resource?.type == 'event' && (
+        <>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
           <div className="flex flex-col gap-2 md:col-span-3">
             <label className="text-sm font-semibold text-slate-700">Scale</label>
             <Select name="scale" value={resource?.scale || ""} onChange={onChange}>
@@ -413,8 +464,6 @@ function ResourceForm() {
           </div>
         </div>
 
-        {/* Schedule Sub-grid (Multi-Session) */}
-        { resource?.type == 'event' && (
           <div className="flex flex-col gap-4 mt-6 pt-6 border-t border-slate-100">
           <div className="flex justify-between items-center mb-2">
             <div>
@@ -431,8 +480,9 @@ function ResourceForm() {
               + Add Session
             </Button>
           </div>
-
-          {/* Map through the sessions array */}
+          {errors.sessions && (
+            <span className="text-xs font-medium text-red-600">{errors.sessions}</span>
+          )}
           {resource?.sessions?.map((session, index) => (
             <div 
               key={index} 
@@ -474,6 +524,9 @@ function ResourceForm() {
                       onChange={(e) => handleSessionChange(index, 'start', 'time', e.target.value)}
                       required
                     />
+                    {errors[`session_${index}_start`] && (
+                      <span className="text-xs font-medium text-red-600">{errors[`session_${index}_start`]}</span>
+                    )}
                   </div>
                 </div>
 
@@ -494,12 +547,16 @@ function ResourceForm() {
                       onChange={(e) => handleSessionChange(index, 'end', 'time', e.target.value)}
                       required
                     />
+                    {errors[`session_${index}_end`] && (
+                      <span className="text-xs font-medium text-red-600">{errors[`session_${index}_end`]}</span>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
           ))}
         </div>
+        </>
         )}
       </Pane>
 
@@ -507,6 +564,10 @@ function ResourceForm() {
       <Pane variant="shadow" className="p-6">
         <h3 className="text-lg font-bold text-slate-900 mb-1">Curriculum Mapping</h3>
         <p className="text-sm text-slate-500 mb-6">Select a Sub-CPL to reveal and assign its indicators.</p>
+
+        {errors.subcpls && (
+          <span className="text-xs font-medium text-red-600 mb-6">{errors.subcpls}</span>
+        )}
         
         <div className="space-y-3">
           {subCpls?.map(subcpl => {
@@ -570,6 +631,9 @@ function ResourceForm() {
       {/* SECTION 3: Topics */}
       <Pane variant="shadow" className="p-6">
         <h3 className="text-lg font-bold text-slate-900 mb-4">Topics & Weighting</h3>
+        {errors.topics && (
+          <span className="text-xs font-medium text-red-600 mb-4">{errors.topics}</span>
+        )}
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {topics?.map(topic => {

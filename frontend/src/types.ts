@@ -49,6 +49,7 @@ export interface Session {
 }
 
 export interface SessionInput {
+    session_id?: string;
     start_datetime: string;
     end_datetime: string;
 }
@@ -63,8 +64,8 @@ export interface Resource {
     scale: typeof ResourceScale[keyof typeof ResourceScale];
     speaker_degree: typeof SpeakerDegree[keyof typeof SpeakerDegree];
     is_active: boolean;
-    subcpls?: SubCpl[];
-    topics?: Topic[];
+    subcpls: SubCpl[];
+    topics: Topic[];
     calculations?: ResourceSupportCalculations;
 }
 
@@ -75,12 +76,12 @@ export interface ResourceInput {
     name: string;
     description: string;
     sessions?: SessionInput[],
-    status: typeof ResourceStatus[keyof typeof ResourceStatus];
-    scale: typeof ResourceScale[keyof typeof ResourceScale];
-    speaker_degree: typeof SpeakerDegree[keyof typeof SpeakerDegree];
+    status?: typeof ResourceStatus[keyof typeof ResourceStatus];
+    scale?: typeof ResourceScale[keyof typeof ResourceScale];
+    speaker_degree?: typeof SpeakerDegree[keyof typeof SpeakerDegree];
     is_active: boolean;
-    subcpls?: ResourceSubCpl[];
-    topics?: ResourceTopic[];
+    subcpls: ResourceSubCpl[];
+    topics: ResourceTopic[];
 }
 
 export interface ResourceTopic {

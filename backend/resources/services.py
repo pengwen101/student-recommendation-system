@@ -19,8 +19,9 @@ async def read_resource_details(resource_id: str):
 async def create_resource(data: ResourceDetailsInput):
     new_resource_id = str(uuid.uuid4())
     data_dict = data.model_dump(mode='json')
-    for idx, session in enumerate(data_dict['sessions']):
-        data_dict['sessions'][idx]['session_id'] = str(uuid.uuid4())
+    if data_dict.get('sessions', None) is not None:
+        for idx, session in enumerate(data_dict['sessions']):
+            data_dict['sessions'][idx]['session_id'] = str(uuid.uuid4())
     print(data_dict)
     for subcpl in data_dict['subcpls']:
         sub_cpl_id = subcpl['sub_cpl_id']
@@ -45,9 +46,10 @@ async def update_resource(resource_id: str, data: ResourceDetailsInput):
     if not resource_exists:
         raise HTTPException(status_code=404, detail="Resource not found")
     data_dict = data.model_dump(mode='json')
-    for idx, session in enumerate(data_dict['sessions']):
-        if data_dict['sessions'][idx]['session_id'] is None:
-            data_dict['sessions'][idx]['session_id'] = str(uuid.uuid4())
+    if data_dict.get('sessions', None) is not None:
+        for idx, session in enumerate(data_dict['sessions']):
+            if data_dict['sessions'][idx]['session_id'] is None:
+                data_dict['sessions'][idx]['session_id'] = str(uuid.uuid4())
     for subcpl in data_dict['subcpls']:
         sub_cpl_id = subcpl['sub_cpl_id']
         subcpl_exists = await subcpl_cypher.subcpl_exists(sub_cpl_id)
