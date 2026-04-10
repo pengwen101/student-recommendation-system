@@ -107,28 +107,53 @@ function ResourceForm() {
   };
 
   const handleSessionChange = (index: number, field: string, type: string, value: string) => {
-    setResource(prev => {
-      if (!prev) return prev;
-        const updatedSessions = [...(prev?.sessions || [])];
-        const session = { ...updatedSessions[index] };
-      
-        const targetField = field === 'start' ? 'start_datetime' : 'end_datetime';
-      
-        const currentDate = getDateOnly(session[targetField]) || "";
-        const currentTime = getTimeOnly(session[targetField]) || "00:00";
+      const updatedSessions = [...(resource?.sessions || [])];
+      const session = { ...updatedSessions[index] };
+    
+      const targetField = field === 'start' ? 'start_datetime' : 'end_datetime';
+    
+      const currentDate = getDateOnly(session[targetField]) || "";
+      const currentTime = getTimeOnly(session[targetField]) || "00:00";
 
-        let newDateTimeStr = "";
-        if (type === 'date') {
-            newDateTimeStr = value ? `${value}T${currentTime}:00` : "";
-        } else if (type === 'time') {
-            newDateTimeStr = currentDate ? `${currentDate}T${value}:00` : "";
+      let newDateTimeStr = "";
+      if (type === 'date') {
+          newDateTimeStr = value ? `${value}T${currentTime}:00` : "";
+      } else if (type === 'time') {
+          newDateTimeStr = currentDate ? `${currentDate}T${value}:00` : "";
+      }
+
+      session[targetField] = newDateTimeStr;
+      updatedSessions[index] = session;
+
+      const updatedResource = { ...resource, sessions: updatedSessions } as ResourceInput;
+      setResource(updatedResource);
+      const newErrors = { ...errors };
+
+      if (updatedResource.type === 'event') {
+        if (!updatedSessions || updatedSessions.length === 0) {
+          newErrors.sessions = "Events must have at least one session.";
+        } else {
+          delete newErrors.sessions; 
+
+          updatedSessions.forEach((sess, idx) => {
+            if (!sess.start_datetime) {
+                newErrors[`session_${idx}_start`] = "Start date and time required.";
+            } else {
+                delete newErrors[`session_${idx}_start`];
+            }
+   
+            if (!sess.end_datetime) {
+                newErrors[`session_${idx}_end`] = "End date and time required.";
+            } else if (sess.start_datetime && new Date(sess.end_datetime) <= new Date(sess.start_datetime)) {
+                newErrors[`session_${idx}_end`] = "End time must be after start time.";
+            } else {
+                delete newErrors[`session_${idx}_end`];
+            }
+          });
         }
+      }
 
-        session[targetField] = newDateTimeStr;
-        updatedSessions[index] = session;
-
-        return { ...prev, sessions: updatedSessions };
-    });
+      setErrors(newErrors);
   };
 
   const handleSubCplToggle = (subCplId: string) => {
@@ -149,6 +174,16 @@ function ResourceForm() {
       ];
     }
     setResource({ ...resource, subcpls: newSubCpls });
+
+    const newErrors = { ...errors };
+
+    if (newSubCpls.length == 0 || newSubCpls[0].indicators.length == 0) {
+      newErrors.subcpls = "At least one Sub-CPL and one Indicator must be selected.";
+    } else {
+      delete newErrors.subcpls;
+    }
+
+    setErrors(newErrors);
   };
 
   const onChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -156,10 +191,29 @@ function ResourceForm() {
 
     const { name, value } = event.target;
 
-    setResource({
+    setResource( {
       ...resource,
       [name]: value
     });
+
+    const newErrors = { ...errors };
+    if (name === "name") {
+      if (value.trim()) {
+        delete newErrors.name;
+      } else {
+        newErrors.name = "Name is required.";
+      }
+    }
+
+    if (name === "description") {
+      if (value.trim()) {
+        delete newErrors.description;
+      } else {
+        newErrors.description = "Description is required.";
+      }
+    }
+
+    setErrors(newErrors);
   };
 
   const handleIndicatorToggle = (subCplId: string, indicatorId: string) => {
@@ -195,6 +249,16 @@ function ResourceForm() {
 
     
     setResource({ ...resource, subcpls: newSubCpls });
+
+    const newErrors = { ...errors };
+
+    if (newSubCpls.length == 0 || newSubCpls[0].indicators.length == 0) {
+      newErrors.subcpls = "At least one Sub-CPL and one Indicator must be selected.";
+    } else {
+      delete newErrors.subcpls;
+    }
+
+    setErrors(newErrors);
   };
 
   const handleTopicToggle = (topic_id: string) => {
@@ -215,6 +279,16 @@ function ResourceForm() {
       ]; 
     }
     setResource({ ...resource, topics: newTopics });
+
+    const newErrors = { ...errors };
+
+    if (newTopics.length == 0) {
+      newErrors.topics = "At least one Topic must be selected.";
+    } else {
+      delete newErrors.topics;
+    }
+
+    setErrors(newErrors);
   };
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -481,7 +555,7 @@ function ResourceForm() {
             </Button>
           </div>
           {errors.sessions && (
-            <span className="text-xs font-medium text-red-600">{errors.sessions}</span>
+            <span className="text-xs font-medium text-red-600 mt-1">{errors.sessions}</span>
           )}
           {resource?.sessions?.map((session, index) => (
             <div 
@@ -524,10 +598,10 @@ function ResourceForm() {
                       onChange={(e) => handleSessionChange(index, 'start', 'time', e.target.value)}
                       required
                     />
-                    {errors[`session_${index}_start`] && (
+                  </div>
+                   {errors[`session_${index}_start`] && (
                       <span className="text-xs font-medium text-red-600">{errors[`session_${index}_start`]}</span>
                     )}
-                  </div>
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -547,11 +621,11 @@ function ResourceForm() {
                       onChange={(e) => handleSessionChange(index, 'end', 'time', e.target.value)}
                       required
                     />
-                    {errors[`session_${index}_end`] && (
-                      <span className="text-xs font-medium text-red-600">{errors[`session_${index}_end`]}</span>
-                    )}
                   </div>
                 </div>
+                {errors[`session_${index}_end`] && (
+                      <span className="text-xs font-medium text-red-600">{errors[`session_${index}_end`]}</span>
+                    )}
               </div>
             </div>
           ))}
@@ -563,13 +637,13 @@ function ResourceForm() {
       {/* SECTION 2: Sub-CPLs & Indicators */}
       <Pane variant="shadow" className="p-6">
         <h3 className="text-lg font-bold text-slate-900 mb-1">Curriculum Mapping</h3>
-        <p className="text-sm text-slate-500 mb-6">Select a Sub-CPL to reveal and assign its indicators.</p>
+        <p className="text-sm text-slate-500">Select a Sub-CPL to reveal and assign its indicators.</p>
 
         {errors.subcpls && (
-          <span className="text-xs font-medium text-red-600 mb-6">{errors.subcpls}</span>
+          <span className="text-xs font-medium text-red-600 mt-2">{errors.subcpls}</span>
         )}
         
-        <div className="space-y-3">
+        <div className="space-y-3 mt-6">
           {subCpls?.map(subcpl => {
             const isSubCplSelected = resource?.subcpls?.some(s => s.sub_cpl_id === subcpl.sub_cpl_id);
 
@@ -630,12 +704,12 @@ function ResourceForm() {
 
       {/* SECTION 3: Topics */}
       <Pane variant="shadow" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 mb-4">Topics & Weighting</h3>
+        <h3 className="text-lg font-bold text-slate-900">Topics & Weighting</h3>
         {errors.topics && (
-          <span className="text-xs font-medium text-red-600 mb-4">{errors.topics}</span>
+          <span className="text-xs font-medium text-red-600 mt-4">{errors.topics}</span>
         )}
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
           {topics?.map(topic => {
             const attachedTopic = resource?.topics?.find(t => t.topic_id === topic.topic_id);
             const isSelected = !!attachedTopic;
