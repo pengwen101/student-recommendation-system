@@ -6,6 +6,7 @@ from backend.topics import routers as topic_routers
 from backend.subcpls import routers as subcpl_routers
 from backend.curriculums import routers as curriculum_routers
 from backend.admins import routers as admin_routers
+from backend.organizers import routers as organizer_routers
 from backend.admins import services as admin_services
 from backend.admins import schemas as admin_schemas
 from contextlib import asynccontextmanager
@@ -129,4 +130,5 @@ app.include_router(quality_routers.qualities_router)
 app.include_router(topic_routers.topics_router)
 app.include_router(subcpl_routers.subcpls_router)
 app.include_router(admin_routers.admins_router)
+app.include_router(organizer_routers.organizers_router)
 app.include_router(curriculum_routers.curriculums_router)

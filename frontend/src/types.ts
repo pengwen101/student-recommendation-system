@@ -179,3 +179,12 @@ export interface Topic {
     code: string;
     name: string;
 }
+
+export interface Organizer {
+    organizer_id: string;
+    name: string;
+}
+
+export interface OrganizerInput {
+    name: string;
+}

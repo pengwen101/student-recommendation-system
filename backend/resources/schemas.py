@@ -1,6 +1,6 @@
 from pydantic import BaseModel, model_validator
 from datetime import datetime
-from typing import List, Dict, Set
+from typing import List, Dict
 from enum import Enum
 
 class ResourceType(str, Enum):

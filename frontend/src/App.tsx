@@ -7,6 +7,8 @@ import SelectTopics from './Student/pages/SelectTopics';
 import ResourceDetails from './Student/pages/ResourceDetails';
 import Profile from './Student/pages/Profile';
 import Resources from './Admin/pages/Resources';
+import Organizers from './Admin/pages/Organizers';
+import OrganizerForm from './Admin/pages/OrganizerForm';
 import Curriculum from './Admin/pages/Curriculum';
 import ResourceForm from './Admin/pages/ResourceForm';
 import ManageAdmins from './Admin/pages/ManageAdmins';
@@ -56,6 +58,9 @@ function App() {
           <Route path="/resource" element={<Resources/>}></Route>
           <Route path="/resource/edit/:resource_id" element={<ResourceForm/>}></Route>
           <Route path="/resource/create" element={<ResourceForm/>}></Route>
+          <Route path="/organizer" element={<Organizers/>}></Route>
+          <Route path="/organizer/edit/:organizer_id" element={<OrganizerForm/>}></Route>
+          <Route path="/organizer/create" element={<OrganizerForm/>}></Route>
           <Route path="/manage-admins" element={<ManageAdmins/>}></Route>
           <Route path="/curriculum" element={<Curriculum/>}></Route>
         </Route>

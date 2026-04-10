@@ -1,7 +1,6 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter
 from backend.subcpls.schemas import (AllSubCplsResponse, AllSubCplIndicatorsResponse, SubCplDetailsResponse)
 from backend.subcpls import services
-from typing import List
 
 subcpls_router = APIRouter(prefix="/subcpl", tags=["subcpl"])
 
