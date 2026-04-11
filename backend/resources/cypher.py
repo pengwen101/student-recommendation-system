@@ -21,6 +21,10 @@ async def read_resources():
                start_datetime: ss.start_datetime,
                end_datetime: ss.end_datetime 
            }] as sessions,
+           [(r)<-[og:ORGANIZES]-(o:Organizer) | {
+               organizer_id: o.organizer_id,
+               name: o.name
+           }] as organizers,
            r.scale as scale,
            r.speaker_degree as speaker_degree,
            r.status as status,
@@ -81,6 +85,10 @@ async def read_resource_details(resource_id: str):
            r.speaker_degree as speaker_degree,
            r.status as status,
            r.is_active as is_active,
+           [(r)<-[og:ORGANIZES]-(o:Organizer) | {
+               organizer_id: o.organizer_id,
+               name: o.name
+           }] as organizers,
            [(r)-[rt1:TARGETS]->(s:SubCpl) | {
                sub_cpl_id: s.sub_cpl_id,
                code: s.code,
@@ -134,6 +142,12 @@ async def create_resource(resource_id: str, data: dict):
     WITH r
     
     CALL (r) {
+        UNWIND $organizers AS org
+        MATCH (o:Organizer {organizer_id: org.organizer_id})
+        MERGE (r)<-[og:ORGANIZES]-(o)
+    }
+    
+    CALL (r) {
         UNWIND $sessions AS session
         MERGE (r)-[hs:HAS_SESSION]->(ss:Session {session_id: session.session_id})
         SET ss.start_datetime = session.start_datetime, ss.end_datetime = session.end_datetime
@@ -165,6 +179,7 @@ async def create_resource(resource_id: str, data: dict):
               "scale": data.get('scale', None),
               "speaker_degree": data.get('speaker_degree', None),
               "sessions": data.get('sessions', None),
+              "organizers": data.get('organizers') if data.get('organizers') else [],
               "status": data.get("status", None),
               "topics": data['topics'], 
               "subcpls": data['subcpls']}
@@ -182,6 +197,9 @@ async def update_resource(resource_id: str, data: dict):
         r.speaker_degree = $speaker_degree,
         r.status = $status
     WITH r
+    OPTIONAL MATCH (r)<-[old_og:ORGANIZES]-(o:Organizer)
+    DELETE old_og
+    WITH r
     OPTIONAL MATCH (r)-[old_rc:COVERS]->(:Topic)
     DELETE old_rc
     WITH r
@@ -197,6 +215,12 @@ async def update_resource(resource_id: str, data: dict):
     OPTIONAL MATCH (r)-[old_hs:HAS_SESSION]->(:Session)
     DELETE old_hs
     WITH r
+    
+    CALL (r) {
+        UNWIND $organizers AS org
+        MATCH (o:Organizer {organizer_id: org.organizer_id})
+        MERGE (r)<-[og:ORGANIZES]-(o)
+    }
 
     CALL (r) {
         UNWIND $sessions AS session
@@ -228,6 +252,7 @@ async def update_resource(resource_id: str, data: dict):
               "name": data['name'], 
               "description": data["description"],
               "scale": data.get('scale', None),
+              "organizers": data.get('organizers') if data.get('organizers') else [],
               "speaker_degree": data.get('speaker_degree', None),
               "sessions": data.get('sessions', None),
               "status": data.get("status", None),
@@ -298,8 +323,19 @@ async def calculate_support_weights(resource_id: str):
     }
 
     CALL (r, s) {
-        MATCH (r)-[rs:SUPPORTS]->(q:Quality)<-[:HAS_QUALITY]-(s)
-        RETURN sum(rs.weight) AS resource_quality_weight
+        MATCH (s)-[sq:HAS_QUALITY]->(q:Quality)
+    
+        CALL (q) {
+            MATCH (q)-[:HAS_INDICATOR]->(ia:Indicator)
+            RETURN count(ia) AS q_ind_count
+        }
+        
+        CALL (r, s, q) {
+            MATCH (r)-[:TARGETS {sub_cpl_id: s.sub_cpl_id}]->(i:Indicator)<-[:HAS_INDICATOR]-(q)
+            RETURN count(i) AS r_ind_count
+        }
+      
+        RETURN sum(((r_ind_count * 1.0) / q_ind_count) * sq.weight) AS resource_quality_weight
     }
 
     WITH r, s, (resource_quality_weight * 1.0) / subcpl_quality_weight as r_s_weight

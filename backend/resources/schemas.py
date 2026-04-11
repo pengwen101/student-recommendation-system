@@ -83,12 +83,17 @@ class ResourceSupportCalculations(BaseModel):
     qualities: List[Dict[str, str | float]]
     subcpls: List[Dict[str, str | float]]
     
+class ResourceOrganizerDetails(BaseModel):
+    organizer_id: str
+    name: str
+    
 class ResourceDetails(BaseModel):
     resource_id: str
     type: ResourceType
     name: str
     description: str
     sessions: List[Session] | None = None
+    organizers: List[ResourceOrganizerDetails] | None = None
     status: ResourceStatus | None = None
     scale: ResourceScale | None = None
     speaker_degree: SpeakerDegree | None = None
@@ -113,6 +118,7 @@ class ResourceDetailsInput(BaseModel):
     name: str
     description: str
     sessions: List[SessionInput] | None = None
+    organizers: List[dict] | None = None
     status: ResourceStatus | None = None
     scale: ResourceScale | None = None
     speaker_degree: SpeakerDegree | None = None

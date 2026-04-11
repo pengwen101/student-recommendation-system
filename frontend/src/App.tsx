@@ -8,6 +8,7 @@ import ResourceDetails from './Student/pages/ResourceDetails';
 import Profile from './Student/pages/Profile';
 import Resources from './Admin/pages/Resources';
 import Organizers from './Admin/pages/Organizers';
+import EventRoster from './Admin/pages/EventRoster';
 import OrganizerForm from './Admin/pages/OrganizerForm';
 import Curriculum from './Admin/pages/Curriculum';
 import ResourceForm from './Admin/pages/ResourceForm';
@@ -58,6 +59,7 @@ function App() {
           <Route path="/resource" element={<Resources/>}></Route>
           <Route path="/resource/edit/:resource_id" element={<ResourceForm/>}></Route>
           <Route path="/resource/create" element={<ResourceForm/>}></Route>
+          <Route path="/resource/roster/:resource_id" element={<EventRoster/>}></Route>
           <Route path="/organizer" element={<Organizers/>}></Route>
           <Route path="/organizer/edit/:organizer_id" element={<OrganizerForm/>}></Route>
           <Route path="/organizer/create" element={<OrganizerForm/>}></Route>

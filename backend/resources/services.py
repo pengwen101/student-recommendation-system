@@ -1,5 +1,6 @@
 from backend.resources import cypher as resource_cypher
 from backend.indicators import cypher as indicator_cypher
+from backend.organizers import cypher as organizer_cypher
 from backend.topics import cypher as topic_cypher
 from backend.subcpls import cypher as subcpl_cypher
 from fastapi import HTTPException
@@ -22,7 +23,6 @@ async def create_resource(data: ResourceDetailsInput):
     if data_dict.get('sessions', None) is not None:
         for idx, session in enumerate(data_dict['sessions']):
             data_dict['sessions'][idx]['session_id'] = str(uuid.uuid4())
-    print(data_dict)
     for subcpl in data_dict['subcpls']:
         sub_cpl_id = subcpl['sub_cpl_id']
         subcpl_exists = await subcpl_cypher.subcpl_exists(sub_cpl_id)
@@ -38,6 +38,12 @@ async def create_resource(data: ResourceDetailsInput):
         topic_exists = await topic_cypher.topic_exists(topic_id)
         if not topic_exists:
             raise HTTPException(status_code=404, detail=f"Topic ID {topic_id} not found")
+    if data_dict['type'] == 'event':
+        for organizer in data_dict['organizers']:
+            organizer_id = organizer['organizer_id']
+            organizer_exists = await organizer_cypher.organizer_exists(organizer_id)
+            if not organizer_exists:
+                raise HTTPException(status_code=404, detail=f"Organizer ID {organizer_id} not found")
     await resource_cypher.create_resource(new_resource_id, data_dict)
     return await resource_cypher.read_resource_details(new_resource_id)
 
@@ -65,6 +71,12 @@ async def update_resource(resource_id: str, data: ResourceDetailsInput):
         topic_exists = await topic_cypher.topic_exists(topic_id)
         if not topic_exists:
             raise HTTPException(status_code=404, detail=f"Topic ID {topic_id} not found")
+    if data_dict['type'] == 'event':
+        for organizer in data_dict['organizers']:
+            organizer_id = organizer['organizer_id']
+            organizer_exists = await organizer_cypher.organizer_exists(organizer_id)
+            if not organizer_exists:
+                raise HTTPException(status_code=404, detail=f"Organizer ID {organizer_id} not found")
     await resource_cypher.update_resource(resource_id, data_dict)
     return await resource_cypher.read_resource_details(resource_id)
 

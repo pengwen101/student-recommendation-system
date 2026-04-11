@@ -60,6 +60,7 @@ export interface Resource {
     name: string;
     description: string;
     sessions?: Session[],
+    organizers: Organizer[],
     status: typeof ResourceStatus[keyof typeof ResourceStatus];
     scale: typeof ResourceScale[keyof typeof ResourceScale];
     speaker_degree: typeof SpeakerDegree[keyof typeof SpeakerDegree];
@@ -76,6 +77,7 @@ export interface ResourceInput {
     name: string;
     description: string;
     sessions?: SessionInput[],
+    organizers?: ResourceOrganizerInput[],
     status?: typeof ResourceStatus[keyof typeof ResourceStatus];
     scale?: typeof ResourceScale[keyof typeof ResourceScale];
     speaker_degree?: typeof SpeakerDegree[keyof typeof SpeakerDegree];
@@ -187,4 +189,8 @@ export interface Organizer {
 
 export interface OrganizerInput {
     name: string;
+}
+
+export interface ResourceOrganizerInput {
+    organizer_id: string;
 }

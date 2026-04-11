@@ -2,7 +2,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 
-import type { ResourceInput, SubCpl, Topic } from "../../types";
+import type { ResourceInput, SubCpl, Topic, Organizer } from "../../types";
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { Select } from '../../components/Select';
@@ -19,6 +19,7 @@ function ResourceForm() {
   const navigate = useNavigate();
   const [resource, setResource] = useState<ResourceInput | null>(null);
   const [subCpls, setSubCpls] = useState<SubCpl[] | null>(null);
+  const [organizers, setOrganizers] = useState<Organizer[] | null>(null);
   const [topics, setTopics] = useState<Topic[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -40,8 +41,10 @@ function ResourceForm() {
 
         const subcpls = await api.get("/subcpl/indicators");
         const topics = await api.get("/topic");
+        const organizers = await api.get("/organizer");
         setSubCpls(subcpls.data.subcpls);
-        setTopics(topics.data.topics);  
+        setTopics(topics.data.topics);
+        setOrganizers(organizers.data.organizers);
 
         if (isEdit && resource_id) {
           const res = await api.get(`/resource/${resource_id}`);
@@ -95,6 +98,20 @@ function ResourceForm() {
       });
   };
 
+  const handleAddOrganizer = () => {
+      setResource(prev => {
+        if (!prev) return prev;
+        
+        return {
+            ...prev,
+            organizers: [
+                ...(prev.organizers || []), 
+                { organizer_id: "" }
+            ]
+        };
+      });
+  };
+
   const handleRemoveSession = (indexToRemove: number) => {
       setResource(prev => {
         if (!prev) return prev;
@@ -105,6 +122,18 @@ function ResourceForm() {
         };
       });
   };
+
+  const handleRemoveOrganizer = (indexToRemove: number) => {
+      setResource(prev => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          organizers: prev.organizers?.filter((_, index) => index !== indexToRemove)
+        };
+      });
+  };
+
 
   const handleSessionChange = (index: number, field: string, type: string, value: string) => {
       const updatedSessions = [...(resource?.sessions || [])];
@@ -150,6 +179,28 @@ function ResourceForm() {
                 delete newErrors[`session_${idx}_end`];
             }
           });
+        }
+      }
+
+      setErrors(newErrors);
+  };
+
+  const handleOrganizerChange = (index: number, value: string) => {
+      const updatedOrganizers = [...(resource?.organizers || [])];
+      const organizer = { ...updatedOrganizers[index] };
+
+      organizer["organizer_id"] = value;
+      updatedOrganizers[index] = organizer;
+
+      const updatedResource = { ...resource, organizers: updatedOrganizers } as ResourceInput;
+      setResource(updatedResource);
+      const newErrors = { ...errors };
+
+      if (updatedResource.type === 'event') {
+        if (!updatedOrganizers || updatedOrganizers.length === 0) {
+          newErrors.organizers = "Events must have an organizer.";
+        } else {
+          delete newErrors.organizers;
         }
       }
 
@@ -329,6 +380,10 @@ function ResourceForm() {
           }
         });
       }
+
+      if (!resource?.organizers || resource?.organizers?.length === 0){
+        newErrors.organizers = "Events must have an organizer."
+      }
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -362,6 +417,7 @@ function ResourceForm() {
       description: resource.description,
       ...(resource.type === 'event' && computedStatus ? { status: computedStatus } : {}),
       ...(resource.type === 'event' && resource.scale ? { scale: resource.scale } : {}),
+      ...(resource.type === 'event' && resource.organizers ? { organizers: resource.organizers } : {}),
       ...(resource.type === 'event' && resource.speaker_degree ? { speaker_degree: resource.speaker_degree } : {}),
 
       ...(resource.type === 'event' ? {
@@ -517,8 +573,8 @@ function ResourceForm() {
         { resource?.type == 'event' && (
         <>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-          <div className="flex flex-col gap-2 md:col-span-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <div className="flex flex-col gap-2 md:col-span-1">
             <label className="text-sm font-semibold text-slate-700">Scale</label>
             <Select name="scale" value={resource?.scale || ""} onChange={onChange}>
               <option value="university">University</option>
@@ -528,7 +584,7 @@ function ResourceForm() {
             </Select>
           </div>
 
-          <div className="flex flex-col gap-2 md:col-span-3">
+          <div className="flex flex-col gap-2 md:col-span-1">
             <label className="text-sm font-semibold text-slate-700">Speaker's Degree</label>
             <Select name="speaker_degree" value={resource?.speaker_degree || ""} onChange={onChange}>
               <option value="bachelor">Bachelor</option>
@@ -538,7 +594,63 @@ function ResourceForm() {
           </div>
         </div>
 
-          <div className="flex flex-col gap-4 mt-6 pt-6 border-t border-slate-100">
+        <div className="flex flex-col gap-4 mt-6 pt-6 border-t border-slate-100">
+          <div className="flex justify-between items-center mb-2">
+            <div>
+              <h4 className="text-base font-bold text-slate-900">Event Organizers</h4>
+              <p className="text-sm text-slate-500">Select organizer(s) of this event.</p>
+            </div>
+            <Button 
+              type="button" 
+              onClick={handleAddOrganizer} 
+              variant="outline" 
+              size="sm"
+              className="text-primary-700 border-primary-200 hover:bg-primary-50"
+            >
+              + Add Organizer
+            </Button>
+          </div>
+          {errors.organizers && (
+            <span className="text-xs font-medium text-red-600 mt-1">{errors.organizers}</span>
+          )}
+          {resource?.organizers?.map((organizer, index) => (
+            <div 
+              key={index} 
+              className="flex flex-col gap-4 p-4 border border-slate-200 rounded-xl bg-slate-50 relative group transition-all hover:border-slate-300"
+            >
+              <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                <span className="text-sm font-bold text-slate-700 uppercase tracking-wider">
+                  Organizer {index + 1}
+                </span>
+                
+                {/* Only show delete button if there is more than 1 session */}
+                {resource.organizers && resource.organizers.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveOrganizer(index)}
+                    className="text-slate-400 hover:text-danger-600 transition-colors p-1"
+                    title="Remove Organizer"
+                  >
+                    <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 md:col-span-1">
+                <label className="text-sm font-semibold text-slate-700">Organizer</label>
+                <Select name="organizer" value={organizer.organizer_id || ""} onChange={ (e) => {handleOrganizerChange(index, e.target.value)}}>
+                  <option value="" disabled>Select an organizer...</option>
+                  { organizers?.map((organizer) => (
+                    <option value={organizer.organizer_id}>{organizer.name.charAt(0).toUpperCase() + organizer.name.slice(1)}</option>
+                  ))
+                  }
+                </Select>
+              </div>
+              
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-4 mt-6 pt-6 border-t border-slate-100">
           <div className="flex justify-between items-center mb-2">
             <div>
               <h4 className="text-base font-bold text-slate-900">Event Sessions</h4>

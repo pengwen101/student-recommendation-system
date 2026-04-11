@@ -63,15 +63,15 @@ async def seed_student_questions_relation(path):
     
     query = """
     MATCH (s:Student)-[ra:ANSWERED]->(:Question)<-[:HAS_QUESTION]-(i:Indicator)
-    WITH s, i, avg(ra.valid_score) AS ind_avg_score
+    WITH s, i, 0.1 * avg(ra.valid_score) AS ind_avg_score
     MERGE (s)-[rli:LACKS]->(i)
-    SET rli.weight = 10 - ind_avg_score
+    SET rli.weight = 1 - ind_avg_score
 
     WITH DISTINCT s
     MATCH (s)-[ra:ANSWERED]->(:Question)<-[:HAS_QUESTION]-(:Indicator)<-[:HAS_INDICATOR]-(q:Quality)
-    WITH s, q, avg(ra.valid_score) AS qual_avg_score
+    WITH s, q, 0.1 * avg(ra.valid_score) AS qual_avg_score
     MERGE (s)-[rlq:LACKS]->(q)
-    SET rlq.weight = 10 - qual_avg_score
+    SET rlq.weight = 1 - qual_avg_score
 
     WITH s, q, qual_avg_score
     MATCH (sc:SubCpl)-[sq:HAS_QUALITY]->(q)
@@ -80,13 +80,13 @@ async def seed_student_questions_relation(path):
         sum(sq.weight) AS total_weight
     WITH s, sc, weighted_score_sum / total_weight as subcpl_avg_score
     MERGE (s)-[rls:LACKS]->(sc)
-    SET rls.weight = 10 - subcpl_avg_score
+    SET rls.weight = 1 - subcpl_avg_score
     
     WITH s, sc, subcpl_avg_score
     MATCH (sc)<-[:HAS_SUB_CPL]-(c:Cpl)
     WITH s, c, avg(subcpl_avg_score) as cpl_avg_score
     MERGE (s)-[rlc:LACKS]->(c)
-    SET rlc.weight = 10 - cpl_avg_score
+    SET rlc.weight = 1 - cpl_avg_score
     """
     
     await Neo4jConnection.query(query)

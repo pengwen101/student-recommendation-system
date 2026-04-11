@@ -115,7 +115,7 @@ async def has_indicators(nrp: str):
 async def get_student_recommendations(nrp: str):
     query = """
         MATCH (s:Student {nrp: $nrp})
-        OPTIONAL MATCH (s)-[rl:LACKS]->(:indicator)
+        OPTIONAL MATCH (s)-[rl:LACKS]->(:Indicator)
         WITH s, sum(coalesce(rl.weight, 0)) as total_lack_weight
         OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(:Topic)
         WITH s, total_lack_weight, count(ri) as total_interest_count
@@ -204,4 +204,5 @@ async def get_student_recommendations(nrp: str):
         LIMIT 10
     """
     params = {"nrp": nrp}
-    return await Neo4jConnection.query(query, params)
+    response = await Neo4jConnection.query(query, params)
+    return response

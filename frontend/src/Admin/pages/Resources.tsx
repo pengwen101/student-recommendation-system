@@ -104,13 +104,23 @@ const Resources = () => {
             headerClassName: "text-center w-24",
             cellClassName: "text-center",
             cell: (resource) => (
-                <Link 
-                    to={`/resource/edit/${resource.resource_id}`}
-                    className="inline-flex items-center justify-center w-8 h-8 rounded-md text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                    title="Edit Resource"
-                >
-                    <FontAwesomeIcon icon={faPenToSquare} />
-                </Link>
+                <div className="flex gap-2">
+                    <Link 
+                        to={`/resource/edit/${resource.resource_id}`}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-md text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        title="Edit Resource"
+                    >
+                        <FontAwesomeIcon icon={faPenToSquare} />
+                    </Link>
+
+                    <Link 
+                        to={`/resource/roster/${resource.resource_id}`}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-md text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        title="View Roster"
+                    >
+                        <FontAwesomeIcon icon={faPenToSquare} />
+                    </Link>
+                </div>
             )
         }
     ], []);
