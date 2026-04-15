@@ -34,6 +34,15 @@ const Navbar = () => {
                         </Button>
                     </Link>
 
+                    <Link to="/topic" className="w-full">
+                        <Button 
+                            variant={isActive("/topic") ? "secondary" : "ghost"} 
+                            className={`w-full justify-start ${isActive("/topic") ? "text-primary-800 font-semibold" : "text-slate-600"}`}
+                        >
+                            Topics
+                        </Button>
+                    </Link>
+
                     <Link to="/resource" className="w-full">
                         <Button 
                             variant={isActive("/resource") ? "secondary" : "ghost"} 

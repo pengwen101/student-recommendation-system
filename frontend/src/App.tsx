@@ -8,8 +8,10 @@ import ResourceDetails from './Student/pages/ResourceDetails';
 import Profile from './Student/pages/Profile';
 import Resources from './Admin/pages/Resources';
 import Organizers from './Admin/pages/Organizers';
+import Topics from './Admin/pages/Topics';
 import EventRoster from './Admin/pages/EventRoster';
 import OrganizerForm from './Admin/pages/OrganizerForm';
+import TopicForm from './Admin/pages/TopicForm';
 import Curriculum from './Admin/pages/Curriculum';
 import ResourceForm from './Admin/pages/ResourceForm';
 import ManageAdmins from './Admin/pages/ManageAdmins';
@@ -63,6 +65,9 @@ function App() {
           <Route path="/organizer" element={<Organizers/>}></Route>
           <Route path="/organizer/edit/:organizer_id" element={<OrganizerForm/>}></Route>
           <Route path="/organizer/create" element={<OrganizerForm/>}></Route>
+          <Route path="/topic" element={<Topics/>}></Route>
+          <Route path="/topic/edit/:topic_id" element={<TopicForm/>}></Route>
+          <Route path="/topic/create" element={<TopicForm/>}></Route>
           <Route path="/manage-admins" element={<ManageAdmins/>}></Route>
           <Route path="/curriculum" element={<Curriculum/>}></Route>
         </Route>

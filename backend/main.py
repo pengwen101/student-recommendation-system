@@ -86,7 +86,6 @@ async def auth(request: Request):
             admin_id = await admin_services.get_id_from_email(email)
             admin_exists = admin_id is not None
             if admin_exists:
-                print(admin_id)
                 is_approved = (await admin_services.read_admin_details(admin_id))["approved"]
                 if is_approved:
                     request.session['user'] = {**user, "role": "admin"}
