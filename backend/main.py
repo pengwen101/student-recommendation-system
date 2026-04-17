@@ -17,6 +17,7 @@ from starlette.responses import RedirectResponse
 from authlib.integrations.starlette_client import OAuth
 import os
 from dotenv import load_dotenv
+import logging
 
 load_dotenv()
 

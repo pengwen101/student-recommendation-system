@@ -214,7 +214,19 @@ function ResourceForm() {
 
     let newSubCpls;
     if (hasSubCpl) {
+      const subCplToRemove = existingSubCpls.find(s => s.sub_cpl_id === subCplId);
+      const indicatorsToUntick = subCplToRemove?.indicators.map(i => i.indicator_id) || [];
+
       newSubCpls = existingSubCpls.filter(s => s.sub_cpl_id !== subCplId);
+
+      if (indicatorsToUntick.length > 0) {
+        newSubCpls = newSubCpls.map(subcpl => {
+          return {
+            ...subcpl,
+            indicators: subcpl.indicators.filter(i => !indicatorsToUntick.includes(i.indicator_id))
+          };
+        }).filter(subcpl => subcpl.indicators.length > 0);
+      }
     } else {
       newSubCpls = [
         ...existingSubCpls,
@@ -228,7 +240,7 @@ function ResourceForm() {
 
     const newErrors = { ...errors };
 
-    if (newSubCpls.length == 0 || newSubCpls[0].indicators.length == 0) {
+    if (newSubCpls.length == 0 || newSubCpls[0]?.indicators.length == 0) {
       newErrors.subcpls = "At least one Sub-CPL and one Indicator must be selected.";
     } else {
       delete newErrors.subcpls;
@@ -267,48 +279,61 @@ function ResourceForm() {
     setErrors(newErrors);
   };
 
-  const handleIndicatorToggle = (subCplId: string, indicatorId: string) => {
-    if (!resource) return;
+  const handleIndicatorToggle = (clickedSubCplId: string, indicatorId: string) => {
+    if (!resource || !subCpls) return;
+
     const existingSubCpls = resource.subcpls || [];
-    
-    const hasSubCpl = existingSubCpls.some(s => s.sub_cpl_id === subCplId);
-    let newSubCpls;
 
-    if (!hasSubCpl) {
-      newSubCpls = [
-        ...existingSubCpls, 
-        { 
-           sub_cpl_id: subCplId,
-           indicators: [{indicator_id: indicatorId}]
-        }
-      ];
-    } else {
-      newSubCpls = existingSubCpls.map(subcpl => {
-        if (subcpl.sub_cpl_id !== subCplId) return subcpl;
+    const clickedSubCpl = existingSubCpls.find(s => s.sub_cpl_id === clickedSubCplId);
+    const isCurrentlyTicked = clickedSubCpl?.indicators.some(i => i.indicator_id === indicatorId);
 
-        const hasindicator = subcpl.indicators.some(i => i.indicator_id === indicatorId);
-        let newindicators;
+    const isTicking = !isCurrentlyTicked;
+
+    const affectedSubCplIds = subCpls
+      .filter(subcpl => subcpl.indicators.some(ind => ind.indicator_id === indicatorId))
+      .map(subcpl => subcpl.sub_cpl_id);
+
+    let newSubCpls = [...existingSubCpls];
+
+    if (isTicking) {
+      affectedSubCplIds.forEach(targetSubCplId => {
+        const existingIndex = newSubCpls.findIndex(s => s.sub_cpl_id === targetSubCplId);
         
-        if (hasindicator) {
-           newindicators = subcpl.indicators.filter(i => i.indicator_id !== indicatorId);
+        if (existingIndex >= 0) {
+          const hasIndicator = newSubCpls[existingIndex].indicators.some(i => i.indicator_id === indicatorId);
+          if (!hasIndicator) {
+            newSubCpls[existingIndex] = {
+              ...newSubCpls[existingIndex],
+              indicators: [...newSubCpls[existingIndex].indicators, { indicator_id: indicatorId }]
+            };
+          }
         } else {
-          newindicators = [...subcpl.indicators, { indicator_id: indicatorId }];
+          newSubCpls.push({
+            sub_cpl_id: targetSubCplId,
+            indicators: [{ indicator_id: indicatorId }]
+          });
         }
-        return { ...subcpl, indicators: newindicators };
-      }).filter(s => s.indicators.length > 0);
+      });
+    } else {
+      newSubCpls = newSubCpls.map(subcpl => {
+        if (affectedSubCplIds.includes(subcpl.sub_cpl_id)) {
+          return {
+            ...subcpl,
+            indicators: subcpl.indicators.filter(i => i.indicator_id !== indicatorId)
+          };
+        }
+        return subcpl;
+      }).filter(subcpl => subcpl.indicators.length > 0);
     }
 
-    
     setResource({ ...resource, subcpls: newSubCpls });
 
     const newErrors = { ...errors };
-
-    if (newSubCpls.length == 0 || newSubCpls[0].indicators.length == 0) {
+    if (newSubCpls.length === 0) {
       newErrors.subcpls = "At least one Sub-CPL and one Indicator must be selected.";
     } else {
       delete newErrors.subcpls;
     }
-
     setErrors(newErrors);
   };
 
@@ -418,7 +443,7 @@ function ResourceForm() {
       ...(resource.type === 'event' && computedStatus ? { status: computedStatus } : {}),
       ...(resource.type === 'event' && resource.scale ? { scale: resource.scale } : {}),
       ...(resource.type === 'event' && resource.organizers ? { organizers: resource.organizers } : {}),
-      ...(resource.type === 'event' && resource.speaker_degree ? { speaker_degree: resource.speaker_degree } : {}),
+      ...(resource.type === 'event' && resource.speaker_degree && resource.speaker_degree !== "no_speaker" ? { speaker_degree: resource.speaker_degree } : {}),
 
       ...(resource.type === 'event' ? {
         sessions: (resource.sessions || []).map((session) => ({
@@ -587,6 +612,8 @@ function ResourceForm() {
           <div className="flex flex-col gap-2 md:col-span-1">
             <label className="text-sm font-semibold text-slate-700">Speaker's Degree</label>
             <Select name="speaker_degree" value={resource?.speaker_degree || ""} onChange={onChange}>
+              <option value="no_speaker">No Speaker</option>
+              <option value="university_student">University Student</option>
               <option value="bachelor">Bachelor</option>
               <option value="master">Master</option>
               <option value="phd">Phd</option>

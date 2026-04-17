@@ -39,7 +39,7 @@ const AdminMainLayout = () => {
 function App() {
   return (
     <BrowserRouter>
-      <Toaster position="top-right" reverseOrder={false} />
+      <Toaster position="top-center" reverseOrder={false} />
       <Routes>
         {/* Public Route */}
         <Route path="/student/login" element={<StudentLogin />} />

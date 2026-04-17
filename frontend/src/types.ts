@@ -37,6 +37,7 @@ export const ResourceScale = {
 }
 
 export const SpeakerDegree = {
+    UniStudent: "university_student",
     Bachelor: "bachelor",
     Master: "master",
     Phd: "phd"

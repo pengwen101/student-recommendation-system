@@ -20,6 +20,7 @@ class ResourceScale(str, Enum):
     INTERNATIONAL = "international"
     
 class SpeakerDegree(str, Enum):
+    UNI_STUDENT = "university_student"
     BACHELOR = "bachelor"
     MASTER = "master"
     PHD = "phd"
