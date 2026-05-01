@@ -54,7 +54,7 @@ async def read_student_indicators(nrp: str):
 async def read_student_subcpls(nrp: str):
     query = """
         MATCH (s:Student {nrp: $nrp})-[r:LACKS]->(sc:SubCpl)
-        RETURN sc.sub_cpl_id as sub_cpl_id, sc.code as code, sc.name as name, r.weight as weight
+        RETURN sc.sub_cpl_id as sub_cpl_id, sc.code as code, sc.name as name, 1.0 - r.weight as weight
     """
     params = {"nrp": nrp}
     response = await Neo4jConnection.query(query, params)
@@ -63,7 +63,7 @@ async def read_student_subcpls(nrp: str):
 async def read_student_cpls(nrp: str):
     query = """
         MATCH (s:Student {nrp: $nrp})-[r:LACKS]->(c:Cpl)
-        RETURN c.cpl_id as cpl_id, c.code as code, c.name as name, r.weight as weight
+        RETURN c.cpl_id as cpl_id, c.code as code, c.name as name, 1.0 - r.weight as weight
     """
     params = {"nrp": nrp}
     response = await Neo4jConnection.query(query, params)

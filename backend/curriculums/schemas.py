@@ -38,3 +38,6 @@ class CPLResponse(BaseModel):
 class CurriculumResponse(BaseModel):
     message: str
     curriculum: List[CPLResponse]
+    
+class StudyLevel(BaseModel):
+    study_level_id: int

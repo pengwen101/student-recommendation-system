@@ -20,7 +20,12 @@ export interface Admin {
 export const ResourceType = {
   Book: "book",
   Video: "video",
-  Event: "event",
+  Event: "event"
+}
+
+export const ActorType = {
+    Admin: "admin",
+    Organizer: "organizer"
 }
 
 export const ResourceStatus = {
@@ -55,18 +60,23 @@ export interface SessionInput {
     end_datetime: string;
 }
 
+export interface ActorInput {
+    actor_id: string;
+    actor_type: typeof ActorType[keyof typeof ActorType]
+}
+
 export interface Resource {
     resource_id: string;
     type: typeof ResourceType[keyof typeof ResourceType];
     name: string;
     description: string;
+    study_levels?: StudyLevel[],
     sessions?: Session[],
     organizers: Organizer[],
     status: typeof ResourceStatus[keyof typeof ResourceStatus];
     scale: typeof ResourceScale[keyof typeof ResourceScale];
     speaker_degree: typeof SpeakerDegree[keyof typeof SpeakerDegree];
     is_active: boolean;
-    subcpls: SubCpl[];
     topics: Topic[];
     calculations?: ResourceSupportCalculations;
 }
@@ -77,13 +87,14 @@ export interface ResourceInput {
     type: typeof ResourceType[keyof typeof ResourceType];
     name: string;
     description: string;
+    study_levels?: StudyLevel[],
     sessions?: SessionInput[],
     organizers?: ResourceOrganizerInput[],
     status?: typeof ResourceStatus[keyof typeof ResourceStatus];
     scale?: typeof ResourceScale[keyof typeof ResourceScale];
     speaker_degree?: typeof SpeakerDegree[keyof typeof SpeakerDegree];
     is_active: boolean;
-    subcpls: ResourceSubCpl[];
+    indicators: ResourceIndicator[];
     topics: ResourceTopic[];
 }
 
@@ -93,7 +104,6 @@ export interface ResourceTopic {
 
 export interface ResourceSubCpl {
     sub_cpl_id: string;
-    indicators: ResourceIndicator[];
 }
 
 export interface ResourceIndicator {
@@ -181,6 +191,10 @@ export interface Topic {
     topic_id: string;
     code: string;
     name: string;
+}
+
+export interface StudyLevel {
+    study_level_id: number;
 }
 
 export interface Organizer {

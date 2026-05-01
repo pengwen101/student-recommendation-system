@@ -2,6 +2,7 @@ from pydantic import BaseModel, model_validator
 from datetime import datetime
 from typing import List, Dict
 from enum import Enum
+from backend.curriculums.schemas import StudyLevel
 
 class ResourceType(str, Enum):
     BOOK = "book"
@@ -25,44 +26,15 @@ class SpeakerDegree(str, Enum):
     MASTER = "master"
     PHD = "phd"
     
+class ActorType(str, Enum):
+    ADMIN = "admin"
+    ORGANIZER = "organizer"
+    
 class ResourceIndicatorsInput(BaseModel):
     indicator_id: str
     
-class ResourceSubCplsInput(BaseModel):
-    sub_cpl_id: str
-    indicators: List[ResourceIndicatorsInput]
-    
 class ResourceTopicsInput(BaseModel):
     topic_id: str
-    
-class ResourceIndicatorsResponse(BaseModel):
-    indicator_id: str
-    code: str
-    name: str
-
-class ResourceCalculatedIndicatorsResponse(BaseModel):
-    indicator_id: str
-    code: str
-    name: str
-    weight: float
-
-class ResourceQualitiesResponse(BaseModel):
-    quality_id: str
-    code: str
-    name: str
-    indicators: List[ResourceIndicatorsResponse]
-    
-class ResourceCalculatedQualitiesResponse(BaseModel):
-    quality_id: str
-    code: str
-    name: str
-    weight: float
-    
-class ResourceSubCplsResponse(BaseModel):
-    sub_cpl_id: str
-    code: str
-    name: str
-    indicators: List[ResourceIndicatorsResponse]
     
 class ResourceTopicsResponse(BaseModel):
     topic_id: str
@@ -93,14 +65,15 @@ class ResourceDetails(BaseModel):
     type: ResourceType
     name: str
     description: str
+    study_levels: List[StudyLevel] | None = None
     sessions: List[Session] | None = None
     organizers: List[ResourceOrganizerDetails] | None = None
     status: ResourceStatus | None = None
     scale: ResourceScale | None = None
     speaker_degree: SpeakerDegree | None = None
     is_active: bool
-    subcpls: List[ResourceSubCplsResponse]
     topics: List[ResourceTopicsResponse]
+    indicators: List[ResourceIndicatorsInput]
     calculations: ResourceSupportCalculations
     @model_validator(mode="after")
     def check_sessions(self):
@@ -113,17 +86,23 @@ class ResourceDetails(BaseModel):
 class ResourceDetailsResponse(BaseModel):
     message: str
     resource_details: ResourceDetails
+
+
+class ActorInput(BaseModel):
+    actor_id: str
+    actor_type: ActorType
     
 class ResourceDetailsInput(BaseModel):
     type: ResourceType
     name: str
     description: str
+    study_levels: List[StudyLevel] | None = None
     sessions: List[SessionInput] | None = None
     organizers: List[dict] | None = None
     status: ResourceStatus | None = None
     scale: ResourceScale | None = None
     speaker_degree: SpeakerDegree | None = None
-    subcpls: List[ResourceSubCplsInput]
+    indicators: List[ResourceIndicatorsInput]
     topics: List[ResourceTopicsInput]
     @model_validator(mode="after")
     def check_sessions(self):

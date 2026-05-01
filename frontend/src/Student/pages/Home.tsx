@@ -39,7 +39,7 @@ const Home = () => {
 
                 // 2. Fetch All Necessary Data in Parallel
                 const [recsRes, resourcesRes, topicsRes] = await Promise.all([
-                    api.get(`/student/recommendations/${nrp}`),
+                    api.get(`/student/recommendations/h14250080`),
                     api.get('/resource'), // Returns all active resources
                     api.get('/topic')     // Returns available topics for the filter
                 ]);
@@ -231,7 +231,7 @@ const Home = () => {
                                 <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Top Matches for You</h2>
                             </div>
                             
-                            <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-6 pt-2 -mx-6 px-6 md:-mx-8 md:px-8 hide-scrollbar">
+                            <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-6 pt-2 px-6 md:px-8 hide-scrollbar">
                                 {topRecommendations.map((rec) => (
                                     <div key={rec.resource.resource_id} className="min-w-[300px] md:min-w-[340px] max-w-[340px] h-[360px] snap-start shrink-0">
                                         <ResourceCard 
@@ -260,10 +260,8 @@ const Home = () => {
                             </div>
                         </section>
                     )}
-
                 </div>
             )}
-            
         </div>
     );
 };

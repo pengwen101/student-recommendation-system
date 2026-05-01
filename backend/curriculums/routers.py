@@ -10,7 +10,6 @@ curriculums_q_router = APIRouter(prefix="/curriculum/q", tags=["curriculum_quest
 @curriculums_router.get("/{version_id:path}", response_model=CurriculumResponse)
 async def read_curriculum(version_id: str):
     curriculum = await services.read_curriculum(version_id)
-    print(curriculum)
     return {"message": "Curriculum successfully retrieved.", "curriculum": curriculum}
 
 @curriculums_router.post("", response_model=CurriculumResponse)

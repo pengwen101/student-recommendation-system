@@ -3,6 +3,8 @@ import { useLocation } from 'react-router-dom';
 import api from '../../api/axios.tsx';
 import type { Topic } from '../../types.ts';
 import toast from 'react-hot-toast';
+import { Pane } from '../../components/Pane';
+import { Button } from '../../components/Button';
 
 function SelectTopics(){
     const [topics, setTopics] = useState<Topic[]>([]);
@@ -62,27 +64,56 @@ function SelectTopics(){
     }
 
     return (
-        <div className="h-screen flex justify-center items-center">
-            <form className="flex flex-col gap-y-4 w-3/4 items-center">
-                <div className="text-lg text-white">Select topics that interests you.</div>
-                { loading ? (<div className="text-gray animate-pulse">Loading...</div>) : (
-                <div className="grid grid-cols-3 gap-2 w-full">
-                    {topics.map((topic) => {
-                        const isSelected = selectedTopics.some(t => t === topic.topic_id);
-                        return (
-                        <div key={topic.topic_id}
-                            onClick= {() => onSelect(topic.topic_id, isSelected)}
-                            className={`border py-2 px-4 border-white rounded-lg flex justify-center items-center ${isSelected ? "bg-blue-200 border-blue-500 text-gray-900" : ""}`}>
-                            {topic.name}
-                        </div>
-                        )
-                    })}
-                </div>)
-                }
-                <div onClick={onSubmit} className="font-bold  px-4 py-2 bg-white text-gray-900 rounded-lg">Proceed</div>
-            </form>
+        <div className="h-screen flex justify-center items-center px-4">
+            <div className="w-full max-w-3xl">
+                <Pane variant="shadow">
+                    <form 
+                        className="flex flex-col gap-y-6 items-center" 
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            onSubmit();
+                        }}
+                    >
+                        <h2 className="text-xl font-semibold text-slate-800">
+                            Select topics that interest you
+                        </h2>
+
+                        {loading ? (
+                            <div className="text-slate-500 animate-pulse py-10">
+                                Loading topics...
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full">
+                                {topics.map((topic) => {
+                                    const isSelected = selectedTopics.some(t => t === topic.topic_id);
+                                    return (
+                                        <Button
+                                            key={topic.topic_id}
+                                            type="button"
+                                            variant={isSelected ? "solid" : "outline"}
+                                            onClick={() => onSelect(topic.topic_id, isSelected)}
+                                            className="w-full"
+                                        >
+                                            {topic.name}
+                                        </Button>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        <Button 
+                            type="submit" 
+                            size="lg" 
+                            className="w-full md:w-1/2 mt-2"
+                            disabled={loading}
+                        >
+                            Proceed
+                        </Button>
+                    </form>
+                </Pane>
+            </div>
         </div>
-    )
+    );
 }
 
 export default SelectTopics;

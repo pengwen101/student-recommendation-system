@@ -1,5 +1,4 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import api from '../../api/axios';
 import { Button } from '../../components/Button';
 
 const Navbar = () => {
@@ -10,8 +9,8 @@ const Navbar = () => {
 
     const handleLogout = async () => {
         try {
-            await api.get('/logout');
-            navigate('/student/login');
+            localStorage.removeItem("access_token");
+            navigate('/login');
         } catch (error) {
             console.error("Logout failed:", error);
         }

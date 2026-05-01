@@ -32,9 +32,9 @@ const Profile = () => {
                 const nrp = userData.nrp;
 
                 const [cplsRes, subCplsRes, topicsRes] = await Promise.all([
-                    api.get(`/student/cpls/${nrp}`),
-                    api.get(`/student/subcpls/${nrp}`),
-                    api.get(`/student/topics/${nrp}`)
+                    api.get(`/student/cpls/h14250080`),
+                    api.get(`/student/subcpls/h14250080`),
+                    api.get(`/student/topics/h14250080`)
                 ]);
 
                 setCpls(cplsRes.data.cpls || []);
@@ -55,10 +55,10 @@ const Profile = () => {
     // Calculate the minimum score so we can "zoom in" the chart. 
     // If lowest score is 7.5, chart starts at 6 instead of 0, exaggerating the differences.
     const radarDomain = useMemo(() => {
-        if (cpls.length === 0) return [0, 10];
+        if (cpls.length === 0) return [0, 1];
         const minScore = Math.min(...cpls.map(c => c.weight));
-        const chartStart = Math.max(0, Math.floor(minScore) - 1.5); // Give it a 1.5 point buffer
-        return [chartStart, 10];
+        const chartStart = Math.max(0, Math.floor(minScore) - 0.15); // Give it a 1.5 point buffer
+        return [chartStart, 1];
     }, [cpls]);
 
 
@@ -206,12 +206,12 @@ const Profile = () => {
 
                         <div className="flex flex-col gap-5 max-h-[300px] overflow-y-auto pr-2">
                             {displaySubCpls.length > 0 ? displaySubCpls.map(sub => {
-                                const progressPercentage = Math.min(Math.max(sub.weight * 10, 0), 100); 
+                                const progressPercentage = Math.min(Math.max(sub.weight * 100, 0), 100); 
                                 
                                 // Color Code the progress bar based on score
                                 let barColor = 'bg-primary-500'; // Default Blue
-                                if (sub.weight >= 8.5) barColor = 'bg-emerald-500'; // Green (Great)
-                                else if (sub.weight <= 6.5) barColor = 'bg-amber-500'; // Orange (Needs Focus)
+                                if (sub.weight >= 0.7) barColor = 'bg-emerald-500'; // Green (Great)
+                                else if (sub.weight < 0.7) barColor = 'bg-amber-500'; // Orange (Needs Focus)
 
                                 return (
                                     <div key={sub.sub_cpl_id} className="flex flex-col gap-1.5">
@@ -219,7 +219,7 @@ const Profile = () => {
                                             <span className="font-semibold text-slate-700">
                                                 {sub.code} <span className="text-slate-400 font-normal">| {sub.name}</span>
                                             </span>
-                                            <span className="font-bold text-slate-900">{sub.weight.toFixed(1)}</span>
+                                            <span className="font-bold text-slate-900">{(sub.weight * 100).toFixed(2)}</span>
                                         </div>
                                         <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
                                             <div className={`h-full rounded-full transition-all duration-1000 ease-out ${barColor}`} style={{ width: `${progressPercentage}%` }}></div>

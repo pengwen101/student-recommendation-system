@@ -25,20 +25,16 @@ async def read_resources():
                organizer_id: o.organizer_id,
                name: o.name
            }] as organizers,
+           [(r)-[af:AVAILABLE_FOR]->(sl:StudyLevel) | {
+               study_level_id: sl.study_level_id
+           }] as study_levels,
            r.scale as scale,
            r.speaker_degree as speaker_degree,
            r.status as status,
            r.is_active as is_active,
-           [(r)-[rt1:TARGETS]->(s:SubCpl) | {
-               sub_cpl_id: s.sub_cpl_id,
-               code: s.code,
-               name: s.name,
-               indicators: [(r)-[rt2:TARGETS {sub_cpl_id: s.sub_cpl_id}]->(i:Indicator) | {
-                   indicator_id: i.indicator_id,
-                   code: i.code,
-                   name: i.name
-               }]
-           }] as subcpls,
+           [(r)-[rsi:SUPPORTS]->(i:Indicator) | {
+                indicator_id: i.indicator_id
+            }] as indicators,
            [(r)-[rc:COVERS]->(t:Topic) | {
                topic_id: t.topic_id, 
                code: t.code,
@@ -89,16 +85,12 @@ async def read_resource_details(resource_id: str):
                organizer_id: o.organizer_id,
                name: o.name
            }] as organizers,
-           [(r)-[rt1:TARGETS]->(s:SubCpl) | {
-               sub_cpl_id: s.sub_cpl_id,
-               code: s.code,
-               name: s.name,
-               indicators: [(r)-[rt2:TARGETS {sub_cpl_id: s.sub_cpl_id}]->(i:Indicator) | {
-                   indicator_id: i.indicator_id,
-                   code: i.code,
-                   name: i.name
-               }]
-           }] as subcpls,
+           [(r)-[af:AVAILABLE_FOR]->(sl:StudyLevel) | {
+               study_level_id: sl.study_level_id
+           }] as study_levels,
+           [(r)-[rsi:SUPPORTS]->(i:Indicator) | {
+                indicator_id: i.indicator_id
+            }] as indicators,
            [(r)-[rc:COVERS]->(t:Topic) | {
                topic_id: t.topic_id, 
                code: t.code,
@@ -129,7 +121,7 @@ async def read_resource_details(resource_id: str):
     response = await Neo4jConnection.query(query, params)
     return response[0] if response else None
 
-async def create_resource(resource_id: str, data: dict):
+async def create_resource(resource_id: str, data: dict, current_user: dict):
     query = """
     MERGE (r:Resource {resource_id: $resource_id})
     SET r.name = $name,
@@ -140,6 +132,26 @@ async def create_resource(resource_id: str, data: dict):
         r.status = $status,
         r.is_active = true
     WITH r
+
+    OPTIONAL MATCH (a:Admin {admin_id: $creator_actor_id})
+    OPTIONAL MATCH (o:Organizer {organizer_id: $creator_actor_id})
+    WITH r, coalesce(a, o) AS updater
+    MERGE (r)-[u:CREATED_BY]->(updater)
+    SET u.updated_at = datetime({timezone: 'Asia/Jakarta'})
+    WITH r
+    OPTIONAL MATCH (a:Admin {admin_id: $updater_actor_id})
+    OPTIONAL MATCH (o:Organizer {organizer_id: $updater_actor_id})
+    WITH r, coalesce(a, o) AS updater
+    MERGE (r)-[u:UPDATED_BY]->(updater)
+    SET u.updated_at = datetime({timezone: 'Asia/Jakarta'})
+    
+    WITH r
+    
+    CALL (r) {
+        UNWIND $study_levels AS study_level
+        MATCH (sl:StudyLevel {study_level_id: study_level.study_level_id})
+        MERGE (r)-[:AVAILABLE_FOR]->(sl)
+    }
     
     CALL (r) {
         UNWIND $organizers AS org
@@ -158,35 +170,26 @@ async def create_resource(resource_id: str, data: dict):
         MATCH (t:Topic {topic_id: topic.topic_id})
         MERGE (r)-[rc:COVERS]->(t)
     }
- 
-    CALL (r) {
-        WITH r
-        UNWIND $subcpls AS subcpl
-        MATCH (s:SubCpl {sub_cpl_id: subcpl.sub_cpl_id})
-        MERGE (r)-[rt1:TARGETS]->(s)
-        
-        WITH r, s, subcpl
-        UNWIND subcpl.indicators AS indicator
-        MATCH (i:Indicator {indicator_id: indicator.indicator_id})
-        MERGE (r)-[rt2:TARGETS {sub_cpl_id: subcpl.sub_cpl_id}]->(i)
-    }
     """
     
     params = {"resource_id": resource_id, 
               "type": data['type'],
               "name": data['name'], 
               "description": data["description"],
+              "study_levels": data.get("study_levels", None),
               "scale": data.get('scale', None),
               "speaker_degree": data.get('speaker_degree', None),
               "sessions": data.get('sessions', None),
               "organizers": data.get('organizers') if data.get('organizers') else [],
               "status": data.get("status", None),
-              "topics": data['topics'], 
-              "subcpls": data['subcpls']}
+              "topics": data['topics'],
+              "creator_actor_id": current_user['sub'],
+              "updater_actor_id": current_user['sub']
+              }
     await Neo4jConnection.query(query, params)
-    await calculate_support_weights(resource_id)
+    await calculate_support_weights(resource_id, data['indicators'])
 
-async def update_resource(resource_id: str, data: dict):
+async def update_resource(resource_id: str, data: dict, current_user: dict):
     
     query = """
     MATCH (r:Resource {resource_id: $resource_id})
@@ -206,15 +209,26 @@ async def update_resource(resource_id: str, data: dict):
     OPTIONAL MATCH (r)-[old_rs:SUPPORTS]->(:Indicator)
     DELETE old_rs
     WITH r
-    OPTIONAL MATCH (r)-[old_rt1:TARGETS]->(:SubCpl)
-    DELETE old_rt1
-    WITH r
-    OPTIONAL MATCH (r)-[old_rt2:TARGETS]->(:Indicator)
-    DELETE old_rt2
-    WITH r
     OPTIONAL MATCH (r)-[old_hs:HAS_SESSION]->(:Session)
     DELETE old_hs
     WITH r
+    OPTIONAL MATCH (r)-[old_af:AVAILABLE_FOR]->(:StudyLevel)
+    DELETE old_af
+    WITH r
+
+    OPTIONAL MATCH (a:Admin {admin_id: $updater_actor_id})
+    OPTIONAL MATCH (o:Organizer {organizer_id: $updater_actor_id})
+    WITH r, coalesce(a, o) AS updater
+    MERGE (r)-[u:UPDATED_BY]->(updater)
+    SET u.updated_at = datetime({timezone: 'Asia/Jakarta'})
+    
+    WITH r
+    
+    CALL (r) {
+        UNWIND $study_levels AS study_level
+        MATCH (sl:StudyLevel {study_level_id: study_level.study_level_id})
+        MERGE (r)-[:AVAILABLE_FOR]->(sl)
+    }
     
     CALL (r) {
         UNWIND $organizers AS org
@@ -233,34 +247,34 @@ async def update_resource(resource_id: str, data: dict):
         MATCH (t:Topic {topic_id: topic.topic_id})
         MERGE (r)-[rc:COVERS]->(t)
     }
- 
-    CALL (r) {
-        WITH r
-        UNWIND $subcpls AS subcpl
-        MATCH (s:SubCpl {sub_cpl_id: subcpl.sub_cpl_id})
-        MERGE (r)-[rt1:TARGETS]->(s)
-        
-        WITH r, s, subcpl
-        UNWIND subcpl.indicators AS indicator
-        MATCH (i:Indicator {indicator_id: indicator.indicator_id})
-        MERGE (r)-[rt2:TARGETS {sub_cpl_id: subcpl.sub_cpl_id}]->(i)
-    }
     """
     
-    params = {"resource_id": resource_id, 
-              "type": data['type'],
-              "name": data['name'], 
-              "description": data["description"],
-              "scale": data.get('scale', None),
-              "organizers": data.get('organizers') if data.get('organizers') else [],
-              "speaker_degree": data.get('speaker_degree', None),
-              "sessions": data.get('sessions', None),
-              "status": data.get("status", None),
-              "topics": data['topics'], 
-              "subcpls": data['subcpls']}
+    params = {
+        "resource_id": resource_id, 
+        "type": data['type'],
+        "name": data['name'], 
+        "description": data["description"],
+        "study_levels": data.get("study_levels") or [], 
+        "scale": data.get('scale'),
+        "organizers": data.get('organizers') or [],
+        "speaker_degree": data.get('speaker_degree'),
+        "sessions": data.get('sessions') or [],
+        "status": data.get("status"),
+        "topics": data.get('topics') or [],
+        "updater_actor_id": current_user['sub'] 
+    }
+    
     await Neo4jConnection.query(query, params)
-    await calculate_support_weights(resource_id)
-
+    await calculate_support_weights(resource_id, data['indicators'])
+    
+async def check_organizer_update_authorization(resource_id, organizer_id):
+    query = """
+    MATCH (o:Organizer {organizer_id: $organizer_id})-[:ORGANIZES]->(r:Resource {resource_id: $resource_id})
+    RETURN count(r) > 0 AS authorized
+    """
+    response = await Neo4jConnection.query(query, {"organizer_id": organizer_id, "resource_id": resource_id})
+    return response[0]['authorized'] if response else False
+    
 async def activate_resource(resource_id: str):
     query = """
     MATCH (r:Resource {resource_id: $resource_id})
@@ -285,63 +299,33 @@ async def delete_resource(resource_id: str):
     params = {"resource_id": resource_id}
     await Neo4jConnection.query(query, params)
     
-async def calculate_support_weights(resource_id: str):
+async def calculate_support_weights(resource_id: str, indicators: list[dict]):
     query = """
     MATCH (r:Resource {resource_id: $resource_id})
-  
-    MATCH (r)-[:TARGETS]->(s:SubCpl)
-    MATCH (r)-[:TARGETS {sub_cpl_id: s.sub_cpl_id}]->(i:Indicator)
-    MATCH (s)-[sq:HAS_QUALITY]->(q:Quality)-[:HAS_INDICATOR]->(i)
+    UNWIND $indicators AS ind_input
+    MATCH (i:Indicator {indicator_id: ind_input.indicator_id})
 
-    WITH r, i, max(sq.weight) AS calculated_weight
+    MATCH (s:SubCpl)-[sq:HAS_QUALITY]->(q:Quality)-[:HAS_INDICATOR]->(i)
+
+    WITH r, i, q, s, max(sq.weight) AS calculated_weight
     MERGE (r)-[rsi:SUPPORTS]->(i)
     SET rsi.weight = calculated_weight
 
-    WITH r
-    MATCH (r)-[:TARGETS]->(s:SubCpl)
-    MATCH (s)-[sq:HAS_QUALITY]->(q:Quality)
+    WITH r, q, s, calculated_weight, count(i) AS resource_indicator_count
+    WITH r, q, s, calculated_weight, resource_indicator_count, COUNT { (q)-[:HAS_INDICATOR]->() } AS quality_indicator_count
 
-    CALL (q) {
-        MATCH (q)-[:HAS_INDICATOR]->(ia:Indicator)
-        RETURN count(ia) AS quality_indicator_count
-    }
-
-    CALL (r, s, q) {
-        MATCH (r)-[:TARGETS {sub_cpl_id: s.sub_cpl_id}]->(i:Indicator)<-[:HAS_INDICATOR]-(q)
-        RETURN count(i) AS resource_indicator_count
-    }
-    
-    WITH r, q, max(sq.weight * ((resource_indicator_count * 1.0) / quality_indicator_count)) AS r_q_weight
+    WITH r, q, s, calculated_weight * ((resource_indicator_count * 1.0) / quality_indicator_count) AS r_q_weight
     MERGE (r)-[rsq:SUPPORTS]->(q)
     SET rsq.weight = r_q_weight
 
-    WITH r
-    MATCH (r)-[:TARGETS]->(s:SubCpl)
+    WITH r, s, sum(r_q_weight) AS resource_quality_weight
     CALL (s) {
-        MATCH (s)-[rsa:HAS_QUALITY]->(qa:Quality)
-        RETURN sum(rsa.weight) AS subcpl_quality_weight
+        MATCH (s)-[sq_all:HAS_QUALITY]->()
+        RETURN sum(sq_all.weight) AS subcpl_quality_weight
     }
 
-    CALL (r, s) {
-        MATCH (s)-[sq:HAS_QUALITY]->(q:Quality)
-    
-        CALL (q) {
-            MATCH (q)-[:HAS_INDICATOR]->(ia:Indicator)
-            RETURN count(ia) AS q_ind_count
-        }
-        
-        CALL (r, s, q) {
-            MATCH (r)-[:TARGETS {sub_cpl_id: s.sub_cpl_id}]->(i:Indicator)<-[:HAS_INDICATOR]-(q)
-            RETURN count(i) AS r_ind_count
-        }
-      
-        RETURN sum(((r_ind_count * 1.0) / q_ind_count) * sq.weight) AS resource_quality_weight
-    }
-
-    WITH r, s, (resource_quality_weight * 1.0) / subcpl_quality_weight as r_s_weight
-            
     MERGE (r)-[rss:SUPPORTS]->(s)
-    SET rss.weight = r_s_weight
+    SET rss.weight = (resource_quality_weight * 1.0) / subcpl_quality_weight
     """
 
-    await Neo4jConnection.query(query, {"resource_id": resource_id})
+    await Neo4jConnection.query(query, {"resource_id": resource_id, "indicators": indicators})

@@ -1,7 +1,6 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Pane } from '../../components/Pane';
 import { Button } from '../../components/Button';
-import api from '../../api/axios';
 
 const Navbar = () => {
     const navigate = useNavigate();
@@ -9,8 +8,8 @@ const Navbar = () => {
     const isActive = (path: string) => location.pathname === path;
 
     const handleLogout = async () => {
-        await api.get('/logout');
-        navigate('/admin/login');
+        localStorage.removeItem("access_token");
+        navigate('/login');
     };
 
     return  (

@@ -32,7 +32,7 @@ function ResourceDetails() {
 
                 const [resourceRes, studentSubCplRes, studentTopicRes] = await Promise.all([
                     api.get(`/resource/${resource_id}`),
-                    api.get(`/student/subcpls/${nrp}`),
+                    api.get(`/student/subcpls/h14250080`),
                     api.get(`/student/topics/${nrp}`)
                 ]);
                 

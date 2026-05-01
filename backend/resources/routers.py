@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from backend.resources.schemas import (AllResourcesResponse, ResourceDetailsResponse, ResourceDetailsInput)
 from backend.resources import services
+from backend.dependencies import get_current_user
 from typing import List
 
 resources_router = APIRouter(prefix="/resource", tags=["resource"])
@@ -17,13 +18,13 @@ async def read_resource_details(resource_id: str):
     return {"message": "Resource details successfully retrieved.", "resource_details": resource_details}
 
 @resources_router.post("", response_model=ResourceDetailsResponse)
-async def create_resource(data: ResourceDetailsInput):
-    resource_details = await services.create_resource(data)
+async def create_resource(data: ResourceDetailsInput, current_user: dict = Depends(get_current_user)):
+    resource_details = await services.create_resource(data, current_user)
     return {"message": "Resource successfully created.", "resource_details": resource_details}
 
 @resources_router.put("/{resource_id}", response_model=ResourceDetailsResponse)
-async def update_resource(resource_id: str, data: ResourceDetailsInput):
-    resource_details = await services.update_resource(resource_id, data)
+async def update_resource(resource_id: str, data: ResourceDetailsInput, current_user: dict = Depends(get_current_user)):
+    resource_details = await services.update_resource(resource_id, data, current_user)
     return {"message": "Resource successfully updated.", "resource_details": resource_details}
 
 @resources_router.put("/activate/{resource_id}", response_model=ResourceDetailsResponse)

@@ -38,3 +38,12 @@ async def read_curriculum(version_id: str):
     response = await Neo4jConnection.query(query, {"version_id": version_id})
     unwrapped_cpls = [record["curriculum"] for record in response]
     return unwrapped_cpls
+
+
+async def study_level_exists(study_level_id: int):
+    query = """
+    MATCH (sl:StudyLevel {study_level_id: $study_level_id})
+    RETURN count(sl) > 0 as exists
+    """
+    response = await Neo4jConnection.query(query, {"study_level_id": study_level_id})
+    return response[0]['exists'] if response else False

@@ -1,4 +1,14 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
+from starlette.responses import RedirectResponse
+from starlette.middleware.sessions import SessionMiddleware
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+from authlib.integrations.starlette_client import OAuth
+import os
+from dotenv import load_dotenv
+from backend.dependencies import get_current_user, create_access_token
+
+from backend.database import Neo4jConnection
 from backend.students import routers as student_routers
 from backend.resources import routers as resource_routers
 from backend.qualities import routers as quality_routers
@@ -9,15 +19,6 @@ from backend.admins import routers as admin_routers
 from backend.organizers import routers as organizer_routers
 from backend.admins import services as admin_services
 from backend.admins import schemas as admin_schemas
-from contextlib import asynccontextmanager
-from backend.database import Neo4jConnection
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import RedirectResponse
-from authlib.integrations.starlette_client import OAuth
-import os
-from dotenv import load_dotenv
-import logging
 
 load_dotenv()
 
@@ -63,14 +64,16 @@ async def admin_login(request: Request):
 @app.get("/auth")
 async def auth(request: Request):
     try:
-        token = await oauth.google.authorize_access_token(request)
-        user = token.get('userinfo')
-        print(user)
+        auth_token = await oauth.google.authorize_access_token(request)
+        user = auth_token.get('userinfo')
         email = user.get('email')
+        name = user.get('name')
         
         intent = request.session.pop('login_intent', 'student')
-        print("Login Intent: " + intent)
         
+        jwt_payload = {}
+        redirect_url = ""
+
         if intent == 'student':
             if not email.endswith("@john.petra.ac.id"):
                 return RedirectResponse(url='http://localhost:5173/login?error=invalid_domain')
@@ -79,41 +82,57 @@ async def auth(request: Request):
             await Neo4jConnection.query("MERGE (s:Student {email: $email}) ON CREATE SET s.nrp = $nrp, s.name = $name", {
                 "email": email,
                 "nrp": nrp,
-                "name": user.get("name")
+                "name": name
             })
-            request.session['user'] = {**user, "nrp": nrp, "role": "student"}
-            return RedirectResponse(url='http://localhost:5173')
+  
+            jwt_payload = {"sub": nrp, "role": "student", "email": email, "name": name}
+            token = create_access_token(jwt_payload)
+            redirect_url = f'http://localhost:5173?token={token}'
+
         elif intent == 'admin':
             admin_id = await admin_services.get_id_from_email(email)
             admin_exists = admin_id is not None
+            
             if admin_exists:
                 is_approved = (await admin_services.read_admin_details(admin_id))["approved"]
-                if is_approved:
-                    request.session['user'] = {**user, "role": "admin"}
-                else:
-                    request.session['user'] = {**user, "role": "pending_admin"}
+                role = "admin" if is_approved else "pending_admin"
             else:
-                admin_details = await admin_services.create_admin(admin_schemas.AdminCreateInput(email=email, name=user.get("name")))
+                admin_details = await admin_services.create_admin(admin_schemas.AdminCreateInput(email=email, name=name))
+                admin_id = admin_details['admin_id']
                 is_root_admin = email == os.getenv("ROOT_ADMIN_EMAIL")
+                
                 if is_root_admin:
-                    await admin_services.approve_admin(admin_details['admin_id'])
-                    request.session['user'] = {**user, "role": "admin"}
+                    await admin_services.approve_admin(admin_id)
+                    role = "admin"
                 else:
-                    request.session['user'] = {**user, "role": "pending_admin"}
-            if request.session['user']['role'] == 'admin':
-                return RedirectResponse(url='http://localhost:5173/admin')
+                    role = "pending_admin"
+
+            jwt_payload = {"sub": str(admin_id), "role": role, "email": email, "name": name}
+            token = create_access_token(jwt_payload)
+            
+            if role == 'admin':
+                redirect_url = f'http://localhost:5173/admin?token={token}'
             else:
-                return RedirectResponse(url='http://localhost:5173/admin/login')
+                redirect_url = f'http://localhost:5173/admin/login?error=pending_approval'
+
+        return RedirectResponse(url=redirect_url)
+
     except Exception as e:
         return {"error": str(e)}
 
 @app.get("/users/me")
-async def get_current_user(request: Request):
-    user = request.session.get('user')
-    if not user:
-        return {"authenticated": False}
-    else:
-        return {"authenticated": True, "user": user}
+async def get_me(current_user: dict = Depends(get_current_user)):
+    """
+    This endpoint now requires a valid JWT in the Authorization header.
+    React must send: Headers: { Authorization: "Bearer <token>" }
+    """
+    return {
+        "authenticated": True,
+        "user_id": current_user.get("sub"),
+        "role": current_user.get("role"),
+        "email": current_user.get("email"),
+        "name": current_user.get("name")
+    }
 
 @app.get("/logout")
 async def logout(request: Request):

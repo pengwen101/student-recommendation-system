@@ -2,7 +2,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 
-import type { ResourceInput, SubCpl, Topic, Organizer } from "../../types";
+import type { ResourceInput, SubCpl, Topic, Organizer, ResourceSubCpl } from "../../types";
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { Select } from '../../components/Select';
@@ -19,6 +19,7 @@ function ResourceForm() {
   const navigate = useNavigate();
   const [resource, setResource] = useState<ResourceInput | null>(null);
   const [subCpls, setSubCpls] = useState<SubCpl[] | null>(null);
+  const [clickedSubCpls, setClickedSubCpls] = useState<ResourceSubCpl[] | null> (null);
   const [organizers, setOrganizers] = useState<Organizer[] | null>(null);
   const [topics, setTopics] = useState<Topic[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,17 +39,35 @@ function ResourceForm() {
           window.location.href = "/admin/login";
           return;
         }
-
-        const subcpls = await api.get("/subcpl/indicators");
-        const topics = await api.get("/topic");
-        const organizers = await api.get("/organizer");
-        setSubCpls(subcpls.data.subcpls);
-        setTopics(topics.data.topics);
-        setOrganizers(organizers.data.organizers);
+        const subcplsRes = await api.get("/subcpl/indicators");
+        const topicsRes = await api.get("/topic");
+        const organizersRes = await api.get("/organizer");
+   
+        const fetchedSubCpls = subcplsRes.data.subcpls;
+        setSubCpls(fetchedSubCpls);
+        setTopics(topicsRes.data.topics);
+        setOrganizers(organizersRes.data.organizers);
 
         if (isEdit && resource_id) {
           const res = await api.get(`/resource/${resource_id}`);
-          setResource(res.data.resource_details || null);
+          const fetchedResource = res.data.resource_details;
+          
+          setResource(fetchedResource || null);
+          if (fetchedResource && fetchedSubCpls) {
+            const resourceIndicatorIds = fetchedResource.indicators.map(
+              (indicator: { indicator_id: string }) => indicator.indicator_id
+            );
+            
+            const initialClickedSubCpls = fetchedSubCpls
+              .filter((subcpl: SubCpl) =>
+                subcpl.indicators.some((indicator: { indicator_id: string }) =>
+                  resourceIndicatorIds.includes(indicator.indicator_id)
+                )
+              )
+              .map((subcpl: SubCpl) => ({ sub_cpl_id: subcpl.sub_cpl_id }));
+              
+            setClickedSubCpls(initialClickedSubCpls);
+          }
         } else {
           setResource({
             resource_id: "",
@@ -60,7 +79,7 @@ function ResourceForm() {
             speaker_degree: "bachelor",
             status: "",
             is_active: true,
-            subcpls: [],
+            indicators: [],
             topics: []
           } as ResourceInput);
         }
@@ -70,7 +89,6 @@ function ResourceForm() {
         setLoading(false);
       }
     };
-
     fetchData();
   }, [resource_id, isEdit]);
 
@@ -207,45 +225,124 @@ function ResourceForm() {
       setErrors(newErrors);
   };
 
-  const handleSubCplToggle = (subCplId: string) => {
+  const availableStudyLevels = [1, 2, 3, 4];
+  
+  const currentStudyLevels = resource?.study_levels || [];
+  const currentStudyLevelIds = currentStudyLevels.map(sl => sl.study_level_id);
+  const isAllLevelsChecked = availableStudyLevels.every(level => currentStudyLevelIds.includes(level));
+
+  const handleStudyLevelToggle = (level: number | 'all') => {
     if (!resource) return;
-    const existingSubCpls = resource.subcpls || [];
-    const hasSubCpl = existingSubCpls.some(s => s.sub_cpl_id === subCplId);
 
-    let newSubCpls;
-    if (hasSubCpl) {
-      const subCplToRemove = existingSubCpls.find(s => s.sub_cpl_id === subCplId);
-      const indicatorsToUntick = subCplToRemove?.indicators.map(i => i.indicator_id) || [];
+    let newLevels = [...currentStudyLevels];
 
-      newSubCpls = existingSubCpls.filter(s => s.sub_cpl_id !== subCplId);
-
-      if (indicatorsToUntick.length > 0) {
-        newSubCpls = newSubCpls.map(subcpl => {
-          return {
-            ...subcpl,
-            indicators: subcpl.indicators.filter(i => !indicatorsToUntick.includes(i.indicator_id))
-          };
-        }).filter(subcpl => subcpl.indicators.length > 0);
+    if (level === 'all') {
+      if (isAllLevelsChecked) {
+        newLevels = [];
+      } else {
+        newLevels = availableStudyLevels.map(l => ({ study_level_id: l }));
       }
     } else {
-      newSubCpls = [
-        ...existingSubCpls,
-        {
-          sub_cpl_id: subCplId,
-          indicators: []
-        }
-      ];
+      const isCurrentlyChecked = newLevels.some(l => l.study_level_id === level);
+      
+      if (isCurrentlyChecked) {
+        newLevels = newLevels.filter(l => l.study_level_id !== level);
+      } else {
+        newLevels.push({ study_level_id: level });
+      }
     }
-    setResource({ ...resource, subcpls: newSubCpls });
 
-    const newErrors = { ...errors };
+    setResource({ ...resource, study_levels: newLevels });
 
-    if (newSubCpls.length == 0 || newSubCpls[0]?.indicators.length == 0) {
+    const newErrors = {...errors};
+    if (newLevels.length == 0) {
+      newErrors.studyLevels = "Must select study level.";
+    } else {
+      delete newErrors.studyLevels;
+    }
+    setErrors(newErrors);
+  };
+
+  const handleSubCplToggle = (subCplId: string) => {
+    if (!resource || !subCpls) return;
+
+    const currentClicked = clickedSubCpls || [];
+    const currentIndicators = resource.indicators || [];
+
+    const isTicked = currentClicked.some((c) => c.sub_cpl_id === subCplId);
+    const targetSubCpl = subCpls.find((s) => s.sub_cpl_id === subCplId);
+
+    let newClickedSubCpls = [...currentClicked];
+    let newIndicators = [...currentIndicators];
+
+    if (isTicked) {
+      newClickedSubCpls = newClickedSubCpls.filter((c) => c.sub_cpl_id !== subCplId);
+
+      if (targetSubCpl) {
+        const indicatorsToRemove = targetSubCpl.indicators.map((i) => i.indicator_id);
+        newIndicators = newIndicators.filter(
+          (indicator) => !indicatorsToRemove.includes(indicator.indicator_id)
+        );
+      }
+    } else {
+      newClickedSubCpls.push({ sub_cpl_id: subCplId });
+    }
+
+    setClickedSubCpls(newClickedSubCpls);
+    setResource({ ...resource, indicators: newIndicators });
+    const newErrors = {...errors};
+    if (newIndicators.length === 0) {
       newErrors.subcpls = "At least one Sub-CPL and one Indicator must be selected.";
     } else {
       delete newErrors.subcpls;
     }
+    setErrors(newErrors);
+  };
 
+  const handleIndicatorToggle = (indicatorId: string) => {
+    if (!resource || !subCpls) return;
+
+    const currentClicked = clickedSubCpls || [];
+    const currentIndicators = resource.indicators || [];
+
+    const isTicked = currentIndicators.some((i) => i.indicator_id === indicatorId);
+
+    let newIndicators = [...currentIndicators];
+    let newClickedSubCpls = [...currentClicked];
+
+    if (isTicked) {
+      newIndicators = newIndicators.filter((i) => i.indicator_id !== indicatorId);
+      newClickedSubCpls = newClickedSubCpls.filter((clickedCpl) => {
+        const subCplData = subCpls.find((s) => s.sub_cpl_id === clickedCpl.sub_cpl_id);
+        if (!subCplData) return false;
+      
+        const hasRemainingTicked = subCplData.indicators.some((ind) =>
+          newIndicators.some((ni) => ni.indicator_id === ind.indicator_id)
+        );
+        
+        return hasRemainingTicked;
+      });
+
+    } else {
+      newIndicators.push({ indicator_id: indicatorId });
+      subCpls.forEach((subCpl) => {
+        const containsIndicator = subCpl.indicators.some(i => i.indicator_id === indicatorId);
+        const isAlreadyClicked = newClickedSubCpls.some(c => c.sub_cpl_id === subCpl.sub_cpl_id);
+        
+        if (containsIndicator && !isAlreadyClicked) {
+          newClickedSubCpls.push({ sub_cpl_id: subCpl.sub_cpl_id });
+        }
+      });
+    }
+
+    setResource({ ...resource, indicators: newIndicators });
+    setClickedSubCpls(newClickedSubCpls);
+    const newErrors = { ...errors };
+    if (newIndicators.length === 0) {
+      newErrors.subcpls = "At least one Sub-CPL and one Indicator must be selected.";
+    } else {
+      delete newErrors.subcpls;
+    }
     setErrors(newErrors);
   };
 
@@ -276,64 +373,6 @@ function ResourceForm() {
       }
     }
 
-    setErrors(newErrors);
-  };
-
-  const handleIndicatorToggle = (clickedSubCplId: string, indicatorId: string) => {
-    if (!resource || !subCpls) return;
-
-    const existingSubCpls = resource.subcpls || [];
-
-    const clickedSubCpl = existingSubCpls.find(s => s.sub_cpl_id === clickedSubCplId);
-    const isCurrentlyTicked = clickedSubCpl?.indicators.some(i => i.indicator_id === indicatorId);
-
-    const isTicking = !isCurrentlyTicked;
-
-    const affectedSubCplIds = subCpls
-      .filter(subcpl => subcpl.indicators.some(ind => ind.indicator_id === indicatorId))
-      .map(subcpl => subcpl.sub_cpl_id);
-
-    let newSubCpls = [...existingSubCpls];
-
-    if (isTicking) {
-      affectedSubCplIds.forEach(targetSubCplId => {
-        const existingIndex = newSubCpls.findIndex(s => s.sub_cpl_id === targetSubCplId);
-        
-        if (existingIndex >= 0) {
-          const hasIndicator = newSubCpls[existingIndex].indicators.some(i => i.indicator_id === indicatorId);
-          if (!hasIndicator) {
-            newSubCpls[existingIndex] = {
-              ...newSubCpls[existingIndex],
-              indicators: [...newSubCpls[existingIndex].indicators, { indicator_id: indicatorId }]
-            };
-          }
-        } else {
-          newSubCpls.push({
-            sub_cpl_id: targetSubCplId,
-            indicators: [{ indicator_id: indicatorId }]
-          });
-        }
-      });
-    } else {
-      newSubCpls = newSubCpls.map(subcpl => {
-        if (affectedSubCplIds.includes(subcpl.sub_cpl_id)) {
-          return {
-            ...subcpl,
-            indicators: subcpl.indicators.filter(i => i.indicator_id !== indicatorId)
-          };
-        }
-        return subcpl;
-      }).filter(subcpl => subcpl.indicators.length > 0);
-    }
-
-    setResource({ ...resource, subcpls: newSubCpls });
-
-    const newErrors = { ...errors };
-    if (newSubCpls.length === 0) {
-      newErrors.subcpls = "At least one Sub-CPL and one Indicator must be selected.";
-    } else {
-      delete newErrors.subcpls;
-    }
     setErrors(newErrors);
   };
 
@@ -381,7 +420,7 @@ function ResourceForm() {
       newErrors.description = "Description is required.";
     }
 
-    if (resource.subcpls.length == 0 || resource.subcpls[0].indicators.length == 0) {
+    if (resource.indicators.length == 0) {
       newErrors.subcpls = "At least one Sub-CPL and one Indicator must be selected.";
     }
 
@@ -408,6 +447,10 @@ function ResourceForm() {
 
       if (!resource?.organizers || resource?.organizers?.length === 0){
         newErrors.organizers = "Events must have an organizer."
+      }
+
+      if (!resource?.study_levels || resource?.study_levels?.length === 0){
+        newErrors.studyLevels = "Must select study level."
       }
     }
 
@@ -444,6 +487,7 @@ function ResourceForm() {
       ...(resource.type === 'event' && resource.scale ? { scale: resource.scale } : {}),
       ...(resource.type === 'event' && resource.organizers ? { organizers: resource.organizers } : {}),
       ...(resource.type === 'event' && resource.speaker_degree && resource.speaker_degree !== "no_speaker" ? { speaker_degree: resource.speaker_degree } : {}),
+      ...(resource.type === 'event' && resource.study_levels ? { study_levels: resource.study_levels } : {}),
 
       ...(resource.type === 'event' ? {
         sessions: (resource.sessions || []).map((session) => ({
@@ -453,7 +497,7 @@ function ResourceForm() {
         }))
       } : {}),
 
-      subcpls: resource.subcpls,
+      indicators: resource.indicators,
       topics: resource.topics
     };
 
@@ -618,6 +662,48 @@ function ResourceForm() {
               <option value="master">Master</option>
               <option value="phd">Phd</option>
             </Select>
+          </div>
+
+          <div className="flex flex-col gap-2 md:col-span-2 mt-2">
+            <label className="text-sm font-semibold text-slate-700">Available for Study Level</label>
+            <div className="flex flex-wrap items-center gap-6 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isAllLevelsChecked}
+                  onChange={() => handleStudyLevelToggle('all')}
+                  className="w-4 h-4 text-primary-600 border-slate-300 rounded cursor-pointer focus:ring-primary-500"
+                />
+                <span className={`text-sm font-medium ${isAllLevelsChecked ? 'text-primary-800' : 'text-slate-700'}`}>
+                  All Levels
+                </span>
+              </label>
+
+              <div className="h-4 w-px bg-slate-300 hidden sm:block"></div>
+
+              {availableStudyLevels.map((level) => {
+                const isChecked = currentStudyLevelIds.includes(level); 
+                
+                return (
+                  <label key={level} className="flex items-center gap-2 cursor-pointer hover:opacity-80">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => handleStudyLevelToggle(level)}
+                      className="w-4 h-4 text-primary-600 border-slate-300 rounded cursor-pointer focus:ring-primary-500"
+                    />
+                    <span className={`text-sm ${isChecked ? 'text-slate-900 font-medium' : 'text-slate-600'}`}>
+                      Level {level}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            {errors.studyLevels && (
+              <span className="text-xs font-medium text-red-600 mt-1">
+                {errors.studyLevels}
+              </span>
+            )}
           </div>
         </div>
 
@@ -784,7 +870,7 @@ function ResourceForm() {
         
         <div className="space-y-3 mt-6">
           {subCpls?.map(subcpl => {
-            const isSubCplSelected = resource?.subcpls?.some(s => s.sub_cpl_id === subcpl.sub_cpl_id);
+            const isSubCplSelected = clickedSubCpls?.some(clickedSubCpl => clickedSubCpl.sub_cpl_id == subcpl.sub_cpl_id);
 
             return (
               <div 
@@ -814,16 +900,14 @@ function ResourceForm() {
                     
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                       {subcpl.indicators?.map(i => {
-                        const isIndicatorChecked = resource?.subcpls?.find(
-                          s => s.sub_cpl_id === subcpl.sub_cpl_id
-                        )?.indicators.some(resInd => resInd.indicator_id === i.indicator_id) || false;
+                        const isIndicatorChecked = resource?.indicators.some(resInd => resInd.indicator_id === i.indicator_id) || false;
 
                         return (
                           <label key={i.indicator_id} className="flex items-start gap-3 cursor-pointer hover:bg-slate-50 p-2 rounded-md transition-colors group">
                             <input
                                type="checkbox"
                                checked={isIndicatorChecked}
-                               onChange={() => handleIndicatorToggle(subcpl.sub_cpl_id, i.indicator_id)}
+                               onChange={() => handleIndicatorToggle(i.indicator_id)}
                                className="mt-0.5 w-4 h-4 text-primary-600 border-slate-300 rounded cursor-pointer focus:ring-primary-500"
                             />
                             <span className={`text-sm leading-tight ${isIndicatorChecked ? 'text-slate-900 font-medium' : 'text-slate-600 group-hover:text-slate-900'}`}>

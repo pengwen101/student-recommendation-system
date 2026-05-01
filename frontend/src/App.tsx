@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import Navbar from './Student/components/Navbar';
-import StudentLogin from './Student/pages/Login';
-import AdminLogin from './Admin/pages/Login';
+import Login from './pages/Login';
 import Home from './Student/pages/Home';
 import SelectTopics from './Student/pages/SelectTopics';
 import ResourceDetails from './Student/pages/ResourceDetails';
@@ -16,6 +15,7 @@ import Curriculum from './Admin/pages/Curriculum';
 import ResourceForm from './Admin/pages/ResourceForm';
 import ManageAdmins from './Admin/pages/ManageAdmins';
 import Layout from './Admin/components/Layout';
+import AuthCatcher from './components/AuthCatcher';
 import { Toaster } from "react-hot-toast";
 
 
@@ -39,11 +39,11 @@ const AdminMainLayout = () => {
 function App() {
   return (
     <BrowserRouter>
+      <AuthCatcher />
       <Toaster position="top-center" reverseOrder={false} />
       <Routes>
         {/* Public Route */}
-        <Route path="/student/login" element={<StudentLogin />} />
-        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/student/input_topics" element={<SelectTopics />} />
 
         {/* Protected Routes (Wrapped in Layout) */}
