@@ -1,5 +1,7 @@
 // Roles
 
+import { type OutputData } from "@editorjs/editorjs";
+
 export interface Student {
     nrp: string;
     name: string;
@@ -20,7 +22,8 @@ export interface Admin {
 export const ResourceType = {
   Book: "book",
   Video: "video",
-  Event: "event"
+  Event: "event",
+  Article: "article",
 }
 
 export const ActorType = {
@@ -70,6 +73,7 @@ export interface Resource {
     type: typeof ResourceType[keyof typeof ResourceType];
     name: string;
     description: string;
+    article_text?: string;
     study_levels?: StudyLevel[],
     sessions?: Session[],
     organizers: Organizer[],
@@ -87,6 +91,7 @@ export interface ResourceInput {
     type: typeof ResourceType[keyof typeof ResourceType];
     name: string;
     description: string;
+    article_text?: OutputData;
     study_levels?: StudyLevel[],
     sessions?: SessionInput[],
     organizers?: ResourceOrganizerInput[],

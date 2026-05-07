@@ -1,13 +1,25 @@
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, field_validator
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Optional, Any
 from enum import Enum
 from backend.curriculums.schemas import StudyLevel
+import json
+
+class EditorBlock(BaseModel):
+    id: Optional[str] = None
+    type: str
+    data: Dict[str, Any]  # The non-strict dict validation
+
+class EditorData(BaseModel):
+    time: Optional[int] = None
+    version: Optional[str] = None
+    blocks: List[EditorBlock]
 
 class ResourceType(str, Enum):
     BOOK = "book"
     VIDEO = "video"
     EVENT = "event"
+    ARTICLE = "article"
 
 class ResourceStatus(str, Enum):
     OPEN = "open"
@@ -64,7 +76,8 @@ class ResourceDetails(BaseModel):
     resource_id: str
     type: ResourceType
     name: str
-    description: str
+    description: str | None = None
+    article_text: Optional[EditorData] = None
     study_levels: List[StudyLevel] | None = None
     sessions: List[Session] | None = None
     organizers: List[ResourceOrganizerDetails] | None = None
@@ -82,6 +95,18 @@ class ResourceDetails(BaseModel):
         if self.type != 'event' and self.sessions:
             raise ValueError(f"Sessions cannot be provided for resource type '{self.type}'.")
         return self
+    
+    @field_validator("article_text", mode="before")
+    @classmethod
+    def parse_article_text(cls, value):
+        if not value: 
+            return None
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return None 
+        return value
 
 class ResourceDetailsResponse(BaseModel):
     message: str
@@ -95,7 +120,8 @@ class ActorInput(BaseModel):
 class ResourceDetailsInput(BaseModel):
     type: ResourceType
     name: str
-    description: str
+    description: str | None = None
+    article_text: Optional[EditorData] = None
     study_levels: List[StudyLevel] | None = None
     sessions: List[SessionInput] | None = None
     organizers: List[dict] | None = None

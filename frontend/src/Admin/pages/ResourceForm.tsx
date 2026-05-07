@@ -11,6 +11,7 @@ import { Textarea } from '../../components/Textarea';
 import api from "../../api/axios";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTrash } from '@fortawesome/free-solid-svg-icons';
+import Editor from '../../components/Editor';
 
 function ResourceForm() {
   // Hooks
@@ -416,7 +417,7 @@ function ResourceForm() {
       newErrors.name = "Name is required.";
     }
 
-    if (!resource.description?.trim()) {
+    if (resource.type != 'article' && !resource.description?.trim()) {
       newErrors.description = "Description is required.";
     }
 
@@ -454,6 +455,12 @@ function ResourceForm() {
       }
     }
 
+    if (resource.type === 'article') {
+      if (!resource.article_text || !resource.article_text.blocks || resource.article_text.blocks.length === 0) {
+        newErrors.article_text = "Article content cannot be empty.";
+      }
+    }
+
     if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
         toast.error("Please fix the highlighted errors in the form."); 
@@ -488,6 +495,7 @@ function ResourceForm() {
       ...(resource.type === 'event' && resource.organizers ? { organizers: resource.organizers } : {}),
       ...(resource.type === 'event' && resource.speaker_degree && resource.speaker_degree !== "no_speaker" ? { speaker_degree: resource.speaker_degree } : {}),
       ...(resource.type === 'event' && resource.study_levels ? { study_levels: resource.study_levels } : {}),
+      ...(resource.type === 'article' && resource.article_text ? { article_text: resource.article_text } : {}),
 
       ...(resource.type === 'event' ? {
         sessions: (resource.sessions || []).map((session) => ({
@@ -615,6 +623,7 @@ function ResourceForm() {
               <option value="event">Event</option>
               <option value="book">Book</option>
               <option value="video">Video</option>
+              <option value="article">Article</option>
             </Select>
             {errors.type && (
               <span className="text-xs font-medium text-red-600 mt-1">
@@ -623,7 +632,42 @@ function ResourceForm() {
             )}
           </div>
 
-          <div className="flex flex-col gap-2 md:col-span-3">
+          {/* SECTION: Article Specific Details */}
+          {resource?.type === 'article' && (
+            <Pane variant="shadow" className="p-6 mt-6 col-span-3">
+              <h3 className="text-lg font-bold text-slate-900 mb-6 border-b border-slate-100 pb-2">
+                Article Content
+              </h3>
+              <div className="flex flex-col gap-2">
+                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 min-h-[300px]">
+                  <Editor
+                    editorBlock="editorjs-container"
+                    data={resource?.article_text}
+                    onChange={(data) => {
+                      setResource(prev => prev ? { ...prev, article_text: data } : prev);
+                      
+                      // Clear error if user starts typing
+                      if (data?.blocks?.length > 0) {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors.article_text;
+                          return newErrors;
+                        });
+                      }
+                    }}
+                  />
+                </div>
+                {errors.article_text && (
+                  <span className="text-xs font-medium text-red-600 mt-1">
+                    {errors.article_text}
+                  </span>
+                )}
+              </div>
+            </Pane>
+          )}
+
+          { resource?.type != 'article' && (
+            <div className="flex flex-col gap-2 md:col-span-3">
             <label className="text-sm font-semibold text-slate-700">Description</label>
             <Textarea
               name="description"
@@ -637,7 +681,11 @@ function ResourceForm() {
               </span>
             )}
           </div>
+
+          )}
         </div>
+
+          
 
         { resource?.type == 'event' && (
         <>

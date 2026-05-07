@@ -39,7 +39,7 @@ const Home = () => {
 
                 // 2. Fetch All Necessary Data in Parallel
                 const [recsRes, resourcesRes, topicsRes] = await Promise.all([
-                    api.get(`/student/recommendations/h14250080`),
+                    api.get(`/student/recommendations/${nrp}`),
                     api.get('/resource'), // Returns all active resources
                     api.get('/topic')     // Returns available topics for the filter
                 ]);

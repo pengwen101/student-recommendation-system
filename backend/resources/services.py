@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from backend.resources.schemas import ResourceDetailsResponse, AllResourcesResponse, ResourceDetailsInput, ActorInput, ActorType
 from typing import List
 import uuid
+import json
 
 async def read_resources():
     return await resource_cypher.read_resources()
@@ -16,7 +17,8 @@ async def read_resource_details(resource_id: str):
     resource_exists = await resource_cypher.resource_exists(resource_id)
     if not resource_exists:
         raise HTTPException(status_code=404, detail="Resource not found")
-    return await resource_cypher.read_resource_details(resource_id)
+    resource_details = await resource_cypher.read_resource_details(resource_id)
+    return resource_details
 
 async def create_resource(data: ResourceDetailsInput, current_user: dict):
     new_resource_id = str(uuid.uuid4())
@@ -34,6 +36,8 @@ async def create_resource(data: ResourceDetailsInput, current_user: dict):
         topic_exists = await topic_cypher.topic_exists(topic_id)
         if not topic_exists:
             raise HTTPException(status_code=404, detail=f"Topic ID {topic_id} not found")
+    if "article_text" in data_dict:
+        data_dict["article_text"] = json.dumps(data_dict["article_text"])
     actor_id = current_user['sub']
     admin_exists = await admin_cypher.admin_exists(actor_id)
     organizer_exists = await organizer_cypher.organizer_exists(actor_id)
@@ -72,6 +76,8 @@ async def update_resource(resource_id: str, data: ResourceDetailsInput, current_
         topic_exists = await topic_cypher.topic_exists(topic_id)
         if not topic_exists:
             raise HTTPException(status_code=404, detail=f"Topic ID {topic_id} not found")
+    if "article_text" in data_dict:
+        data_dict["article_text"] = json.dumps(data_dict["article_text"])
     actor_id = current_user['sub']
     admin_exists = await admin_cypher.admin_exists(actor_id)
     organizer_exists = await organizer_cypher.organizer_exists(actor_id)
