@@ -32,3 +32,10 @@ class ResourceCharacteristic(BaseModel):
     resource_id: str
     sub_cpl_count: int
     sub_cpl_avg_support: float
+    
+class OrganizerSupport(BaseModel):
+    organizer_id: str
+    organizer_name: str
+    curriculum_id: str
+    curriculum_code: str
+    support_score: float

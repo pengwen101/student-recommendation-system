@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status, Query
-from backend.analytics.schemas import (SupportLackGap, ResourceSupportingX, ResourceCharacteristic)
+from backend.analytics.schemas import (SupportLackGap, ResourceSupportingX, ResourceCharacteristic, OrganizerSupport)
 from backend.analytics import services
 from typing import List
 
@@ -21,12 +21,11 @@ async def resource_supporting_x(curriculum_id: str | None = Query(default=None),
     result = await services.resource_supporting_x(curriculum_id, study_level_ids, resource_types, organizer_ids)
     return result
 
-@analytic_router.get("/resource_support", response_model=List[ResourceSupportingX])
-async def resource_support(curriculum_id: str | None = Query(default=None),
+@analytic_router.get("/organizer_support", response_model=List[OrganizerSupport])
+async def organizer_support(curriculum_type: str,
                             study_level_ids: list[str] | None = Query(default=None), 
-                            resource_types: list[str] | None = Query(default=None), 
-                            organizer_ids: list[str] | None = Query(default=None)):
-    result = await services.resource_support(curriculum_id, study_level_ids, resource_types, organizer_ids)
+                            resource_types: list[str] | None = Query(default=None)):
+    result = await services.organizer_support(curriculum_type, study_level_ids, resource_types)
     return result
 
 @analytic_router.get("/resource_characteristic", response_model=List[ResourceCharacteristic])

@@ -65,19 +65,23 @@ async def resource_supporting_x(curriculum_id: str | None = None, study_level_id
     result = await Neo4jConnection.query(query, {"curriculum_id": curriculum_id, "study_level_ids": study_level_ids, "resource_types": resource_types, "organizer_ids": organizer_ids})
     return result
 
-async def organizer_support(curriculum_type: str):
+async def organizer_support(curriculum_type: str, study_level_ids: str | None, resource_types: str | None):
     query = f"""
     MATCH (o:Organizer)
     MATCH (c:{curriculum_type})
     OPTIONAL MATCH (o)-[]->(r:Resource)-[rs:SUPPORTS]->(c)
+    WHERE $resource_types IS NULL OR r.type IN $resource_types
+    MATCH (r)-[]->(sl:StudyLevel)
+    WHERE $study_level_ids IS NULL OR sl.study_level_id IN $study_level_ids
     WITH o, c, sum(rs.weight * r.internal_weight) as support_score
-    RETURN o.name as organizer_name,
-    c.code as code,
+    RETURN o.organizer_id as organizer_id, o.name as organizer_name,
+    coalesce(c.cpl_id, c.sub_cpl_id, c.quality_id, c.indicator_id) as curriculum_id,
+    c.code as curriculum_code,
     c.name as curriculum_name,
     COALESCE(support_score, 0) AS support_score
     """
     
-    result = await Neo4jConnection.query(query)
+    result = await Neo4jConnection.query(query, {"study_level_ids": study_level_ids, "resource_types": resource_types})
     return result
 
 

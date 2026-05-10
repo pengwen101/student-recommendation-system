@@ -24,3 +24,13 @@ async def resource_characteristic(study_level_ids: list[str] | None = None,
                             organizer_ids: list[str] | None = None):
     result = await analytic_cypher.resource_characteristic(study_level_ids, resource_types, organizer_ids)
     return result
+
+async def organizer_support(curriculum_type: str,
+                            study_level_ids: list[str] | None = None, 
+                            resource_types: list[str] | None = None):
+    if curriculum_type not in CURRICULUM_TYPE_LABEL_MAP:
+        raise HTTPException(f"Invalid type provided: {curriculum_type}")
+        
+    target_label = CURRICULUM_TYPE_LABEL_MAP[curriculum_type]
+    result = await analytic_cypher.organizer_support(target_label, study_level_ids, resource_types)
+    return result

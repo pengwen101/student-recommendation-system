@@ -12,6 +12,7 @@ import EventRoster from './Admin/pages/EventRoster';
 import Dashboard from './Admin/pages/Dashboard';
 import SupportLackGap from "./Admin/pages/dashboards/SupportLackGap";
 import ResourceCharacteristic from "./Admin/pages/dashboards/ResourceCharacteristic";
+import OrganizerSupport from "./Admin/pages/dashboards/OrganizerSupport";
 import OrganizerForm from './Admin/pages/OrganizerForm';
 import TopicForm from './Admin/pages/TopicForm';
 import Curriculum from './Admin/pages/Curriculum';
@@ -77,6 +78,7 @@ function App() {
 
           <Route path="/support_lack_gap" element={<SupportLackGap/>}></Route>
           <Route path="/resource_characteristic" element={<ResourceCharacteristic/>}></Route>
+          <Route path="/organizer_support" element={<OrganizerSupport/>}></Route>
         </Route>
       </Routes>
     </BrowserRouter>

@@ -260,3 +260,11 @@ export interface ResourceCharacteristic {
     sub_cpl_count: number;
     sub_cpl_avg_support: number;
 }
+
+export interface OrganizerSupport {
+    organizer_id: string;
+    organizer_name: string;
+    curriculum_id: string;
+    curriculum_code: string;
+    support_score: number;
+}

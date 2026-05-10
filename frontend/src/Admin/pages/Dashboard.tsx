@@ -13,7 +13,7 @@ export default function Dashboard() {
                 variant={isActive("/support_lack_gap") ? "secondary" : "ghost"} 
                 className={`w-full justify-start ${isActive("/support_lack_gap") ? "text-primary-800 font-semibold" : "text-slate-600"}`}
             >
-                Topics
+                Support Lack Gap
             </Button>
         </Link>
 
@@ -22,7 +22,16 @@ export default function Dashboard() {
                 variant={isActive("/resource_characteristic") ? "secondary" : "ghost"} 
                 className={`w-full justify-start ${isActive("/resource_characteristic") ? "text-primary-800 font-semibold" : "text-slate-600"}`}
             >
-                Resources
+                Resource Characteristic
+            </Button>
+        </Link>
+
+        <Link to="/organizer_support" className="w-full">
+            <Button 
+                variant={isActive("/organizer_support") ? "secondary" : "ghost"} 
+                className={`w-full justify-start ${isActive("/organizer_support") ? "text-primary-800 font-semibold" : "text-slate-600"}`}
+            >
+                Organizer Support
             </Button>
         </Link>
     </>
