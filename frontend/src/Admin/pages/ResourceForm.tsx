@@ -2,7 +2,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 
-import type { ResourceInput, SubCpl, Topic, Organizer, ResourceSubCpl } from "../../types";
+import type { ResourceInput, SubCpl, Topic, Organizer, ResourceSubCpl, CurriculumVersion } from "../../types";
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { Select } from '../../components/Select';
@@ -12,6 +12,7 @@ import api from "../../api/axios";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTrash } from '@fortawesome/free-solid-svg-icons';
 import Editor from '../../components/Editor';
+import axios from 'axios';
 
 function ResourceForm() {
   // Hooks
@@ -23,8 +24,11 @@ function ResourceForm() {
   const [clickedSubCpls, setClickedSubCpls] = useState<ResourceSubCpl[] | null> (null);
   const [organizers, setOrganizers] = useState<Organizer[] | null>(null);
   const [topics, setTopics] = useState<Topic[] | null>(null);
+  const [versions, setVersions] = useState<CurriculumVersion[] | null>(null);
+  const [versionId, setVersionId] = useState<string>("1");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [activating, setActivating] = useState(false);
@@ -40,14 +44,16 @@ function ResourceForm() {
           window.location.href = "/admin/login";
           return;
         }
-        const subcplsRes = await api.get("/subcpl/indicators");
+        const subcplsRes = await api.get(`/subcpl/indicators/${versionId}`);
         const topicsRes = await api.get("/topic");
         const organizersRes = await api.get("/organizer");
+        const versionsRes = await api.get("/curriculum_version");
    
         const fetchedSubCpls = subcplsRes.data.subcpls;
         setSubCpls(fetchedSubCpls);
         setTopics(topicsRes.data.topics);
         setOrganizers(organizersRes.data.organizers);
+        setVersions(versionsRes.data.curriculum_versions);
 
         if (isEdit && resource_id) {
           const res = await api.get(`/resource/${resource_id}`);
@@ -91,7 +97,29 @@ function ResourceForm() {
       }
     };
     fetchData();
-  }, [resource_id, isEdit]);
+  }, [resource_id, isEdit, versionId]);
+
+
+  const fetchBookInfo = async (isbn: string | null | undefined) => {
+    if (!isbn) return;
+    setSearching(true);
+    axios.get(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`)
+    .then(res => {
+      const book = res.data.items[0].volumeInfo;
+      setResource(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          name: book.title,
+          publisher: book.publisher,
+          authors: book.authors,
+          published_date: book.publishedDate,
+          description: book.description
+        };
+      });
+    }).catch(err => console.log(err));
+    setSearching(false);
+  }
 
   const getDateOnly = (isoString?: string) => {
     if (!isoString) return "";
@@ -131,6 +159,20 @@ function ResourceForm() {
       });
   };
 
+  const handleAddAuthor = () => {
+      setResource(prev => {
+        if (!prev) return prev;
+        
+        return {
+            ...prev,
+            authors: [
+                ...(prev.authors || []), 
+                ""
+            ]
+        };
+      });
+  };
+
   const handleRemoveSession = (indexToRemove: number) => {
       setResource(prev => {
         if (!prev) return prev;
@@ -149,6 +191,17 @@ function ResourceForm() {
         return {
           ...prev,
           organizers: prev.organizers?.filter((_, index) => index !== indexToRemove)
+        };
+      });
+  };
+
+  const handleRemoveAuthor = (indexToRemove: number) => {
+      setResource(prev => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          authors: prev.authors?.filter((_, index) => index !== indexToRemove)
         };
       });
   };
@@ -220,6 +273,28 @@ function ResourceForm() {
           newErrors.organizers = "Events must have an organizer.";
         } else {
           delete newErrors.organizers;
+        }
+      }
+
+      setErrors(newErrors);
+  };
+
+  const handleAuthorChange = (index: number, value: string) => {
+      const updatedAuthors = [...(resource?.authors || [])];
+      let author = updatedAuthors[index];
+
+      author = value;
+      updatedAuthors[index] = author;
+
+      const updatedResource = { ...resource, authors: updatedAuthors } as ResourceInput;
+      setResource(updatedResource);
+      const newErrors = { ...errors };
+
+      if (updatedResource.type === 'event') {
+        if (!updatedAuthors || updatedAuthors.length === 0) {
+          newErrors.authors = "Events must have an author.";
+        } else {
+          delete newErrors.authors;
         }
       }
 
@@ -347,6 +422,10 @@ function ResourceForm() {
     setErrors(newErrors);
   };
 
+  const handleVersionChange = (version_id: string) => {
+    setVersionId(version_id);
+  }
+
   const onChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     if (!resource) return;
 
@@ -455,6 +534,7 @@ function ResourceForm() {
       }
     }
 
+
     if (resource.type === 'article') {
       if (!resource.article_text || !resource.article_text.blocks || resource.article_text.blocks.length === 0) {
         newErrors.article_text = "Article content cannot be empty.";
@@ -496,6 +576,12 @@ function ResourceForm() {
       ...(resource.type === 'event' && resource.speaker_degree && resource.speaker_degree !== "no_speaker" ? { speaker_degree: resource.speaker_degree } : {}),
       ...(resource.type === 'event' && resource.study_levels ? { study_levels: resource.study_levels } : {}),
       ...(resource.type === 'article' && resource.article_text ? { article_text: resource.article_text } : {}),
+
+      ...(resource.type === 'book' && resource.isbn ? { isbn: resource.isbn } : {}),
+      ...(resource.type === 'book' && resource.publisher ? { publisher: resource.publisher } : {}),
+      ...(resource.type === 'book' && resource.authors ? { authors: resource.authors } : {}),
+      ...(resource.type === 'book' && resource.published_date ? { published_date: resource.published_date } : {}),
+      ...(resource.type === 'video' && resource.content_link ? { content_link: resource.content_link } : {}),
 
       ...(resource.type === 'event' ? {
         sessions: (resource.sessions || []).map((session) => ({
@@ -632,6 +718,146 @@ function ResourceForm() {
             )}
           </div>
 
+          { resource?.type === "video" && (
+              <div className="flex flex-col gap-2">
+              <label className="text-sm font-semibold text-slate-700">Content Link</label>
+              <Input
+                type="text"
+                name="content_link"
+                placeholder=""
+                value={resource?.content_link || ""}
+                onChange={onChange}
+              />
+              {errors.content_link && (
+                <span className="text-xs font-medium text-red-600 mt-1">
+                  {errors.content_link}
+                </span>
+              )}
+            </div>
+          )
+          }
+
+          { resource?.type === "book" && (
+
+            <>
+            <div className="flex flex-col col-span-3 gap-2">
+            <label className="text-sm font-semibold text-slate-700">ISBN</label>
+            <div className="grid grid-cols-4 gap-x-6">
+            <Input
+              type="text"
+              name="isbn"
+              placeholder=""
+              className="col-span-3"
+              value={resource?.isbn || ""}
+              onChange={onChange}
+            />
+            <Button
+              isLoading={searching}
+              onClick={() => fetchBookInfo(resource?.isbn)}
+              size="default"
+              variant="solid" 
+              className="text-base col-span-1"
+            >
+              {searching ? "Searching..." : "Search Book"}
+            </Button>
+            </div>
+            {errors.isbn && (
+              <span className="text-xs font-medium text-red-600 mt-1">
+                {errors.isbn}
+              </span>
+            )}
+            </div>
+
+          <div className="flex flex-col col-span-1 gap-2">
+            <label className="text-sm font-semibold text-slate-700">Publisher</label>
+            <Input
+              type="text"
+              name="publisher"
+              placeholder=""
+              value={resource?.publisher || ""}
+              onChange={onChange}
+            />
+            {errors.publisher && (
+              <span className="text-xs font-medium text-red-600 mt-1">
+                {errors.publisher}
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col col-span-2 gap-2">
+            <label className="text-xs font-semibold text-slate-600">Published Date</label>
+              <Input
+                type="date"
+                name="published_date"
+                className="flex-1 bg-white"
+                value={getDateOnly(resource?.published_date) || ""}
+                onChange={(e) => onChange(e)}
+                required
+              />
+              {errors.published_date && (
+                <span className="text-xs font-medium text-red-600">{errors.published_date}</span>
+              )}
+            </div>
+
+            <div className="flex flex-col col-span-3 gap-4 mt-6 pt-6 border-t border-slate-100">
+              <div className="flex justify-between items-center mb-2">
+                <div>
+                  <h4 className="text-base font-bold text-slate-900">Authors</h4>
+                  <p className="text-sm text-slate-500">Input author(s) of this book.</p>
+                </div>
+                <Button 
+                  type="button" 
+                  onClick={handleAddAuthor} 
+                  variant="outline" 
+                  size="sm"
+                  className="text-primary-700 border-primary-200 hover:bg-primary-50"
+                >
+                  + Add Author
+                </Button>
+              </div>
+              {errors.authors && (
+                <span className="text-xs font-medium text-red-600 mt-1">{errors.authors}</span>
+              )}
+              {resource?.authors?.map((author, index) => (
+                <div 
+                  key={index} 
+                  className="flex flex-col gap-4 p-4 border border-slate-200 rounded-xl bg-slate-50 relative group transition-all hover:border-slate-300"
+                >
+                  <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                    <span className="text-sm font-bold text-slate-700 uppercase tracking-wider">
+                      Author {index + 1}
+                    </span>
+                    
+                    {/* Only show delete button if there is more than 1 session */}
+                    {resource.authors && resource.authors.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAuthor(index)}
+                        className="text-slate-400 hover:text-danger-600 transition-colors p-1"
+                        title="Remove author"
+                      >
+                        <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2 md:col-span-1">
+                    <label className="text-sm font-semibold text-slate-700">Author</label>
+                    <Input
+                      type="text"
+                      name="author"
+                      className="flex-1 bg-white"
+                      value={author || ""}
+                      onChange={(e) => handleAuthorChange(index, e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                </div>
+              ))}
+            </div>
+          </>
+          )}
+
           {/* SECTION: Article Specific Details */}
           {resource?.type === 'article' && (
             <Pane variant="shadow" className="p-6 mt-6 col-span-3">
@@ -684,9 +910,6 @@ function ResourceForm() {
 
           )}
         </div>
-
-          
-
         { resource?.type == 'event' && (
         <>
 
@@ -911,6 +1134,14 @@ function ResourceForm() {
       <Pane variant="shadow" className="p-6">
         <h3 className="text-lg font-bold text-slate-900 mb-1">Curriculum Mapping</h3>
         <p className="text-sm text-slate-500">Select a Sub-CPL to reveal and assign its indicators.</p>
+
+        <Select name="version_id" value={versionId || ""} onChange={ (e) => handleVersionChange(e.target.value)}>
+          {
+            versions?.map(version => (
+              <option value={version.curriculum_version_id}>{version.curriculum_version_id}</option>
+            ))
+          }
+        </Select>
 
         {errors.subcpls && (
           <span className="text-xs font-medium text-red-600 mt-2">{errors.subcpls}</span>

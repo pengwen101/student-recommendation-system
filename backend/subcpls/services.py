@@ -4,11 +4,11 @@ from fastapi import HTTPException
 from typing import List
 import uuid
 
-async def read_subcpls():
-    return await subcpl_cypher.read_subcpls()
+async def read_subcpls(version_id: str):
+    return await subcpl_cypher.read_subcpls(version_id)
 
-async def read_subcpl_indicators():
-    return await subcpl_cypher.read_subcpl_indicators()
+async def read_subcpl_indicators(version_id: str):
+    return await subcpl_cypher.read_subcpl_indicators(version_id)
 
 async def read_subcpl_details(sub_cpl_id: str):
     subcpl_exists = await subcpl_cypher.subcpl_exists(sub_cpl_id)

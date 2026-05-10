@@ -8,3 +8,6 @@ async def read_curriculum(version_id: str):
 
 async def study_level_exists(study_level_id: int):
     return await curriculum_cypher.study_level_exists(study_level_id)
+
+async def read_curriculum_versions():
+    return await curriculum_cypher.read_curriculum_versions()

@@ -8,7 +8,7 @@ import json
 class EditorBlock(BaseModel):
     id: Optional[str] = None
     type: str
-    data: Dict[str, Any]  # The non-strict dict validation
+    data: Dict[str, Any]
 
 class EditorData(BaseModel):
     time: Optional[int] = None
@@ -77,6 +77,11 @@ class ResourceDetails(BaseModel):
     type: ResourceType
     name: str
     description: str | None = None
+    authors: List[str] | None = None
+    publisher: str | None = None
+    published_date: datetime | None = None
+    isbn: str | None = None
+    content_link: str | None = None
     article_text: Optional[EditorData] = None
     study_levels: List[StudyLevel] | None = None
     sessions: List[Session] | None = None
@@ -121,6 +126,11 @@ class ResourceDetailsInput(BaseModel):
     type: ResourceType
     name: str
     description: str | None = None
+    authors: List[str] | None = None
+    publisher: str | None = None
+    published_date: datetime | None = None
+    isbn: str | None = None
+    content_link: str | None = None
     article_text: Optional[EditorData] = None
     study_levels: List[StudyLevel] | None = None
     sessions: List[SessionInput] | None = None

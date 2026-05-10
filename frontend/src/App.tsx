@@ -9,6 +9,7 @@ import Resources from './Admin/pages/Resources';
 import Organizers from './Admin/pages/Organizers';
 import Topics from './Admin/pages/Topics';
 import EventRoster from './Admin/pages/EventRoster';
+import Dashboard from './Admin/pages/Dashboard';
 import OrganizerForm from './Admin/pages/OrganizerForm';
 import TopicForm from './Admin/pages/TopicForm';
 import Curriculum from './Admin/pages/Curriculum';
@@ -70,6 +71,7 @@ function App() {
           <Route path="/topic/create" element={<TopicForm/>}></Route>
           <Route path="/manage-admins" element={<ManageAdmins/>}></Route>
           <Route path="/curriculum" element={<Curriculum/>}></Route>
+          <Route path="/dashboard" element={<Dashboard/>}></Route>
         </Route>
       </Routes>
     </BrowserRouter>

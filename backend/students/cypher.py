@@ -112,7 +112,7 @@ async def has_indicators(nrp: str):
     response = await Neo4jConnection.query(query, params)
     return response[0]['has_indicators'] if response else False
 
-async def get_student_recommendations(nrp: str):
+async def get_student_recommendations(nrp: str, type: str):
     query = """
         MATCH (s:Student {nrp: $nrp})
         OPTIONAL MATCH (s)-[rl:LACKS]->(:Indicator)
@@ -120,7 +120,7 @@ async def get_student_recommendations(nrp: str):
         OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(:Topic)
         WITH s, total_lack_weight, count(ri) as total_interest_count
 
-        MATCH (r:Resource)
+        MATCH (s)-[:CURRENTLY_IN]->(:StudyLevel)<-[:AVAILABLE_FOR]-(r:Resource {type: $type})
         OPTIONAL MATCH (s)-[rl:LACKS]->(i:Indicator)<-[rp:SUPPORTS]-(r)
         WITH s, r, total_lack_weight, total_interest_count,
             sum(
@@ -140,6 +140,8 @@ async def get_student_recommendations(nrp: str):
                     ELSE 1.0
                 END
             ) as topic_intersection
+            
+        MATCH (cf:Config:RecommendationWeight)
 
         RETURN {
             resource_id: r.resource_id,
@@ -148,22 +150,17 @@ async def get_student_recommendations(nrp: str):
             description: r.description,
             sessions: [(r)-[:HAS_SESSION]->(ss:Session) | {
                 session_id: ss.session_id,
-                start_datetime: ss.start_datetime,
-                end_datetime: ss.end_datetime 
+                start_datetime: apoc.temporal.format(ss.start_datetime, "yyyy-MM-dd'T'HH:mm:ss"),
+                end_datetime: apoc.temporal.format(ss.end_datetime, "yyyy-MM-dd'T'HH:mm:ss")
             }],
             scale: r.scale,
             speaker_degree: r.speaker_degree,
             status: r.status,
             is_active: r.is_active,
-            subcpls: [(r)-[rt1:TARGETS]->(s:SubCpl) | {
-                sub_cpl_id: s.sub_cpl_id,
-                code: s.code,
-                name: s.name,
-                indicators: [(r)-[rt2:TARGETS {sub_cpl_id: s.sub_cpl_id}]->(i:Indicator) | {
-                    indicator_id: i.indicator_id,
-                    code: i.code,
-                    name: i.name
-                }]
+            indicators: [(r)-[rs:SUPPORTS]->(i:Indicator) | {
+                indicator_id: i.indicator_id,
+                code: i.code,
+                name: i.name
             }],
             topics: [(r)-[rc:COVERS]->(t:Topic) | {
                 topic_id: t.topic_id, 
@@ -183,26 +180,26 @@ async def get_student_recommendations(nrp: str):
                     name: q.name, 
                     weight: toFloat(rsq.weight)
                 }],
-                subcpls: [(r)-[rss:SUPPORTS]->(s:SubCpl) | {
-                    sub_cpl_id: s.sub_cpl_id,
-                    code: s.code,
-                    name: s.name, 
+                subcpls: [(r)-[rss:SUPPORTS]->(sc:SubCpl) | {
+                    sub_cpl_id: sc.sub_cpl_id,
+                    code: sc.code,
+                    name: sc.name, 
                     weight: toFloat(rss.weight)
                 }]
             }
         } AS resource,
-        (
-            0.6 * (CASE WHEN total_lack_weight > 0 
+        ((
+            cf.need_weight * (CASE WHEN total_lack_weight > 0 
                         THEN indicator_intersection / total_lack_weight 
                         ELSE 0.0 END) 
         ) + (
-            0.4 * (CASE WHEN total_interest_count > 0 
+            cf.interest_weight * (CASE WHEN total_interest_count > 0 
                         THEN topic_intersection / total_interest_count 
                         ELSE 0.0 END)
-        ) AS probability_score
-        ORDER BY probability_score DESC
+        )) * r.internal_weight AS score
+        ORDER BY score DESC
         LIMIT 10
     """
-    params = {"nrp": nrp}
+    params = {"nrp": nrp, "type": type}
     response = await Neo4jConnection.query(query, params)
     return response

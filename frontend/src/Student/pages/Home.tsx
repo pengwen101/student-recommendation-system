@@ -30,7 +30,7 @@ const Home = () => {
                     return;
                 }
                 
-                const nrp = userRes.data.user.nrp;
+                const nrp = userRes.data.user_id;
                 const hasTopicsRes = await api.get(`/student/topics/has_topics/${nrp}`);
                 if (!hasTopicsRes.data) {
                     navigate("/student/input_topics", { state: { nrp } });

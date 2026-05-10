@@ -41,3 +41,10 @@ class CurriculumResponse(BaseModel):
     
 class StudyLevel(BaseModel):
     study_level_id: int
+    
+class CurriculumVersion(BaseModel):
+    curriculum_version_id: int
+
+class CurriculumVersionResponse(BaseModel):
+    message: str
+    curriculum_versions: List[CurriculumVersion]

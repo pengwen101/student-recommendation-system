@@ -93,8 +93,8 @@ async def has_indicators(nrp: str):
         raise HTTPException(status_code=404, detail="Student not found")
     return await student_cypher.has_indicators(nrp)
 
-async def get_student_recommendations(nrp: str):
+async def get_student_recommendations(nrp: str, type: str):
     student_exists = await student_cypher.student_exists(nrp)
     if not student_exists:
         raise HTTPException(status_code=404, detail="Student not found")
-    return await student_cypher.get_student_recommendations(nrp)
+    return await student_cypher.get_student_recommendations(nrp, type)

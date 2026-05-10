@@ -72,7 +72,12 @@ export interface Resource {
     resource_id: string;
     type: typeof ResourceType[keyof typeof ResourceType];
     name: string;
-    description: string;
+    description?: string;
+    authors?: string[];
+    publisher?: string;
+    published_date?: string;
+    isbn?: string;
+    content_link?: string;
     article_text?: string;
     study_levels?: StudyLevel[],
     sessions?: Session[],
@@ -90,7 +95,12 @@ export interface ResourceInput {
     resource_id: string;
     type: typeof ResourceType[keyof typeof ResourceType];
     name: string;
-    description: string;
+    description?: string;
+    authors?: string[];
+    publisher?: string;
+    published_date?: string;
+    isbn?: string;
+    content_link?: string;
     article_text?: OutputData;
     study_levels?: StudyLevel[],
     sessions?: SessionInput[],
@@ -213,4 +223,40 @@ export interface OrganizerInput {
 
 export interface ResourceOrganizerInput {
     organizer_id: string;
+}
+
+export interface CurriculumVersion {
+    curriculum_version_id: number;
+}
+
+export interface SupportLackGap {
+    id: string;
+    code: string;
+    name: string;
+    resource_count: number;
+    lack_score: number;
+    avg_lack_score: number;
+    student_count: number;
+    support_score: number;
+    avg_support_score: number;
+}
+
+export interface ResourceSupportingX {
+    resource_name: string;
+    resource_type: typeof ResourceType[keyof typeof ResourceType];
+    organizers: string[];
+    topics: string[];
+    status: string;
+    attendees: number; 
+}
+
+export interface Dashboard {
+    support_lack_gap: SupportLackGap[];
+    resource_supporting_x: ResourceSupportingX[];
+}
+
+export interface ResourceCharacteristic {
+    resource_id: string;
+    sub_cpl_count: number;
+    sub_cpl_avg_support: number;
 }

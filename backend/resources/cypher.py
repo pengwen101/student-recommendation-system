@@ -17,10 +17,17 @@ async def read_resources():
            r.name as name,
            r.description as description,
            r.article_text as article_text,
+           r.authors as authors,
+           r.publisher as publisher,
+           CASE WHEN r.published_date IS NOT NULL THEN apoc.temporal.format(r.published_date, "yyyy-MM-dd")
+           ELSE NULL
+           END AS published_date,
+           r.isbn as isbn,
+           r.content_link as content_link,
            [(r)-[:HAS_SESSION]->(ss:Session) | {
                session_id: ss.session_id,
-               start_datetime: ss.start_datetime,
-               end_datetime: ss.end_datetime 
+               start_datetime: apoc.temporal.format(ss.start_datetime, "yyyy-MM-dd'T'HH:mm:ss"),
+               end_datetime: apoc.temporal.format(ss.end_datetime, "yyyy-MM-dd'T'HH:mm:ss")
            }] as sessions,
            [(r)<-[og:ORGANIZES]-(o:Organizer) | {
                organizer_id: o.organizer_id,
@@ -73,11 +80,18 @@ async def read_resource_details(resource_id: str):
            r.name as name,
            r.type as type,
            r.description as description,
+           r.authors as authors,
+           r.publisher as publisher,
+           CASE WHEN r.published_date IS NOT NULL THEN apoc.temporal.format(r.published_date, "yyyy-MM-dd")
+           ELSE NULL
+           END AS published_date,
+           r.isbn as isbn,
+           r.content_link as content_link,
            r.article_text as article_text,
            [(r)-[:HAS_SESSION]->(ss:Session) | {
                session_id: ss.session_id,
-               start_datetime: ss.start_datetime,
-               end_datetime: ss.end_datetime 
+               start_datetime: apoc.temporal.format(ss.start_datetime, "yyyy-MM-dd'T'HH:mm:ss"),
+               end_datetime: apoc.temporal.format(ss.end_datetime, "yyyy-MM-dd'T'HH:mm:ss")
            }] as sessions,
            r.scale as scale,
            r.speaker_degree as speaker_degree,
@@ -129,6 +143,11 @@ async def create_resource(resource_id: str, data: dict, current_user: dict):
     SET r.name = $name,
         r.type = $type,
         r.description = $description,
+        r.authors = $authors,
+        r.publisher = $publisher,
+        r.published_date = datetime($published_date + '[Asia/Jakarta]'),
+        r.isbn = $isbn,
+        r.content_link = $content_link,
         r.article_text = $article_text,
         r.scale = $scale,
         r.speaker_degree = $speaker_degree,
@@ -165,7 +184,7 @@ async def create_resource(resource_id: str, data: dict, current_user: dict):
     CALL (r) {
         UNWIND $sessions AS session
         MERGE (r)-[hs:HAS_SESSION]->(ss:Session {session_id: session.session_id})
-        SET ss.start_datetime = session.start_datetime, ss.end_datetime = session.end_datetime
+        SET ss.start_datetime = datetime(session.start_datetime + '[Asia/Jakarta]'), ss.end_datetime = datetime(session.end_datetime + '[Asia/Jakarta]')
     }
 
     CALL (r) {
@@ -179,6 +198,11 @@ async def create_resource(resource_id: str, data: dict, current_user: dict):
               "type": data['type'],
               "name": data['name'], 
               "description": data.get("description"),
+              "authors": data.get("authors"),
+              "publisher": data.get("publisher"),
+              "published_date": data.get("published_date"),
+              "isbn": data.get("isbn"),
+              "content_link": data.get("content_link"),
               "article_text": data.get("article_text"),
               "study_levels": data.get("study_levels", None),
               "scale": data.get('scale', None),
@@ -192,6 +216,7 @@ async def create_resource(resource_id: str, data: dict, current_user: dict):
               }
     await Neo4jConnection.query(query, params)
     await calculate_support_weights(resource_id, data['indicators'])
+    await set_resource_weight(resource_id)
 
 async def update_resource(resource_id: str, data: dict, current_user: dict):
     
@@ -200,6 +225,11 @@ async def update_resource(resource_id: str, data: dict, current_user: dict):
     SET r.name = $name,
         r.type = $type,
         r.description = $description,
+        r.authors = $authors,
+        r.publisher = $publisher,
+        r.published_date = datetime($published_date + '[Asia/Jakarta]'),
+        r.isbn = $isbn,
+        r.content_link = $content_link,
         r.article_text = $article_text,
         r.scale = $scale,
         r.speaker_degree = $speaker_degree,
@@ -244,7 +274,7 @@ async def update_resource(resource_id: str, data: dict, current_user: dict):
     CALL (r) {
         UNWIND $sessions AS session
         MERGE (r)-[hs:HAS_SESSION]->(ss:Session {session_id: session.session_id})
-        SET ss.start_datetime = session.start_datetime, ss.end_datetime = session.end_datetime
+        SET ss.start_datetime = datetime(session.start_datetime + '[Asia/Jakarta]'), ss.end_datetime = datetime(session.end_datetime + '[Asia/Jakarta]')
     }
 
     CALL (r) {
@@ -259,6 +289,11 @@ async def update_resource(resource_id: str, data: dict, current_user: dict):
         "type": data['type'],
         "name": data['name'], 
         "description": data.get("description"),
+        "authors": data.get("authors"),
+        "publisher": data.get("publisher"),
+        "published_date": data.get("published_date"),
+        "isbn": data.get("isbn"),
+        "content_link": data.get("content_link"),
         "article_text": data.get("article_text"),
         "study_levels": data.get("study_levels") or [], 
         "scale": data.get('scale'),
@@ -272,6 +307,7 @@ async def update_resource(resource_id: str, data: dict, current_user: dict):
     
     await Neo4jConnection.query(query, params)
     await calculate_support_weights(resource_id, data['indicators'])
+    await set_resource_weight(resource_id)
     
 async def check_organizer_update_authorization(resource_id, organizer_id):
     query = """
@@ -308,30 +344,67 @@ async def delete_resource(resource_id: str):
 async def calculate_support_weights(resource_id: str, indicators: list[dict]):
     query = """
     MATCH (r:Resource {resource_id: $resource_id})
-    UNWIND $indicators AS ind_input
-    MATCH (i:Indicator {indicator_id: ind_input.indicator_id})
+    MATCH (i:Indicator)
+    WHERE i.indicator_id IN [ind IN $indicators | ind.indicator_id]
+    MATCH (c:Cpl)-[:HAS_SUB_CPL]->(s:SubCpl)-[sq:HAS_QUALITY]->(q:Quality)-[:HAS_INDICATOR]->(i)
 
-    MATCH (s:SubCpl)-[sq:HAS_QUALITY]->(q:Quality)-[:HAS_INDICATOR]->(i)
-
-    WITH r, i, q, s, max(sq.weight) AS calculated_weight
+    WITH r, i, q, s, c, max(sq.weight) AS calculated_weight
     MERGE (r)-[rsi:SUPPORTS]->(i)
     SET rsi.weight = calculated_weight
 
-    WITH r, q, s, calculated_weight, count(i) AS resource_indicator_count
-    WITH r, q, s, calculated_weight, resource_indicator_count, COUNT { (q)-[:HAS_INDICATOR]->() } AS quality_indicator_count
+    WITH r, q, s, c, calculated_weight, count(i) AS resource_indicator_count
+    WITH r, q, s, c, calculated_weight, resource_indicator_count, COUNT { (q)-[:HAS_INDICATOR]->() } AS quality_indicator_count
 
-    WITH r, q, s, calculated_weight * ((resource_indicator_count * 1.0) / quality_indicator_count) AS r_q_weight
+    WITH r, q, s, c, calculated_weight * ((resource_indicator_count * 1.0) / quality_indicator_count) AS r_q_weight
     MERGE (r)-[rsq:SUPPORTS]->(q)
     SET rsq.weight = r_q_weight
 
-    WITH r, s, sum(r_q_weight) AS resource_quality_weight
+    WITH r, s, c, sum(r_q_weight) AS resource_quality_weight
     CALL (s) {
         MATCH (s)-[sq_all:HAS_QUALITY]->()
         RETURN sum(sq_all.weight) AS subcpl_quality_weight
     }
+    
+    WITH r, s, c, resource_quality_weight, (resource_quality_weight * 1.0) / subcpl_quality_weight as r_s_weight
 
     MERGE (r)-[rss:SUPPORTS]->(s)
-    SET rss.weight = (resource_quality_weight * 1.0) / subcpl_quality_weight
+    SET rss.weight = r_s_weight
+    
+    WITH r, c, sum(r_s_weight) as total_subcpl_weight, COUNT { (c)-[:HAS_SUB_CPL]->() } AS cpl_subcpl_count
+    WITH r, c, total_subcpl_weight / cpl_subcpl_count as r_c_weight
+    
+    MERGE (r)-[rsc:SUPPORTS]->(c)
+    SET rsc.weight = r_c_weight
     """
-
+   
     await Neo4jConnection.query(query, {"resource_id": resource_id, "indicators": indicators})
+    
+async def set_resource_weight(resource_id: str | None = None):
+    query = """ 
+    MATCH (r:Resource) WHERE $resource_id IS NULL OR r.resource_id = $resource_id
+
+    OPTIONAL MATCH (r)-[:HAS_SESSION]->(s:Session)
+    WITH r, sum(duration.inSeconds(s.start_datetime, s.end_datetime).minutes) as minute_duration
+
+    MATCH (ew:Config:EventWeight)
+    OPTIONAL MATCH (sr:Config:ScaleRule) WHERE sr.scale = r.scale
+    OPTIONAL MATCH (spr:Config:SpeakerDegreeRule) WHERE spr.speaker_degree = r.speaker_degree
+    OPTIONAL MATCH (dr:Config:DurationRule)
+
+    WITH r, minute_duration, ew, sr, spr, dr
+
+    SET r.internal_weight = 
+        CASE
+            WHEN r.type = "event"
+            THEN COALESCE((ew.speaker_degree_weight * spr.weight), 0) +
+                    COALESCE((ew.scale_weight * sr.weight), 0) + 
+                    COALESCE((ew.duration_weight *
+                    CASE WHEN minute_duration < 720.0 THEN (((minute_duration/60.0) - dr.a)/(dr.b-dr.a))
+                    ELSE 1.0
+                    END
+                    ), 0)
+        ELSE 1.0
+        END
+    """
+    
+    await Neo4jConnection.query(query, {"resource_id": resource_id})

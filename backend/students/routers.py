@@ -3,6 +3,7 @@ from backend.students.schemas import (TopicActionResponse, StudentRecommendation
                                     IndicatorActionResponse, StudentIndicatorsInputBatch, StudentTopicsInputBatch, SubCplActionResponse, CplActionResponse)
 from backend.students import services
 from typing import List
+from backend.resources.schemas import ResourceType
 
 topics_router = APIRouter(prefix="/student/topics", tags=["student_topics"])
 recommendations_router = APIRouter(prefix="/student/recommendations", tags=["student_recommendations"])
@@ -59,6 +60,6 @@ async def has_student_indicators(nrp: str):
     return await services.has_indicators(nrp)
 
 @recommendations_router.get("/{nrp}", response_model=StudentRecommendationsResponse)
-async def get_student_recommendations(nrp: str):
-    recommendations = await services.get_student_recommendations(nrp)
+async def get_student_recommendations(nrp: str, type: ResourceType):
+    recommendations = await services.get_student_recommendations(nrp, type)
     return {"message": "Student recommendations successfully retrieved.", "count": len(recommendations), "recommendations": recommendations}

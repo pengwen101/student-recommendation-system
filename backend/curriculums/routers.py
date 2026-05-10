@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException, status, UploadFile, File
-from backend.curriculums.schemas import (CurriculumResponse, CurriculumQuestionResponse)
+from backend.curriculums.schemas import (CurriculumResponse, CurriculumQuestionResponse, CurriculumVersionResponse)
 from backend.curriculums import services
 from typing import List
 
 curriculums_router = APIRouter(prefix="/curriculum", tags=["curriculum"])
+curriculum_versions_router = APIRouter(prefix="/curriculum_version", tags=["curriculum_version"])
 
 curriculums_q_router = APIRouter(prefix="/curriculum/q", tags=["curriculum_question"])
 
@@ -21,6 +22,11 @@ async def create_curriculum(file: UploadFile = File(...)):
 async def read_curriculum():
     curriculum = await services.read_curriculum()
     return {"message": "Curriculum successfully retrieved.", "curriculum": curriculum}
+
+@curriculum_versions_router.get("", response_model=CurriculumVersionResponse)
+async def read_curriculum_versions():
+    curriculum_versions = await services.read_curriculum_versions()
+    return {"message": "Curriculum versions successfully retrieved.", "curriculum_versions": curriculum_versions}
 
 @curriculums_q_router.post("", response_model=CurriculumQuestionResponse)
 async def create_curriculum(file: UploadFile = File(...)):

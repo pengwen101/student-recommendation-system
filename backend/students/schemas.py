@@ -20,7 +20,7 @@ class StudentTopicsInputBatch(BaseModel):
     
 class StudentRecommendation(BaseModel):
     resource: ResourceDetails
-    probability_score: float
+    score: float
 
 class StudentRecommendationsResponse(BaseModel):
     message: str

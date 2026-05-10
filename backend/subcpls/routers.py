@@ -4,14 +4,14 @@ from backend.subcpls import services
 
 subcpls_router = APIRouter(prefix="/subcpl", tags=["subcpl"])
 
-@subcpls_router.get("", response_model=AllSubCplsResponse)
-async def read_subcpls():
-    subcpls = await services.read_subcpls()
+@subcpls_router.get("/{version_id}", response_model=AllSubCplsResponse)
+async def read_subcpls(version_id: str):
+    subcpls = await services.read_subcpls(version_id)
     return {"message": "SubCpls successfully retrieved.", "count": len(subcpls), "subcpls": subcpls}
 
-@subcpls_router.get("/indicators", response_model=AllSubCplIndicatorsResponse)
-async def read_subcpl_indicators():
-    subcpls = await services.read_subcpl_indicators()
+@subcpls_router.get("/indicators/{version_id}", response_model=AllSubCplIndicatorsResponse)
+async def read_subcpl_indicators(version_id: str):
+    subcpls = await services.read_subcpl_indicators(version_id)
     return {"message": "SubCpls successfully retrieved.", "count": len(subcpls), "subcpls": subcpls}
 
 @subcpls_router.get("/{sub_cpl_id}", response_model=SubCplDetailsResponse)

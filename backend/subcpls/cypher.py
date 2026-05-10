@@ -9,9 +9,9 @@ async def subcpl_exists(sub_cpl_id: str):
     response = await Neo4jConnection.query(query, params)
     return response[0]['exists'] if response else False
 
-async def read_subcpls():
+async def read_subcpls(version_id: str):
     query = """
-    MATCH (s:SubCpl)
+    MATCH (:CurriculumVersion {curriculum_version_id: toInteger($version_id)})-[]->(:Cpl)-[]->(s:SubCpl)
     RETURN s.sub_cpl_id as sub_cpl_id, 
            s.code as code,
            s.name as name,
@@ -22,12 +22,12 @@ async def read_subcpls():
                 weight: r.weight
            }] as qualities
     """
-    response = await Neo4jConnection.query(query)
+    response = await Neo4jConnection.query(query, {"version_id": version_id})
     return response
 
-async def read_subcpl_indicators():
+async def read_subcpl_indicators(version_id: str):
     query = """
-    MATCH (s:SubCpl)
+    MATCH (:CurriculumVersion {curriculum_version_id: toInteger($version_id)})-[]->(:Cpl)-[]->(s:SubCpl)
     RETURN s.sub_cpl_id as sub_cpl_id, 
            s.code as code,
            s.name as name,
@@ -38,7 +38,7 @@ async def read_subcpl_indicators():
                 weight: rq.weight
            }] as indicators
     """
-    response = await Neo4jConnection.query(query)
+    response = await Neo4jConnection.query(query, {"version_id": version_id})
     return response
 
 async def read_subcpl_details(sub_cpl_id: str):

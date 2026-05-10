@@ -47,3 +47,13 @@ async def study_level_exists(study_level_id: int):
     """
     response = await Neo4jConnection.query(query, {"study_level_id": study_level_id})
     return response[0]['exists'] if response else False
+
+async def read_curriculum_versions():
+    query = """
+        MATCH (cv:CurriculumVersion)
+        RETURN cv.curriculum_version_id as curriculum_version_id
+    """
+    
+    response = await Neo4jConnection.query(query)
+    return response
+    

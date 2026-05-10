@@ -22,6 +22,11 @@ async def create_resource(data: ResourceDetailsInput, current_user: dict = Depen
     resource_details = await services.create_resource(data, current_user)
     return {"message": "Resource successfully created.", "resource_details": resource_details}
 
+@resources_router.put("/set-resource-weight")
+async def set_resource_weight(resource_id: str | None = None):
+    await services.set_resource_weight(resource_id)
+    return {"message": "Resource weight successfully updated."}
+
 @resources_router.put("/{resource_id}", response_model=ResourceDetailsResponse)
 async def update_resource(resource_id: str, data: ResourceDetailsInput, current_user: dict = Depends(get_current_user)):
     resource_details = await services.update_resource(resource_id, data, current_user)
