@@ -2,6 +2,8 @@ from pydantic import BaseModel
 from typing import List, Dict, Set
 from datetime import date
 from backend.resources.schemas import ResourceType
+from enum import Enum
+
 
 class SupportLackGap(BaseModel):
     id: str
@@ -39,3 +41,16 @@ class OrganizerSupport(BaseModel):
     curriculum_id: str
     curriculum_code: str
     support_score: float
+    
+class StudentMastery(BaseModel):
+    curriculum_id: str
+    curriculum_code: str
+    curriculum_name: str
+    mastery_score: float
+    target_score: float
+    
+class CurriculumType(str, Enum):
+    CPL = "cpl"
+    SUBCPL = "sub_cpl"
+    QUALITY = "quality"
+    INDICATOR = "indicator"

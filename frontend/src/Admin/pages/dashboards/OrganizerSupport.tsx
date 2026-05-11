@@ -4,6 +4,9 @@ import api from "../../../api/axios";
 import type { OrganizerSupport, ResourceSupportingX } from '../../../types';
 import toast from "react-hot-toast";
 import { DropdownFilter } from '../../../components/DropDownFilter';
+import { type CallbackDataParams } from 'echarts/types/dist/shared';
+
+type HeatmapDataPoint = [number, number, number, string, string];
 
 // --- TABLE COMPONENT (Reused & Enhanced) ---
 
@@ -224,8 +227,8 @@ export default function OrganizerSupportDashboard() {
     const option = {
       tooltip: {
         position: 'top',
-        formatter: (params: any) => {
-          const [xIdx, yIdx, score] = params.data;
+        formatter: (params: CallbackDataParams) => {
+          const [xIdx, yIdx, score] = params.data as HeatmapDataPoint;
           return `
             <div class="text-sm">
               <div class="font-bold border-b border-gray-300 pb-1 mb-1">Support Detail</div>
@@ -276,7 +279,10 @@ export default function OrganizerSupportDashboard() {
         data: matrix,
         label: {
           show: true,
-          formatter: (p: any) => p.data[2] > 0 ? Number(p.data[2]).toFixed(1) : ''
+          formatter: (p: CallbackDataParams) => {
+            const data = p.data as HeatmapDataPoint;
+            return data[2] > 0 ? data[2].toFixed(1) : '';
+          }
         },
         itemStyle: {
           borderColor: '#fff',
@@ -296,11 +302,12 @@ export default function OrganizerSupportDashboard() {
 
   // Handle clicks on cells, X-axis labels, and Y-axis labels
   const onEvents = useMemo(() => ({
-    click: (params: any) => {
+    click: (params: CallbackDataParams) => {
       if (params.componentType === 'series') {
         // Cell Click: Has index [x, y, value, org_id, curr_id]
-        setActiveOrganizerId(params.data[3]);
-        setActiveCurriculumId(params.data[4]);
+        const data = params.data as HeatmapDataPoint;
+        setActiveOrganizerId(data[3]);
+        setActiveCurriculumId(data[4]);
         toast.success(`Filtered by intersection`);
       } 
       else if (params.componentType === 'xAxis') {

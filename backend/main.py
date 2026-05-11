@@ -15,6 +15,7 @@ from backend.qualities import routers as quality_routers
 from backend.topics import routers as topic_routers
 from backend.subcpls import routers as subcpl_routers
 from backend.curriculums import routers as curriculum_routers
+from backend.demography import routers as demography_routers
 from backend.analytics import routers as analytic_routers
 from backend.admins import routers as admin_routers
 from backend.organizers import routers as organizer_routers
@@ -154,3 +155,4 @@ app.include_router(organizer_routers.organizers_router)
 app.include_router(curriculum_routers.curriculums_router)
 app.include_router(curriculum_routers.curriculum_versions_router)
 app.include_router(analytic_routers.analytic_router)
+app.include_router(demography_routers.demography_router)

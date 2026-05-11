@@ -34,6 +34,15 @@ export default function Dashboard() {
                 Organizer Support
             </Button>
         </Link>
+
+        <Link to="/student_performance" className="w-full">
+            <Button 
+                variant={isActive("/student_performance") ? "secondary" : "ghost"} 
+                className={`w-full justify-start ${isActive("/student_performance") ? "text-primary-800 font-semibold" : "text-slate-600"}`}
+            >
+                Student Performance
+            </Button>
+        </Link>
     </>
 
 );

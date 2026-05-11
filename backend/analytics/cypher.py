@@ -56,7 +56,7 @@ async def resource_supporting_x(curriculum_id: str | None = None, study_level_id
     OPTIONAL MATCH (r)<-[:ORGANIZES]-(o:Organizer)
     WHERE $organizer_ids IS NULL OR o.organizer_id IN $organizer_ids
     MATCH (r)-[:COVERS]->(t:Topic)
-    OPTIONAL MATCH (s:Student)-[:ATTENDED]->(r)
+    OPTIONAL MATCH (s:Student)-[:ATTENDS]->(r)
     
     RETURN r.name as resource_name, r.type as resource_type, coalesce(collect(distinct o.name), []) as organizers, 
     coalesce(r.status, '-') as status, count(distinct s.nrp) as attendees, collect(distinct t.name) as topics
@@ -146,16 +146,49 @@ async def resource_support(curriculum_type: str, curriculum_id: str, study_level
     return result
 
 
-async def student_mastery(curriculum_type: str, study_level_id: list | None = None):
+async def student_mastery(curriculum_type: str, curriculum_id: str | None = None, nrp: str | None = None, major_ids: list | None = None, batch_ids: list | None = None):
     query = f"""
     MATCH (c:{curriculum_type})
-    OPTIONAL MATCH (s:Student)-[rh:HAS]->(c)
-    OPTIONAL MATCH (s)-[]->(sl:StudyLevel)
-    WHERE $study_level_id IS NULL OR sl.study_level_id IN $study_level_id
-    
-    RETURN c.code as code, c.name as name, sum(rh.weight) as mastery_score
     """
     
-    result = await Neo4jConnection.query(query, {"study_level_id": study_level_id})
+    query = query + """
+    WHERE $curriculum_id IS NULL
+        OR COALESCE(c.cpl_id, c.sub_cpl_id, c.quality_id, c.indicator_id) = $curriculum_id
+       OR EXISTS {
+           MATCH (c)<-[*1..3]-(parent)
+           WHERE COALESCE(parent.cpl_id, parent.sub_cpl_id, parent.quality_id, parent.indicator_id) = $curriculum_id
+       }
+    OPTIONAL MATCH (s:Student)-[rh:HAS]->(c)
+    WHERE $nrp IS NULL OR s.nrp = $nrp
+    MATCH (s)-[]->(b:Batch)
+    WHERE $batch_ids IS NULL OR b.batch_id IN $batch_ids
+    MATCH (s)-[]->(m:Major)
+    WHERE $major_ids iS NULL OR m.major_id IN $major_ids
+    
+    MATCH (b)-[]->(cf:Config:StudentTarget)
+    
+    RETURN COALESCE(c.cpl_id, c.sub_cpl_id, c.quality_id, c.indicator_id) AS curriculum_id, c.code as curriculum_code, c.name as curriculum_name, avg(rh.weight) as mastery_score, cf.target_score as target_score
+    """
+    
+    result = await Neo4jConnection.query(query, {"batch_ids": batch_ids, "major_ids": major_ids, "nrp": nrp, "curriculum_id": curriculum_id})
     return result
 
+
+# async def student_history(academic_year: str, semester: str, nrp: str | None = None, major_ids = list | None = None, study_level_ids: list | None = None):
+#     query = """
+    
+#     MATCH (s:Student)-[]->(m:Major)
+#     WHERE ($nrp IS NULL OR s.nrp = $nrp) AND ($major_ids IS NULL OR m.major_id IN $major_ids)
+#     MATCH (s)-[]->(sl:StudyLevel)
+#     WHERE $study_level_ids IS NULL OR sl.study_level_id IN $study_level_ids
+#     MATCH (s)-[rh:HAS]->(c:Cpl)
+#     OPTIONAL MATCH (s)-[:LOGGED_SCORE]->(h:ScoreHistory)
+#     WHERE h.date >= min_year AND h.date <= max_year AND h.date >= min_month and h.date <= max_month
+    
+#     WITH avg(rh.weight) AS latest_mastery, h ORDER BY h.date
+#     WITH latest_mastery, collect(h) as periods
+#     UNWIND range(0, size(periods)-1) AS i
+#     WITH periods[i] as current, periods[i-1] as prev
+#     WHERE current.avg_cpl_weight IS NULL
+#     SET current.value = previous.value
+#     """

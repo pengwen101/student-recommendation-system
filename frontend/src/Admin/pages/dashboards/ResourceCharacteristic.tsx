@@ -4,6 +4,7 @@ import api from "../../../api/axios";
 import type { ResourceCharacteristic, Organizer, Resource } from '../../../types';
 import toast from "react-hot-toast";
 import { DropdownFilter } from '../../../components/DropDownFilter';
+import { type CallbackDataParams } from 'echarts/types/dist/shared';
 
 interface ResourceCharacteristicPayload {
   value: [number, number];
@@ -96,7 +97,7 @@ export function ResourceCharacteristicChart({ data, selectedId, onSelect }: { da
   return <ReactECharts option={option} onEvents={onEvents} style={{ height: '300px' }} />;
 }
 
-export function Support({ data }: { data: { code: string; weight: number; name?: string; [key: string]: any }[] }) {
+export function Support({ data }: { data: { code: string; weight: number; name?: string; [key: string]: string | number | undefined }[] }) {
   const option = useMemo(() => {
     if (!data || data.length === 0) return {};
 
@@ -110,8 +111,8 @@ export function Support({ data }: { data: { code: string; weight: number; name?:
           type: 'shadow'
         },
         // Custom formatter to show the name and weight when hovered
-        formatter: (params: any) => {
-          const item = Array.isArray(params) ? params[0].data : params.data;
+        formatter: (params: CallbackDataParams | CallbackDataParams[]) => {
+          const item = (Array.isArray(params) ? params[0].data : params.data) as { name?: string; code?: string; weight?: number };
           if (!item) return '';
           
           const displayName = item.name ? item.name : item.code;
