@@ -1,317 +1,207 @@
 from backend.database import Neo4jConnection
 
+    
+update_cleanup_query = """
+    OPTIONAL MATCH (r)<-[old_og:ORGANIZES]-(:Organizer) DELETE old_og WITH r
+    OPTIONAL MATCH (r)-[old_rc:COVERS]->(:Topic) DELETE old_rc WITH r
+    OPTIONAL MATCH (r)-[old_rs:SUPPORTS]->(n) DELETE old_rs WITH r
+    OPTIONAL MATCH (r)-[old_hs:HAS_SESSION]->(:Session) DELETE old_hs WITH r
+    OPTIONAL MATCH (r)-[old_af:AVAILABLE_FOR]->(:StudyLevel) DELETE old_af WITH r
+    OPTIONAL MATCH (r)-[old_ra:HAS]->(:ResourceAssessment) DELETE old_ra 
+"""
+
+create_update_base_query = """
+    CALL (r) {
+        UNWIND $study_levels AS study_level
+        MATCH (sl:StudyLevel {study_level_id: study_level.study_level_id})
+        MERGE (r)-[:AVAILABLE_FOR]->(sl)
+    }
+    
+    CALL (r) {
+        UNWIND $organizers AS org
+        MATCH (o:Organizer {organizer_id: org.organizer_id})
+        MERGE (r)<-[og:ORGANIZES]-(o)
+    }
+    
+    CALL (r) {
+        UNWIND $sessions AS session
+        MERGE (r)-[hs:HAS_SESSION]->(ss:Session {session_id: session.session_id})
+        SET ss.start_datetime = datetime(session.start_datetime + '[Asia/Jakarta]'), ss.end_datetime = datetime(session.end_datetime + '[Asia/Jakarta]')
+    }
+    
+    CALL (r) {
+        UNWIND CASE WHEN $topics IS NULL THEN [] ELSE $topics END AS topic
+        MATCH (t:Topic {topic_id: topic.topic_id})
+        MERGE (r)-[rc:COVERS]->(t)
+    }
+    CALL (r) {
+        UNWIND CASE WHEN $assessments IS NULL THEN [] ELSE $assessments END AS ra_input
+        MATCH (ra:ResourceAssessment {resource_assessment_id: ra_input.resource_assessment_id})
+        MERGE (r)-[rh:HAS]->(ra)
+        SET rh.weight = toFloat(ra_input.resource_weight)
+        WITH r, SUM(toFloat(ra.weight) * toFloat(ra_input.resource_weight)) as internal_weight
+        SET r.internal_weight = internal_weight
+    }
+"""
+
+
 async def resource_exists(resource_id: str):
     query = """
-    MATCH (r: Resource {resource_id: $resource_id})
+    MATCH (r:UniResource {resource_id: $resource_id})
     RETURN count(r) > 0 as exists
     """
     params = {"resource_id": resource_id}
     response = await Neo4jConnection.query(query, params)
     return response[0]['exists'] if response else False
-
-async def read_resources():
-    query = """
-    MATCH (r:Resource)
+    
+async def read_resources(label: str | None = None, resource_id: str | None = None):
+    if not label:
+        match_query = "MATCH (r:UniResource)"
+    else:
+        match_query = f"MATCH (r:UniResource:{label})"
+        
+    query = f"""{match_query}
+    WHERE $resource_id IS NULL OR r.resource_id = $resource_id
     RETURN r.resource_id as resource_id, 
-           r.type as type,
-           r.name as name,
-           r.description as description,
-           r.article_text as article_text,
-           r.authors as authors,
-           r.publisher as publisher,
-           CASE WHEN r.published_date IS NOT NULL THEN apoc.temporal.format(r.published_date, "yyyy-MM-dd")
-           ELSE NULL
-           END AS published_date,
-           r.isbn as isbn,
-           r.content_link as content_link,
-           [(r)-[:HAS_SESSION]->(ss:Session) | {
-               session_id: ss.session_id,
-               start_datetime: apoc.temporal.format(ss.start_datetime, "yyyy-MM-dd'T'HH:mm:ss"),
-               end_datetime: apoc.temporal.format(ss.end_datetime, "yyyy-MM-dd'T'HH:mm:ss")
-           }] as sessions,
-           [(r)<-[og:ORGANIZES]-(o:Organizer) | {
-               organizer_id: o.organizer_id,
-               name: o.name
-           }] as organizers,
-           [(r)-[af:AVAILABLE_FOR]->(sl:StudyLevel) | {
-               study_level_id: sl.study_level_id
-           }] as study_levels,
-           r.scale as scale,
-           r.speaker_degree as speaker_degree,
-           r.status as status,
-           r.is_active as is_active,
-           [(r)-[rsi:SUPPORTS]->(i:Indicator) | {
-                indicator_id: i.indicator_id
-            }] as indicators,
-           [(r)-[rc:COVERS]->(t:Topic) | {
-               topic_id: t.topic_id, 
-               code: t.code,
-               name: t.name
-           }] as topics,
-           {
-                indicators: [(r)-[rsi:SUPPORTS]->(i:Indicator) | {
-                    indicator_id: i.indicator_id,
-                    code: i.code,
-                    name: i.name, 
-                    weight: toFloat(rsi.weight)
-                }],
-                qualities: [(r)-[rsq:SUPPORTS]->(q:Quality) | {
-                    quality_id: q.quality_id,
-                    code: q.code,
-                    name: q.name, 
-                    weight: toFloat(rsq.weight)
-                }],
-                subcpls: [(r)-[rss:SUPPORTS]->(s:SubCpl) | {
-                    sub_cpl_id: s.sub_cpl_id,
-                    code: s.code,
-                    name: s.name, 
-                    weight: toFloat(rss.weight)
-                }]
-            } AS calculations
+    tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) AS type,
+    r.title as title,
+    r.is_active as is_active,
+    r.description as description,
+    r.content_link as content_link,
+    r.article_text as article_text,
+    r.isbn as isbn,
+    r.authors as authors,
+    CASE WHEN r.published_date IS NOT NULL THEN apoc.temporal.format(r.published_date, "yyyy-MM-dd") ELSE null END as published_date,
+    r.publisher as publisher,
+    r.status as status,
+    r.internal_weight as internal_weight,
+    [(r)-[:HAS_SESSION]->(ss:Session) | {{
+        session_id: ss.session_id,
+        start_datetime: apoc.temporal.format(ss.start_datetime, "yyyy-MM-dd'T'HH:mm:ss"),
+        end_datetime: apoc.temporal.format(ss.end_datetime, "yyyy-MM-dd'T'HH:mm:ss")
+    }}] as sessions,
+    [(r)<-[og:ORGANIZES]-(o:Organizer) | {{
+        organizer_id: o.organizer_id,
+        name: o.name
+    }}] as organizers,
+    [(r)-[af:AVAILABLE_FOR]->(sl:StudyLevel) | {{
+        study_level_id: sl.study_level_id
+    }}] as study_levels,
+    [(r)-[rh:HAS]->(ra:ResourceAssessment) | {{
+        resource_assessment_id: ra.resource_assessment_id,
+        display_name: ra.display_name,
+        resource_type: ra.resource_type,
+        weight: toFloat(ra.weight),
+        resource_weight: toFloat(rh.weight)
+    }}] AS resource_assessments,
+    [(r)-[rsi:SUPPORTS]->(i:Indicator) | {{
+        indicator_id: i.indicator_id
+    }}] as indicators,
+    [(r)-[rc:COVERS]->(t:Topic) | {{
+        topic_id: t.topic_id, 
+        code: t.code,
+        name: t.name
+    }}] as topics,
+    {{
+        indicators: [(r)-[rsi:SUPPORTS]->(i:Indicator) | {{
+            indicator_id: i.indicator_id,
+            code: i.code,
+            name: i.name, 
+            weight: toFloat(rsi.weight)
+        }}],
+        qualities: [(r)-[rsq:SUPPORTS]->(q:Quality) | {{
+            quality_id: q.quality_id,
+            code: q.code,
+            name: q.name, 
+            weight: toFloat(rsq.weight)
+        }}],
+        subcpls: [(r)-[rss:SUPPORTS]->(s:SubCpl) | {{
+            sub_cpl_id: s.sub_cpl_id,
+            code: s.code,
+            name: s.name, 
+            weight: toFloat(rss.weight)
+        }}]
+    }} AS calculations
     """
-    response = await Neo4jConnection.query(query)
-    return response
+    response = await Neo4jConnection.query(query, {"resource_id": resource_id})
+    if not response:
+        return None if resource_id else []
+    
+    return response[0] if resource_id else response
 
 
-async def read_resource_details(resource_id: str):
-    query = """
-    MATCH (r:Resource {resource_id: $resource_id})
-    RETURN r.resource_id as resource_id, 
-           r.name as name,
-           r.type as type,
-           r.description as description,
-           r.authors as authors,
-           r.publisher as publisher,
-           CASE WHEN r.published_date IS NOT NULL THEN apoc.temporal.format(r.published_date, "yyyy-MM-dd")
-           ELSE NULL
-           END AS published_date,
-           r.isbn as isbn,
-           r.content_link as content_link,
-           r.article_text as article_text,
-           [(r)-[:HAS_SESSION]->(ss:Session) | {
-               session_id: ss.session_id,
-               start_datetime: apoc.temporal.format(ss.start_datetime, "yyyy-MM-dd'T'HH:mm:ss"),
-               end_datetime: apoc.temporal.format(ss.end_datetime, "yyyy-MM-dd'T'HH:mm:ss")
-           }] as sessions,
-           r.scale as scale,
-           r.speaker_degree as speaker_degree,
-           r.status as status,
-           r.is_active as is_active,
-           [(r)<-[og:ORGANIZES]-(o:Organizer) | {
-               organizer_id: o.organizer_id,
-               name: o.name
-           }] as organizers,
-           [(r)-[af:AVAILABLE_FOR]->(sl:StudyLevel) | {
-               study_level_id: sl.study_level_id
-           }] as study_levels,
-           [(r)-[rsi:SUPPORTS]->(i:Indicator) | {
-                indicator_id: i.indicator_id
-            }] as indicators,
-           [(r)-[rc:COVERS]->(t:Topic) | {
-               topic_id: t.topic_id, 
-               code: t.code,
-               name: t.name
-           }] as topics,
-           {
-                indicators: [(r)-[rsi:SUPPORTS]->(i:Indicator) | {
-                    indicator_id: i.indicator_id,
-                    code: i.code,
-                    name: i.name, 
-                    weight: toFloat(rsi.weight)
-                }],
-                qualities: [(r)-[rsq:SUPPORTS]->(q:Quality) | {
-                    quality_id: q.quality_id,
-                    code: q.code,
-                    name: q.name, 
-                    weight: toFloat(rsq.weight)
-                }],
-                subcpls: [(r)-[rss:SUPPORTS]->(s:SubCpl) | {
-                    sub_cpl_id: s.sub_cpl_id,
-                    code: s.code,
-                    name: s.name, 
-                    weight: toFloat(rss.weight)
-                }]
-            } AS calculations
+async def create_resource(resource_id: str, label: str, data: dict, current_user: dict):
+    query = f"""
+    MERGE (r:UniResource:{label} {{resource_id: $resource_id}})
+    SET r += $resource_properties
+    SET r.published_date =  datetime($published_date + '[Asia/Jakarta]')
+    WITH r
+    OPTIONAL MATCH (a:Admin {{admin_id: $updater_actor_id}})
+    OPTIONAL MATCH (o:Organizer {{organizer_id: $updater_actor_id}})
+    WITH r, coalesce(a, o) AS actor
+    MERGE (r)-[u:UPDATED_BY]->(actor)
+    SET u.updated_at = datetime({{timezone: 'Asia/Jakarta'}})
+    OPTIONAL MATCH (a:Admin {{admin_id: $creator_actor_id}})
+    OPTIONAL MATCH (o:Organizer {{organizer_id: $creator_actor_id}})
+    WITH r, coalesce(a, o) AS actor
+    MERGE (r)-[u:CREATED_BY]->(actor)
+    SET u.created_at = datetime({{timezone: 'Asia/Jakarta'}})
+    WITH r
+    {create_update_base_query}
     """
-    params = {"resource_id": resource_id}
-    response = await Neo4jConnection.query(query, params)
-    return response[0] if response else None
-
-async def create_resource(resource_id: str, data: dict, current_user: dict):
-    query = """
-    MERGE (r:Resource {resource_id: $resource_id})
-    SET r.name = $name,
-        r.type = $type,
-        r.description = $description,
-        r.authors = $authors,
-        r.publisher = $publisher,
-        r.published_date = datetime($published_date + '[Asia/Jakarta]'),
-        r.isbn = $isbn,
-        r.content_link = $content_link,
-        r.article_text = $article_text,
-        r.scale = $scale,
-        r.speaker_degree = $speaker_degree,
-        r.status = $status,
-        r.is_active = true
-    WITH r
-
-    OPTIONAL MATCH (a:Admin {admin_id: $creator_actor_id})
-    OPTIONAL MATCH (o:Organizer {organizer_id: $creator_actor_id})
-    WITH r, coalesce(a, o) AS updater
-    MERGE (r)-[u:CREATED_BY]->(updater)
-    SET u.updated_at = datetime({timezone: 'Asia/Jakarta'})
-    WITH r
-    OPTIONAL MATCH (a:Admin {admin_id: $updater_actor_id})
-    OPTIONAL MATCH (o:Organizer {organizer_id: $updater_actor_id})
-    WITH r, coalesce(a, o) AS updater
-    MERGE (r)-[u:UPDATED_BY]->(updater)
-    SET u.updated_at = datetime({timezone: 'Asia/Jakarta'})
+    resource_properties = {k: v for k, v in data.items() if k not in {"study_levels", "organizers", "sessions", "topics", "resource_assessments", "indicators", "published_date"}}
     
-    WITH r
-    
-    CALL (r) {
-        UNWIND $study_levels AS study_level
-        MATCH (sl:StudyLevel {study_level_id: study_level.study_level_id})
-        MERGE (r)-[:AVAILABLE_FOR]->(sl)
-    }
-    
-    CALL (r) {
-        UNWIND $organizers AS org
-        MATCH (o:Organizer {organizer_id: org.organizer_id})
-        MERGE (r)<-[og:ORGANIZES]-(o)
-    }
-    
-    CALL (r) {
-        UNWIND $sessions AS session
-        MERGE (r)-[hs:HAS_SESSION]->(ss:Session {session_id: session.session_id})
-        SET ss.start_datetime = datetime(session.start_datetime + '[Asia/Jakarta]'), ss.end_datetime = datetime(session.end_datetime + '[Asia/Jakarta]')
-    }
-
-    CALL (r) {
-        UNWIND $topics AS topic
-        MATCH (t:Topic {topic_id: topic.topic_id})
-        MERGE (r)-[rc:COVERS]->(t)
-    }
-    """
     
     params = {"resource_id": resource_id, 
-              "type": data['type'],
-              "name": data['name'], 
-              "description": data.get("description"),
-              "authors": data.get("authors"),
-              "publisher": data.get("publisher"),
+              "resource_properties": resource_properties,
               "published_date": data.get("published_date"),
-              "isbn": data.get("isbn"),
-              "content_link": data.get("content_link"),
-              "article_text": data.get("article_text"),
-              "study_levels": data.get("study_levels", None),
-              "scale": data.get('scale', None),
-              "speaker_degree": data.get('speaker_degree', None),
-              "sessions": data.get('sessions', None),
-              "organizers": data.get('organizers') if data.get('organizers') else [],
-              "status": data.get("status", None),
+              "study_levels": data.get("study_levels"),
+              "sessions": data.get('sessions'),
+              "organizers": data.get('organizers'),
               "topics": data['topics'],
               "creator_actor_id": current_user['sub'],
-              "updater_actor_id": current_user['sub']
+              "updater_actor_id": current_user['sub'],
+              "resource_assessments": data['resource_assessments']
               }
+    
     await Neo4jConnection.query(query, params)
     await calculate_support_weights(resource_id, data['indicators'])
-    await set_resource_weight(resource_id)
-
+    
 async def update_resource(resource_id: str, data: dict, current_user: dict):
-    
-    query = """
-    MATCH (r:Resource {resource_id: $resource_id})
-    SET r.name = $name,
-        r.type = $type,
-        r.description = $description,
-        r.authors = $authors,
-        r.publisher = $publisher,
-        r.published_date = datetime($published_date + '[Asia/Jakarta]'),
-        r.isbn = $isbn,
-        r.content_link = $content_link,
-        r.article_text = $article_text,
-        r.scale = $scale,
-        r.speaker_degree = $speaker_degree,
-        r.status = $status
+    query = f"""
+    MERGE (r:UniResource {{resource_id: $resource_id}})
+    SET r += $resource_properties
+    SET r.published_date =  datetime($published_date + '[Asia/Jakarta]')
     WITH r
-    OPTIONAL MATCH (r)<-[old_og:ORGANIZES]-(o:Organizer)
-    DELETE old_og
+    {update_cleanup_query}
     WITH r
-    OPTIONAL MATCH (r)-[old_rc:COVERS]->(:Topic)
-    DELETE old_rc
+    OPTIONAL MATCH (a:Admin {{admin_id: $updater_actor_id}})
+    OPTIONAL MATCH (o:Organizer {{organizer_id: $updater_actor_id}})
+    WITH r, coalesce(a, o) AS actor
+    MERGE (r)-[u:UPDATED_BY]->(actor)
+    SET u.updated_at = datetime({{timezone: 'Asia/Jakarta'}})
     WITH r
-    OPTIONAL MATCH (r)-[old_rs:SUPPORTS]->(:Indicator)
-    DELETE old_rs
-    WITH r
-    OPTIONAL MATCH (r)-[old_hs:HAS_SESSION]->(:Session)
-    DELETE old_hs
-    WITH r
-    OPTIONAL MATCH (r)-[old_af:AVAILABLE_FOR]->(:StudyLevel)
-    DELETE old_af
-    WITH r
-
-    OPTIONAL MATCH (a:Admin {admin_id: $updater_actor_id})
-    OPTIONAL MATCH (o:Organizer {organizer_id: $updater_actor_id})
-    WITH r, coalesce(a, o) AS updater
-    MERGE (r)-[u:UPDATED_BY]->(updater)
-    SET u.updated_at = datetime({timezone: 'Asia/Jakarta'})
-    
-    WITH r
-    
-    CALL (r) {
-        UNWIND $study_levels AS study_level
-        MATCH (sl:StudyLevel {study_level_id: study_level.study_level_id})
-        MERGE (r)-[:AVAILABLE_FOR]->(sl)
-    }
-    
-    CALL (r) {
-        UNWIND $organizers AS org
-        MATCH (o:Organizer {organizer_id: org.organizer_id})
-        MERGE (r)<-[og:ORGANIZES]-(o)
-    }
-
-    CALL (r) {
-        UNWIND $sessions AS session
-        MERGE (r)-[hs:HAS_SESSION]->(ss:Session {session_id: session.session_id})
-        SET ss.start_datetime = datetime(session.start_datetime + '[Asia/Jakarta]'), ss.end_datetime = datetime(session.end_datetime + '[Asia/Jakarta]')
-    }
-
-    CALL (r) {
-        UNWIND $topics AS topic
-        MATCH (t:Topic {topic_id: topic.topic_id})
-        MERGE (r)-[rc:COVERS]->(t)
-    }
+    {create_update_base_query}
     """
+    resource_properties = {k: v for k, v in data.items() if k not in {"study_levels", "organizers", "sessions", "topics", "resource_assessments", "indicators", "published_date"}}
     
-    params = {
-        "resource_id": resource_id, 
-        "type": data['type'],
-        "name": data['name'], 
-        "description": data.get("description"),
-        "authors": data.get("authors"),
-        "publisher": data.get("publisher"),
-        "published_date": data.get("published_date"),
-        "isbn": data.get("isbn"),
-        "content_link": data.get("content_link"),
-        "article_text": data.get("article_text"),
-        "study_levels": data.get("study_levels") or [], 
-        "scale": data.get('scale'),
-        "organizers": data.get('organizers') or [],
-        "speaker_degree": data.get('speaker_degree'),
-        "sessions": data.get('sessions') or [],
-        "status": data.get("status"),
-        "topics": data.get('topics') or [],
-        "updater_actor_id": current_user['sub'] 
-    }
+    params = {"resource_id": resource_id, 
+              "resource_properties": resource_properties,
+              "published_date": data.get("published_date"),
+              "study_levels": data.get("study_levels"),
+              "sessions": data.get('sessions'),
+              "organizers": data.get('organizers'),
+              "topics": data['topics'],
+              "updater_actor_id": current_user['sub'],
+              "resource_assessments": data['resource_assessments']
+              }
     
     await Neo4jConnection.query(query, params)
     await calculate_support_weights(resource_id, data['indicators'])
-    await set_resource_weight(resource_id)
     
 async def check_organizer_update_authorization(resource_id, organizer_id):
     query = """
-    MATCH (o:Organizer {organizer_id: $organizer_id})-[:ORGANIZES]->(r:Resource {resource_id: $resource_id})
+    MATCH (o:Organizer {organizer_id: $organizer_id})-[:ORGANIZES]->(r:UniResource {resource_id: $resource_id})
     RETURN count(r) > 0 AS authorized
     """
     response = await Neo4jConnection.query(query, {"organizer_id": organizer_id, "resource_id": resource_id})
@@ -319,7 +209,7 @@ async def check_organizer_update_authorization(resource_id, organizer_id):
     
 async def activate_resource(resource_id: str):
     query = """
-    MATCH (r:Resource {resource_id: $resource_id})
+    MATCH (r:UniResource {resource_id: $resource_id})
     SET r.is_active = true
     """
     params = {"resource_id": resource_id}
@@ -327,7 +217,7 @@ async def activate_resource(resource_id: str):
     
 async def archive_resource(resource_id: str):
     query = """
-    MATCH (r:Resource {resource_id: $resource_id})
+    MATCH (r:UniResource {resource_id: $resource_id})
     SET r.is_active = false
     """
     params = {"resource_id": resource_id}
@@ -335,7 +225,7 @@ async def archive_resource(resource_id: str):
 
 async def delete_resource(resource_id: str):
     query = """
-    MATCH (r:Resource {resource_id: $resource_id})
+    MATCH (r:UniResource {resource_id: $resource_id})
     DETACH DELETE r
     """
     params = {"resource_id": resource_id}
@@ -343,7 +233,45 @@ async def delete_resource(resource_id: str):
     
 async def calculate_support_weights(resource_id: str, indicators: list[dict]):
     query = """
-    MATCH (r:Resource {resource_id: $resource_id})
+    MATCH (r:UniResource {resource_id: $resource_id})
+    MATCH (i:Indicator)
+    WHERE i.indicator_id IN [ind IN $indicators | ind.indicator_id]
+    
+    MERGE (r)-[rsi:SUPPORTS]->(i)
+    SET rsi.weight = 1.0
+    
+    WITH r, i
+    MATCH (q:Quality)-[:HAS_INDICATOR]->(i)
+    WITH r, q, count(i) AS resource_indicator_count
+    WITH r, q, resource_indicator_count, COUNT { (q)-[:HAS_INDICATOR]->() } AS total_indicators
+    
+    MERGE (r)-[rsq:SUPPORTS]->(q)
+    SET rsq.weight = toFloat(resource_indicator_count) / toFloat(total_indicators)
+ 
+    WITH DISTINCT r
+    MATCH (s:SubCpl)-[sq:HAS_QUALITY]->(q:Quality)<-[rsq:SUPPORTS]-(r)
+    WITH r, s, sum(sq.weight * rsq.weight) AS resource_quality_weight
+    
+    MATCH (s)-[sq_all:HAS_QUALITY]->()
+    WITH r, s, resource_quality_weight, sum(sq_all.weight) AS subcpl_quality_weight
+    
+    MERGE (r)-[rss:SUPPORTS]->(s)
+    SET rss.weight = toFloat(resource_quality_weight) / toFloat(subcpl_quality_weight)
+    
+    WITH DISTINCT r
+    MATCH (c:Cpl)-[:HAS_SUB_CPL]->(s:SubCpl)<-[rss:SUPPORTS]-(r)
+    WITH r, c, sum(rss.weight) AS resource_subcpl_weight
+    WITH r, c, resource_subcpl_weight, COUNT { (c)-[:HAS_SUB_CPL]->() } AS cpl_subcpl_count
+    
+    MERGE (r)-[rsc:SUPPORTS]->(c)
+    SET rsc.weight = toFloat(resource_subcpl_weight) / toFloat(cpl_subcpl_count)
+    """
+   
+    await Neo4jConnection.query(query, {"resource_id": resource_id, "indicators": indicators})
+    
+async def calculate_support_weights_old(resource_id: str, indicators: list[dict]):
+    query = """
+    MATCH (r:UniResource {resource_id: $resource_id})
     MATCH (i:Indicator)
     WHERE i.indicator_id IN [ind IN $indicators | ind.indicator_id]
     MATCH (c:Cpl)-[:HAS_SUB_CPL]->(s:SubCpl)-[sq:HAS_QUALITY]->(q:Quality)-[:HAS_INDICATOR]->(i)
@@ -381,17 +309,23 @@ async def calculate_support_weights(resource_id: str, indicators: list[dict]):
     
 async def set_resource_weight(resource_id: str | None = None):
     query = """ 
-    MATCH (r:Resource) WHERE $resource_id IS NULL OR r.resource_id = $resource_id
+    MATCH (r:UniResource) WHERE $resource_id IS NULL OR r.resource_id = $resource_id
 
     OPTIONAL MATCH (r)-[:HAS_SESSION]->(s:Session)
     WITH r, sum(duration.inSeconds(s.start_datetime, s.end_datetime).minutes) as minute_duration
 
     MATCH (ew:Config:EventWeight)
+    MATCH (bvw:Config:BookVideoWeight)
     OPTIONAL MATCH (sr:Config:ScaleRule) WHERE sr.scale = r.scale
     OPTIONAL MATCH (spr:Config:SpeakerDegreeRule) WHERE spr.speaker_degree = r.speaker_degree
     OPTIONAL MATCH (dr:Config:DurationRule)
+    
+    
+    OPTIONAL MATCH (at:Config:AuthorTypeRule) WHERE at.author_type = r.author_type
+    OPTIONAL MATCH (is:Config:ImpactScaleRule) WHERE is.impact_scale = r.impact_scale
+    OPTIONAL MATCH (tw:Config:ThematicWeightRule) WHERE tw.thematic_weight = r.thematic_weight
 
-    WITH r, minute_duration, ew, sr, spr, dr
+    WITH r, minute_duration, ew, sr, spr, dr, at, is, tw, bvw
 
     SET r.internal_weight = 
         CASE
@@ -403,7 +337,11 @@ async def set_resource_weight(resource_id: str | None = None):
                     ELSE 1.0
                     END
                     ), 0)
-        ELSE 1.0
+            WHEN r.type = "book" OR r.type = "video"
+            THEN COALESCE((bvw.author_type_weight * at.weight), 0) +
+                 COALESCE((bvw.impact_scale_weight * is.weight), 0) + 
+                 COALESCE((bvw.thematic_weight_weight * tw.weight), 0)
+            ELSE 1.0
         END
     """
     

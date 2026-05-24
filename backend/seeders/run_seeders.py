@@ -1,5 +1,15 @@
 import pandas as pd
 from backend.database import Neo4jConnection
+import spacy
+import requests
+import os
+import httpx
+from deep_translator import GoogleTranslator
+import asyncio
+
+nlp = spacy.load("en_core_web_sm")
+if "entityLinker" not in nlp.pipe_names:
+    nlp.add_pipe("entityLinker", last=True)
 
 async def seed_years_and_versions():
     query = """
@@ -140,6 +150,36 @@ async def seed_configs():
     MERGE (cfsp:Config:SpeakerDegreeRule {speaker_degree: "phd"})
     SET cfsp.weight = 1.0
     
+    MERGE (cfpb:Config:AuthorType {author_type: "personal_blog"})
+    SET cfpb.weight=0.6
+
+    MERGE (cfp:Config:AuthorType {author_type: "practitioner"})
+    SET cfp.weight=0.8
+
+    MERGE (cfa:Config:AuthorType {author_type: "academic"})
+    SET cfa.weight=1.0
+    
+    MERGE (cfpo:Config:ThematicWeight {thematic_weight: "personal_opinion"})
+    SET cfpo.weight=0.4
+
+    MERGE (cfaj:Config:ThematicWeight {thematic_weight: "academic_journal"})
+    SET cfaj.weight=0.6
+
+    MERGE (cfc:Config:ThematicWeight {thematic_weight: "critique"})
+    SET cfc.weight=0.8
+
+    MERGE (cfph:Config:ThematicWeight {thematic_weight: "philosophy"})
+    SET cfph.weight=1.0
+    
+    MERGE (cfl:Config:ImpactScale {impact_scale: "local"})
+    SET cfl.weight=0.6
+
+    MERGE (cfin:Config:ImpactScale {impact_scale: "international"})
+    SET cfin.weight=0.8
+
+    MERGE (cfw:Config:ImpactScale {impact_scale: "worldwide"})
+    SET cfw.weight=1.0
+    
     MERGE (cfd:Config:DurationRule {a: -8, b: 12, c: gds.util.infinity(), d: gds.util.infinity()})
     
     MERGE (cf:Config:StudentTarget {target_score: 0.7})
@@ -151,11 +191,95 @@ async def seed_configs():
     MERGE (:Config:EventWeight {speaker_degree_weight: 0.5, scale_weight: 0.3, duration_weight: 0.2})
     
     MERGE (:Config:RecommendationWeight {need_weight: 0.7, interest_weight: 0.3})
+    
+    MERGE (:Config:BookVideoWeight {author_type_weight: 0.5, impact_scale_weight: 0.3, thematic_weight_weight: 0.2})
     """
     
     await Neo4jConnection.query(query)
     
+async def translate_one_word(id_word):
+    en_word = await asyncio.to_thread(
+        GoogleTranslator(source='id', target='en').translate, 
+        id_word
+    )
+    return en_word
     
+    
+async def get_q_code(keyword):
+    headers = {
+        "Authorization": f"Bearer {os.getenv("WIKIDATA_ACCESS_TOKEN")}",
+        "User-Agent": "SurabayaEventRecommender/1.0 (student.thesis@example.com)",
+        "Content-Type": "application/json"
+    }
+    params = {
+        "q": keyword,
+        "limit": 1,
+        "language": "en"
+    }
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                "https://www.wikidata.org/w/rest.php/wikibase/v1/search/items", 
+                headers=headers, 
+                params=params, 
+                timeout=10.0
+            )
+            response.raise_for_status()
+            result = response.json()
+            print(result)
+            if result.get('results'):
+                print(result['results'])
+                q_code = result['results'][0]['id']
+                label = result['results'][0]['display-label']['value']
+                description = result['results'][0]['description']['value']
+                return q_code, label, description
+            return None 
+        except httpx.HTTPStatusError as err:
+            print(f"HTTP Error: {err}")
+            print(f"Response Body: {err.response.text}")
+            return None
+        except Exception as e:
+            print(f"A general error occurred: {e}")
+            return None
+    
+
+async def seed_topic_wikidata_id():
+    query = """
+    MATCH (t:Topic)
+    RETURN t.name as name
+    """
+    result = await Neo4jConnection.query(query)
+    topics = [topic['name'] for topic in result]
+    for topic in topics:
+        print(f"Processing topic {topic}...")
+        topic_en = await translate_one_word(topic)
+        print(f"Translated to {topic_en}")
+        q_code, label, description = await get_q_code(topic_en)
+        print(f"QCode: {q_code}")
+        print(f"Label: {label}")
+        query = """
+        MATCH (t:Topic {name: $name})
+        WHERE NOT t:Wikidata
+        MERGE (w:Topic:Wikidata {wikidata_id: $id})
+        SET w.name = $label
+        SET w.description = $description
+        MERGE (t)-[:LINKED_TO]->(w)
+        """
+        params = {"name": topic, "id": q_code, "label": label, "description": description}
+        await Neo4jConnection.query(query, params)
+        
+    manual_mapping = {
+        "Pengembangan Diri": ["Q10998095"],
+        "Keragaman & Perbedaan": ["Q1230584"],
+        "Ekonomi & Bisnis": ["Q8134", "Q4830453"],
+        "Teologi & Filosofi": ["Q34178", "Q5891"]
+    }
+    
+# def seed_wikidata_terms(resource_keywords, student_keywords):
+    
+    
+
 async def run_all_seeders():
     # print("Seeding Batch Year and Versions...")
     # await seed_years_and_versions()
@@ -169,8 +293,11 @@ async def run_all_seeders():
     # print("Seeding Configuration...")
     # await seed_configs()
     
-    print("Seeding Relations...")
-    await seed_student_questions_relation("data/hasil_survei.parquet")
+    # print("Seeding Relations...")
+    # await seed_student_questions_relation("data/hasil_survei.parquet")
+    
+    # print("Seeding Topic Wikidata from Topic...")
+    await seed_topic_wikidata_id()
     
     print("All seeding complete!")
     

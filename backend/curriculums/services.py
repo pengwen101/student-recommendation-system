@@ -6,7 +6,7 @@ from typing import List
 async def read_curriculum(version_id: str):
     return await curriculum_cypher.read_curriculum(version_id)
 
-async def study_level_exists(study_level_id: int):
+async def study_level_exists(study_level_id: str):
     return await curriculum_cypher.study_level_exists(study_level_id)
 
 async def read_curriculum_versions():

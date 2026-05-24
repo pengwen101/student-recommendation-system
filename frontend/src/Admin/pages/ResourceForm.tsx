@@ -2,7 +2,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 
-import type { ResourceInput, SubCpl, Topic, Organizer, ResourceSubCpl, CurriculumVersion } from "../../types";
+import type { ResourceInput, SubCpl, Topic, Organizer, ResourceSubCpl, CurriculumVersion, ResourceAssessment } from "../../types";
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { Select } from '../../components/Select';
@@ -20,6 +20,8 @@ function ResourceForm() {
   const location = useLocation();
   const navigate = useNavigate();
   const [resource, setResource] = useState<ResourceInput | null>(null);
+  const [resourceType, setResourceType] = useState<string>("event");
+  const [resourceAssessments, setResourceAssessments] = useState<ResourceAssessment[] | null>(null);
   const [subCpls, setSubCpls] = useState<SubCpl[] | null>(null);
   const [clickedSubCpls, setClickedSubCpls] = useState<ResourceSubCpl[] | null> (null);
   const [organizers, setOrganizers] = useState<Organizer[] | null>(null);
@@ -48,12 +50,14 @@ function ResourceForm() {
         const topicsRes = await api.get("/topic");
         const organizersRes = await api.get("/organizer");
         const versionsRes = await api.get("/curriculum_version");
+        const resourceAssessmentsRes = await api.get(`/resource_assessment/${resourceType}`);
    
         const fetchedSubCpls = subcplsRes.data.subcpls;
-        setSubCpls(fetchedSubCpls);
+        setSubCpls(subcplsRes.data.subcpls);
         setTopics(topicsRes.data.topics);
         setOrganizers(organizersRes.data.organizers);
         setVersions(versionsRes.data.curriculum_versions);
+        setResourceAssessments(resourceAssessmentsRes.data.resource_assessments);
 
         if (isEdit && resource_id) {
           const res = await api.get(`/resource/${resource_id}`);
@@ -78,13 +82,15 @@ function ResourceForm() {
         } else {
           setResource({
             resource_id: "",
-            type: "event",
-            name: "",
-            description: "",
-            sessions: [],
-            scale: "university",
-            speaker_degree: "bachelor",
-            status: "",
+            //type: "event",
+            title: "",
+            // sessions: [],
+            // scale: "university",
+            // speaker_degree: "bachelor",
+            // author_type: "personal_blog",
+            // thematic_weight: "personal_opinion",
+            // impact_scale: "local",
+            // status: "",
             is_active: true,
             indicators: [],
             topics: []
@@ -97,7 +103,7 @@ function ResourceForm() {
       }
     };
     fetchData();
-  }, [resource_id, isEdit, versionId]);
+  }, [resource_id, isEdit, versionId, resourceType]);
 
 
   const fetchBookInfo = async (isbn: string | null | undefined) => {
@@ -206,6 +212,35 @@ function ResourceForm() {
       });
   };
 
+const handleAssessmentChange = (resource_assessment_id: string, resource_weight: number) => {
+  if (!resource) return;
+  const updatedAssessments = [...(resource.resource_assessments || [])];
+  const existingIndex = updatedAssessments.findIndex(
+    (a) => a.resource_assessment_id === resource_assessment_id
+  );
+  
+  if (existingIndex >= 0) {
+    updatedAssessments[existingIndex] = { 
+      ...updatedAssessments[existingIndex], 
+      resource_weight: resource_weight 
+    };
+  } else {
+    updatedAssessments.push({ 
+      resource_assessment_id: resource_assessment_id, 
+      resource_weight: resource_weight 
+    });
+  }
+  setResource({
+    ...resource,
+    resource_assessments: updatedAssessments
+  });
+  const newErrors = { ...errors };
+  if (newErrors.resource_assessments) {
+    delete newErrors.resource_assessments;
+    setErrors(newErrors);
+  }
+};
+
 
   const handleSessionChange = (index: number, field: string, type: string, value: string) => {
       const updatedSessions = [...(resource?.sessions || [])];
@@ -230,7 +265,7 @@ function ResourceForm() {
       setResource(updatedResource);
       const newErrors = { ...errors };
 
-      if (updatedResource.type === 'event') {
+      if (resourceType === 'event') {
         if (!updatedSessions || updatedSessions.length === 0) {
           newErrors.sessions = "Events must have at least one session.";
         } else {
@@ -268,7 +303,7 @@ function ResourceForm() {
       setResource(updatedResource);
       const newErrors = { ...errors };
 
-      if (updatedResource.type === 'event') {
+      if (resourceType === 'event') {
         if (!updatedOrganizers || updatedOrganizers.length === 0) {
           newErrors.organizers = "Events must have an organizer.";
         } else {
@@ -290,9 +325,9 @@ function ResourceForm() {
       setResource(updatedResource);
       const newErrors = { ...errors };
 
-      if (updatedResource.type === 'event') {
+      if (resourceType === 'book') {
         if (!updatedAuthors || updatedAuthors.length === 0) {
-          newErrors.authors = "Events must have an author.";
+          newErrors.authors = "Books must have an author.";
         } else {
           delete newErrors.authors;
         }
@@ -301,13 +336,13 @@ function ResourceForm() {
       setErrors(newErrors);
   };
 
-  const availableStudyLevels = [1, 2, 3, 4];
+  const availableStudyLevels = ["1", "2", "3", "4"];
   
   const currentStudyLevels = resource?.study_levels || [];
   const currentStudyLevelIds = currentStudyLevels.map(sl => sl.study_level_id);
   const isAllLevelsChecked = availableStudyLevels.every(level => currentStudyLevelIds.includes(level));
 
-  const handleStudyLevelToggle = (level: number | 'all') => {
+  const handleStudyLevelToggle = (level: string | 'all') => {
     if (!resource) return;
 
     let newLevels = [...currentStudyLevels];
@@ -492,11 +527,11 @@ function ResourceForm() {
     if (!resource) return;
     const newErrors: Record<string, string> = {};
 
-    if (!resource.name?.trim()) {
-      newErrors.name = "Name is required.";
+    if (!resource.title?.trim()) {
+      newErrors.title = "Title is required.";
     }
 
-    if (resource.type != 'article' && !resource.description?.trim()) {
+    if (resourceType != 'article' && !resource.description?.trim()) {
       newErrors.description = "Description is required.";
     }
 
@@ -508,7 +543,7 @@ function ResourceForm() {
       newErrors.topics = "At least one topic must be selected.";
     }
 
-    if (resource.type === 'event') {
+    if (resourceType === 'event') {
       if (!resource.sessions || resource.sessions.length === 0) {
         newErrors.sessions = "Events must have at least one session.";
       } else {
@@ -535,14 +570,54 @@ function ResourceForm() {
     }
 
 
-    if (resource.type === 'article') {
+    if (resourceType === 'article') {
       if (!resource.article_text || !resource.article_text.blocks || resource.article_text.blocks.length === 0) {
         newErrors.article_text = "Article content cannot be empty.";
       }
     }
 
+    // if (resource.type === 'book' || resource.type == "video") {
+    //   if (!resource.author_type) {
+    //     console.log(resource.author_type);
+    //     newErrors.author_type = "Author type cannot be empty.";
+    //   }
+    //   if (!resource.impact_scale) {
+    //     newErrors.impact_scale = "Impact scale cannot be empty.";
+    //   }
+    //   if (!resource.thematic_weight) {
+    //     newErrors.thematic_weight = "Thematic weight cannot be empty.";
+    //   }
+    // }
+
+    if (resourceType === "book") {
+      if (!resource.authors || resource.authors.length === 0) {
+          newErrors.authors = "Book must have an author.";
+      }
+
+      if (!resource.isbn) {
+          newErrors.isbn = "Book must have an ISBN.";
+      }
+
+      if (!resource.publisher) {
+          newErrors.publisher = "Book must have a publisher.";
+      }
+
+      if (!resource.published_date) {
+          newErrors.published_date = "Book must have a published date.";
+      }
+    }
+
+    if (resource.resource_assessments) {
+      resource.resource_assessments.forEach((assessment, index) => {
+        if (assessment.resource_weight < 0 || assessment.resource_weight > 1) {
+          newErrors[`resource_assessments_${index}`] = "Weight must be between 0 and 1.0.";
+        }
+      });
+    }
+
     if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
+        console.log(newErrors);
         toast.error("Please fix the highlighted errors in the form."); 
         return; 
     }
@@ -552,7 +627,7 @@ function ResourceForm() {
 
     let computedStatus;
 
-    if (resource.type === 'event' && resource.sessions && resource.sessions.length > 0) {
+    if (resourceType === 'event' && resource.sessions && resource.sessions.length > 0) {
       const now = new Date().getTime();
       const earliestStart = Math.min(...resource.sessions.map(s => new Date(s.start_datetime).getTime()));
       const latestEnd = Math.max(...resource.sessions.map(s => new Date(s.end_datetime).getTime()));
@@ -567,23 +642,28 @@ function ResourceForm() {
     }
 
     const resource_input = {
-      type: resource.type,
-      name: resource.name,
+      //type: resource.type,
+      title: resource.title,
       description: resource.description,
-      ...(resource.type === 'event' && computedStatus ? { status: computedStatus } : {}),
-      ...(resource.type === 'event' && resource.scale ? { scale: resource.scale } : {}),
-      ...(resource.type === 'event' && resource.organizers ? { organizers: resource.organizers } : {}),
-      ...(resource.type === 'event' && resource.speaker_degree && resource.speaker_degree !== "no_speaker" ? { speaker_degree: resource.speaker_degree } : {}),
-      ...(resource.type === 'event' && resource.study_levels ? { study_levels: resource.study_levels } : {}),
-      ...(resource.type === 'article' && resource.article_text ? { article_text: resource.article_text } : {}),
+      ...(resourceType === 'event' && computedStatus ? { status: computedStatus } : {}),
+      //...(resourceType === 'event' && resource.scale ? { scale: resource.scale } : {}),
+      ...(resourceType === 'event' && resource.organizers ? { organizers: resource.organizers } : {}),
+      //...(resourceType === 'event' && resource.speaker_degree && resource.speaker_degree !== "no_speaker" ? { speaker_degree: resource.speaker_degree } : {}),
+      ...(resourceType === 'event' && resource.study_levels ? { study_levels: resource.study_levels } : {}),
+      ...(resourceType === 'article' && resource.article_text ? { article_text: resource.article_text } : {}),
 
-      ...(resource.type === 'book' && resource.isbn ? { isbn: resource.isbn } : {}),
-      ...(resource.type === 'book' && resource.publisher ? { publisher: resource.publisher } : {}),
-      ...(resource.type === 'book' && resource.authors ? { authors: resource.authors } : {}),
-      ...(resource.type === 'book' && resource.published_date ? { published_date: resource.published_date } : {}),
-      ...(resource.type === 'video' && resource.content_link ? { content_link: resource.content_link } : {}),
+      ...(resourceType === 'book' && resource.isbn ? { isbn: resource.isbn } : {}),
+      ...(resourceType === 'book' && resource.publisher ? { publisher: resource.publisher } : {}),
+      ...(resourceType === 'book' && resource.authors ? { authors: resource.authors } : {}),
+      ...(resourceType === 'book' && resource.published_date ? { published_date: resource.published_date } : {}),
+      ...(resourceType === 'video' && resource.content_link ? { content_link: resource.content_link } : {}),
+      ...(resource.resource_assessments ? {resource_assessments: resource.resource_assessments}: {}),
 
-      ...(resource.type === 'event' ? {
+      // ...((resourceType === 'book' || resourceType === "video") && resource.author_type ? { author_type: resource.author_type } : {}),
+      // ...((resourceType === 'book' || resourceType === "video") && resource.impact_scale ? { impact_scale: resource.impact_scale } : {}),
+      // ...((resourceType === 'book' || resourceType === "video") && resource.thematic_weight ? { thematic_weight: resource.thematic_weight } : {}),
+
+      ...(resourceType === 'event' ? {
         sessions: (resource.sessions || []).map((session) => ({
           ...(session.session_id ? { session_id: session.session_id } : {}),
           start_datetime: session.start_datetime,
@@ -691,21 +771,21 @@ function ResourceForm() {
             <label className="text-sm font-semibold text-slate-700">Name</label>
             <Input
               type="text"
-              name="name"
+              name="title"
               placeholder="e.g. Intro to Advanced Robotics"
-              value={resource?.name || ""}
+              value={resource?.title || ""}
               onChange={onChange}
             />
-            {errors.name && (
+            {errors.title && (
               <span className="text-xs font-medium text-red-600 mt-1">
-                {errors.name}
+                {errors.title}
               </span>
             )}
           </div>
 
           <div className="flex flex-col gap-2">
             <label className="text-sm font-semibold text-slate-700">Type</label>
-            <Select name="type" onChange={onChange} value={resource?.type || ""}>
+            <Select name="type" onChange={(e)=>{setResourceType(e.target.value)}} value={resourceType || ""}>
               <option value="event">Event</option>
               <option value="book">Book</option>
               <option value="video">Video</option>
@@ -718,8 +798,8 @@ function ResourceForm() {
             )}
           </div>
 
-          { resource?.type === "video" && (
-              <div className="flex flex-col gap-2">
+          { resourceType === "video" && (
+              <div className="flex flex-col gap-2 col-span-3">
               <label className="text-sm font-semibold text-slate-700">Content Link</label>
               <Input
                 type="text"
@@ -737,7 +817,7 @@ function ResourceForm() {
           )
           }
 
-          { resource?.type === "book" && (
+          { resourceType === "book" && (
 
             <>
             <div className="flex flex-col col-span-3 gap-2">
@@ -858,8 +938,42 @@ function ResourceForm() {
           </>
           )}
 
+          {/* {(resource?.type === "book" || resource?.type === "video") && (
+            <>
+              <div className="flex flex-col gap-2 md:col-span-1">
+                <label className="text-sm font-semibold text-slate-700">Author Type</label>
+                <Select name="author_type" value={resource?.author_type || "personal_blog"} onChange={onChange}>
+                  <option value="personal_blog">Personal Blog</option>
+                  <option value="practitioner">Practitioner</option>
+                  <option value="academic">Academic</option>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-2 md:col-span-1">
+                <label className="text-sm font-semibold text-slate-700">Impact Scale</label>
+                <Select name="impact_scale" value={resource?.impact_scale || "local"} onChange={onChange}>
+                  <option value="local">Local</option>
+                  <option value="international">International</option>
+                  <option value="worldwide">Worldwide</option>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-2 md:col-span-1">
+                <label className="text-sm font-semibold text-slate-700">Thematic Weight</label>
+                <Select name="thematic_weight" value={resource?.thematic_weight || "personal_opinion"} onChange={onChange}>
+                  <option value="personal_opinion">Personal Opinion</option>
+                  <option value="academic_journal">Academic Journal</option>
+                  <option value="critique">Critique</option>
+                  <option value="philosophy">Philosophy</option>
+                </Select>
+              </div>
+
+            </>
+
+          )} */}
+
           {/* SECTION: Article Specific Details */}
-          {resource?.type === 'article' && (
+          {resourceType === 'article' && (
             <Pane variant="shadow" className="p-6 mt-6 col-span-3">
               <h3 className="text-lg font-bold text-slate-900 mb-6 border-b border-slate-100 pb-2">
                 Article Content
@@ -892,7 +1006,7 @@ function ResourceForm() {
             </Pane>
           )}
 
-          { resource?.type != 'article' && (
+          { resourceType != 'article' && (
             <div className="flex flex-col gap-2 md:col-span-3">
             <label className="text-sm font-semibold text-slate-700">Description</label>
             <Textarea
@@ -910,11 +1024,11 @@ function ResourceForm() {
 
           )}
         </div>
-        { resource?.type == 'event' && (
+        { resourceType == 'event' && (
         <>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-          <div className="flex flex-col gap-2 md:col-span-1">
+          {/* <div className="flex flex-col gap-2 md:col-span-1">
             <label className="text-sm font-semibold text-slate-700">Scale</label>
             <Select name="scale" value={resource?.scale || ""} onChange={onChange}>
               <option value="university">University</option>
@@ -933,7 +1047,7 @@ function ResourceForm() {
               <option value="master">Master</option>
               <option value="phd">Phd</option>
             </Select>
-          </div>
+          </div> */}
 
           <div className="flex flex-col gap-2 md:col-span-2 mt-2">
             <label className="text-sm font-semibold text-slate-700">Available for Study Level</label>
@@ -1129,6 +1243,47 @@ function ResourceForm() {
         </>
         )}
       </Pane>
+
+      <Pane variant="shadow" className="p-6">
+        <div className="grid grid-cols-1 gap-6">
+
+          {resourceAssessments?.map((resourceAssessment, index) => {
+            const currentVal = resource?.resource_assessments?.find(
+              (a) => a.resource_assessment_id === resourceAssessment.resource_assessment_id
+            )?.resource_weight || 0;
+
+            return (
+              <div key={resourceAssessment.resource_assessment_id || index} className="flex flex-col mb-4">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-sm font-semibold text-slate-700">
+                    {resourceAssessment.display_name}
+                  </label>
+                  <span className="text-sm font-bold text-blue-600">
+                    {currentVal.toFixed(2)}
+                  </span>
+                </div>
+
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={currentVal}
+                  onChange={(e) => handleAssessmentChange(resourceAssessment.resource_assessment_id, parseFloat(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+                {errors[`resource_assessments_${index}`] && (
+                  <span className="text-xs font-medium text-red-600 mt-1">
+                    {errors[`resource_assessments_${index}`]}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+
+        </div>
+      </Pane>
+
 
       {/* SECTION 2: Sub-CPLs & Indicators */}
       <Pane variant="shadow" className="p-6">

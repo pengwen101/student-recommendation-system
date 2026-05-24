@@ -8,3 +8,7 @@ configs_router = APIRouter(prefix="/config", tags=["config"])
 @configs_router.get("/student_target", response_model=StudentTarget)
 async def get_student_target():
     return await services.get_student_target()
+
+@configs_router.get("/resource_assessments/{type}")
+async def get_resource_assessments(type: str):
+    return await services.get_resource_assessments(type)

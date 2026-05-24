@@ -18,7 +18,7 @@ async def support_lack_gap(curriculum_type: str, study_level_ids: list | None = 
     
     WITH c, student_count, lack_score, CASE WHEN student_count = 0 THEN 0 ELSE lack_score / student_count END AS avg_lack_score
 
-    OPTIONAL MATCH (r:Resource)-[rs:SUPPORTS]->(c)
+    OPTIONAL MATCH (r:UniResource)-[rs:SUPPORTS]->(c)
     WHERE $resource_types IS NULL OR r.type IN $resource_types
     
     OPTIONAL MATCH (o:Organizer)-[]->(r)-[]->(sl)
@@ -48,7 +48,7 @@ async def resource_supporting_x(curriculum_id: str | None = None, study_level_id
     query = f"""
     MATCH (n:Cpl|SubCpl|Quality|Indicator) WHERE $curriculum_id IS NULL OR n.cpl_id = $curriculum_id OR n.sub_cpl_id = $curriculum_id OR n.quality_id = $curriculum_id OR n.indicator_id = $curriculum_id
     
-    MATCH (r:Resource)-[:SUPPORTS]->(n)
+    MATCH (r:UniResource)-[:SUPPORTS]->(n)
     WHERE $resource_types IS NULL OR r.type IN $resource_types
     MATCH (r)-[]->(sl:StudyLevel)
     WHERE $study_level_ids IS NULL OR sl.study_level_id IN $study_level_ids
@@ -69,7 +69,7 @@ async def organizer_support(curriculum_type: str, study_level_ids: str | None, r
     query = f"""
     MATCH (o:Organizer)
     MATCH (c:{curriculum_type})
-    OPTIONAL MATCH (o)-[]->(r:Resource)-[rs:SUPPORTS]->(c)
+    OPTIONAL MATCH (o)-[]->(r:UniResource)-[rs:SUPPORTS]->(c)
     WHERE $resource_types IS NULL OR r.type IN $resource_types
     MATCH (r)-[]->(sl:StudyLevel)
     WHERE $study_level_ids IS NULL OR sl.study_level_id IN $study_level_ids
@@ -87,7 +87,7 @@ async def organizer_support(curriculum_type: str, study_level_ids: str | None, r
 
 async def resource_characteristic(study_level_ids: list | None = None, resource_types: str | None = None, organizer_ids: list | None = None):
     query = """
-    MATCH (r:Resource)-[rs:SUPPORTS]->(s:SubCpl)
+    MATCH (r:UniResource)-[rs:SUPPORTS]->(s:SubCpl)
     WHERE $resource_types IS NULL OR r.type IN $resource_types
     MATCH (r)-[]->(sl:StudyLevel)
     WHERE $study_level_ids IS NULL OR sl.study_level_id IN $study_level_ids 
@@ -110,7 +110,7 @@ async def coverage_interest_gap(study_level_id: list | None = None, resource_typ
         
     WITH t, COUNT(DISTINCT s.nrp) AS interest_count
 
-    OPTIONAL MATCH (r:Resource)-[rc:COVERS]->(t)
+    OPTIONAL MATCH (r:UniResource)-[rc:COVERS]->(t)
     MATCH (o:Organizer)-[]->(r)-[]->(sl)
     
     WHERE $resource_type IS NULL OR r.type = $resource_type
@@ -133,7 +133,7 @@ async def resource_support(curriculum_type: str, curriculum_id: str, study_level
     query = f"""
     MATCH (c:{curriculum_type})
     WHERE $curriculum_id IS NULL OR c.id = $curriculum_id
-    OPTIONAL MATCH (r:Resource)-[rs:SUPPORTS]->(c)
+    OPTIONAL MATCH (r:UniResource)-[rs:SUPPORTS]->(c)
     OPTIONAL MATCH (o:Organizer)-[]->(r)-[]->(sl)
     WHERE $study_level_id IS NULL OR sl.study_level_id IN $study_level_id
     WHERE $resource_type IS NULL OR r.type = $resource_type

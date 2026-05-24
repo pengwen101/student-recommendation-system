@@ -120,7 +120,7 @@ async def get_student_recommendations(nrp: str, type: str):
         OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(:Topic)
         WITH s, total_lack_weight, count(ri) as total_interest_count
 
-        MATCH (s)-[:CURRENTLY_IN]->(:StudyLevel)<-[:AVAILABLE_FOR]-(r:Resource {type: $type})
+        MATCH (s)-[:CURRENTLY_IN]->(:StudyLevel)<-[:AVAILABLE_FOR]-(r:UniResource {type: $type})
         OPTIONAL MATCH (s)-[rl:LACKS]->(i:Indicator)<-[rp:SUPPORTS]-(r)
         WITH s, r, total_lack_weight, total_interest_count,
             sum(

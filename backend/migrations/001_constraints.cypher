@@ -32,7 +32,7 @@ CREATE CONSTRAINT curriculum_version_id IF NOT EXISTS
 FOR (c:CurriculumVersion)
 REQUIRE c.curriculum_version_id IS UNIQUE;
 CREATE CONSTRAINT resource_id IF NOT EXISTS
-FOR (r:Resource)
+FOR (r:UniResource)
 REQUIRE r.resource_id IS UNIQUE;
 CREATE CONSTRAINT organizer_id IF NOT EXISTS
 FOR (o:Organizer)
@@ -43,3 +43,12 @@ REQUIRE a.admin_id IS UNIQUE;
 CREATE CONSTRAINT topic_id IF NOT EXISTS
 FOR (t:Topic)
 REQUIRE t.topic_id IS UNIQUE;
+CREATE CONSTRAINT author_type IF NOT EXISTS
+FOR (cf:AuthorTypeRule)
+REQUIRE cf.author_type IS UNIQUE;
+CREATE CONSTRAINT impact_scale IF NOT EXISTS
+FOR (cf:ImpactScaleRule)
+REQUIRE cf.impact_scale IS UNIQUE;
+CREATE CONSTRAINT thematic_weight IF NOT EXISTS
+FOR (cf:ThematicWeightRule)
+REQUIRE cf.thematic_weight IS UNIQUE;

@@ -19,6 +19,25 @@ export interface Admin {
 
 // Resource
 
+export const AuthorType = {
+    PersonalBlog: "personal_blog",
+    Practitioner: "practitioner",
+    Academic: "academic"
+}
+
+export const ThematicWeight = {
+    PersonalOpinion: "personal_opinion",
+    AcademicJournal: "academic_journal",
+    Critique: "critique",
+    Philosophy: "philosophy"
+}
+
+export const ImpactScale = {
+    Local: "local",
+    International: "international",
+    Worldwide: "worldwide"
+}
+
 export const ResourceType = {
   Book: "book",
   Video: "video",
@@ -68,6 +87,13 @@ export interface ActorInput {
     actor_type: typeof ActorType[keyof typeof ActorType]
 }
 
+export interface ResourceAssessment {
+    resource_assessment_id: string;
+    weight: number;
+    display_name: string;
+    resource_type: typeof ResourceType[keyof typeof ResourceType];
+}
+
 export interface Resource {
     resource_id: string;
     type: typeof ResourceType[keyof typeof ResourceType];
@@ -81,20 +107,23 @@ export interface Resource {
     article_text?: string;
     study_levels?: StudyLevel[],
     sessions?: Session[],
-    organizers: Organizer[],
-    status: typeof ResourceStatus[keyof typeof ResourceStatus];
-    scale: typeof ResourceScale[keyof typeof ResourceScale];
-    speaker_degree: typeof SpeakerDegree[keyof typeof SpeakerDegree];
+    organizers?: Organizer[],
+    status?: typeof ResourceStatus[keyof typeof ResourceStatus];
+    scale?: typeof ResourceScale[keyof typeof ResourceScale];
+    speaker_degree?: typeof SpeakerDegree[keyof typeof SpeakerDegree];
+    author_type?: typeof AuthorType[keyof typeof AuthorType];
+    impact_scale?: typeof ImpactScale[keyof typeof ImpactScale];
+    thematic_weight?: typeof ThematicWeight[keyof typeof ThematicWeight];
     is_active: boolean;
     topics: Topic[];
-    calculations?: ResourceSupportCalculations;
+    calculations: ResourceSupportCalculations;
 }
 
 // For edit / create
 export interface ResourceInput {
     resource_id: string;
-    type: typeof ResourceType[keyof typeof ResourceType];
-    name: string;
+    //type: typeof ResourceType[keyof typeof ResourceType];
+    title: string;
     description?: string;
     authors?: string[];
     publisher?: string;
@@ -106,11 +135,51 @@ export interface ResourceInput {
     sessions?: SessionInput[],
     organizers?: ResourceOrganizerInput[],
     status?: typeof ResourceStatus[keyof typeof ResourceStatus];
-    scale?: typeof ResourceScale[keyof typeof ResourceScale];
-    speaker_degree?: typeof SpeakerDegree[keyof typeof SpeakerDegree];
+    // scale?: typeof ResourceScale[keyof typeof ResourceScale];
+    // speaker_degree?: typeof SpeakerDegree[keyof typeof SpeakerDegree];
+    // author_type?: typeof AuthorType[keyof typeof AuthorType];
+    // impact_scale?: typeof ImpactScale[keyof typeof ImpactScale];
+    // thematic_weight?: typeof ThematicWeight[keyof typeof ThematicWeight];
+    resource_assessments?: ResourceAssessmentInput[];
     is_active: boolean;
     indicators: ResourceIndicator[];
     topics: ResourceTopic[];
+}
+
+export interface ResourceAssessmentInput {
+    resource_assessment_id: string;
+    resource_weight: number;
+}
+
+export interface ResourceBaseInput {
+    title: string;
+    is_active: boolean;
+    resource_assessments?: ResourceAssessmentInput[];
+    topics: ResourceTopic[];
+    indicators: ResourceIndicator[];
+}
+
+export interface ResourceEventInput extends ResourceBaseInput {
+    description: string
+    sessions: SessionInput[];
+    organizers: ResourceOrganizerInput[];
+    status: typeof ResourceStatus[keyof typeof ResourceStatus];
+}
+
+export interface ResourceBookInput extends ResourceBaseInput {
+    description: string;
+    authors: string[];
+    publisher: string;
+    published_date: string;
+}
+
+export interface ResourceVideoInput extends ResourceBaseInput {
+    description: string;
+    content_link: string;
+}
+
+export interface ResourceArticleInput extends ResourceBaseInput {
+    article_text: OutputData;
 }
 
 export interface ResourceTopic {
@@ -209,7 +278,7 @@ export interface Topic {
 }
 
 export interface StudyLevel {
-    study_level_id: number;
+    study_level_id: string;
 }
 
 export interface Organizer {

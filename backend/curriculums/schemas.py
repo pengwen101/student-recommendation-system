@@ -40,7 +40,7 @@ class CurriculumResponse(BaseModel):
     curriculum: List[CPLResponse]
     
 class StudyLevel(BaseModel):
-    study_level_id: int
+    study_level_id: str
     
 class CurriculumVersion(BaseModel):
     curriculum_version_id: int

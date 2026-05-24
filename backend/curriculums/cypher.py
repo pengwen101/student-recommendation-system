@@ -40,7 +40,7 @@ async def read_curriculum(version_id: str):
     return unwrapped_cpls
 
 
-async def study_level_exists(study_level_id: int):
+async def study_level_exists(study_level_id: str):
     query = """
     MATCH (sl:StudyLevel {study_level_id: $study_level_id})
     RETURN count(sl) > 0 as exists

@@ -7,4 +7,3 @@ async def get_student_target():
     """
     
     return await Neo4jConnection.query(query)
-    

@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException, status, Depends
-from backend.resources.schemas import (AllResourcesResponse, ResourceDetailsResponse, ResourceDetailsInput)
+from fastapi import APIRouter, HTTPException, status, Depends, Query
+from backend.resources.schemas import (AllResourcesResponse, ResourceDetailsResponse, ResourceEventInput, ResourceBookInput, ResourceVideoInput, ResourceArticleInput, ResourceType)
 from backend.resources import services
 from backend.dependencies import get_current_user
 from typing import List
@@ -8,8 +8,8 @@ resources_router = APIRouter(prefix="/resource", tags=["resource"])
 recommendation_configs_router = APIRouter(prefix="/recommendation-config", tags=["config"])
 
 @resources_router.get("", response_model=AllResourcesResponse)
-async def read_resources():
-    resources = await services.read_resources()
+async def read_resources(type: ResourceType):
+    resources = await services.read_resources(type)
     return {"message": "Resources successfully retrieved.", "count": len(resources), "resources": resources}
 
 @resources_router.get("/{resource_id}", response_model=ResourceDetailsResponse)
@@ -18,8 +18,8 @@ async def read_resource_details(resource_id: str):
     return {"message": "Resource details successfully retrieved.", "resource_details": resource_details}
 
 @resources_router.post("", response_model=ResourceDetailsResponse)
-async def create_resource(data: ResourceDetailsInput, current_user: dict = Depends(get_current_user)):
-    resource_details = await services.create_resource(data, current_user)
+async def create_resource(type: ResourceType, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict = Depends(get_current_user)):
+    resource_details = await services.create_resource(type, data, current_user)
     return {"message": "Resource successfully created.", "resource_details": resource_details}
 
 @resources_router.put("/set-resource-weight")
@@ -28,7 +28,7 @@ async def set_resource_weight(resource_id: str | None = None):
     return {"message": "Resource weight successfully updated."}
 
 @resources_router.put("/{resource_id}", response_model=ResourceDetailsResponse)
-async def update_resource(resource_id: str, data: ResourceDetailsInput, current_user: dict = Depends(get_current_user)):
+async def update_resource(resource_id: str, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict = Depends(get_current_user)):
     resource_details = await services.update_resource(resource_id, data, current_user)
     return {"message": "Resource successfully updated.", "resource_details": resource_details}
 

@@ -1,10 +1,26 @@
-from pydantic import BaseModel, model_validator, field_validator
+from pydantic import BaseModel, model_validator, field_validator, Field
 from datetime import datetime
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Annotated, Literal
 from enum import Enum
 from backend.curriculums.schemas import StudyLevel
 import json
 
+class AuthorType(str, Enum):
+    PERSONAL_BLOG = "personal_blog"
+    PRACTITIONER = "practitioner"
+    ACADEMIC = "academic"
+    
+class ThematicWeight(str, Enum):
+    PERSONAL_OPINION = "personal_opinion"
+    ACADEMIC_JOURNAL = "academic_journal"
+    CRITIQUE = "critique"
+    PHILOSOPHY = "philosophy"
+    
+class ImpactScale(str, Enum):
+    LOCAL = "local"
+    INTERNATIONAL = "international"
+    WORLDWIDE = "worldwide"
+    
 class EditorBlock(BaseModel):
     id: Optional[str] = None
     type: str
@@ -72,6 +88,58 @@ class ResourceOrganizerDetails(BaseModel):
     organizer_id: str
     name: str
     
+class ResourceAssessment(BaseModel):
+    resource_assessment_id: str
+    display_name: str
+    resource_type: str
+    weight: float
+    resource_weight: float
+    
+class ResourceAssessmentInput(BaseModel):
+    resource_assessment_id: str
+    resource_weight: float
+    
+class ResourceBase(BaseModel):
+    resource_id: str
+    title: str
+    is_active: bool
+    internal_weight: float
+    resource_assessments: List[ResourceAssessment] | None = None
+    topics: List[ResourceTopicsResponse]
+    indicators: List[ResourceIndicatorsInput]
+    calculations: ResourceSupportCalculations
+    
+class ResourceBaseInput(BaseModel):
+    title: str
+    is_active: bool
+    resource_assessments: List[ResourceAssessmentInput] | None = None
+    topics: List[ResourceTopicsInput]
+    indicators: List[ResourceIndicatorsInput]
+  
+class ResourceEvent(ResourceBase):
+    type: Literal["event"]
+    description: str
+    sessions: List[Session]
+    organizers: List[ResourceOrganizerDetails]
+    status: ResourceStatus
+    
+class ResourceBook(ResourceBase):
+    type: Literal["book"]
+    description: str
+    authors: List[str]
+    publisher: str
+    published_date: datetime
+    isbn: str
+    
+class ResourceVideo(ResourceBase):
+    type: Literal["video"]
+    description: str
+    content_link: str
+    
+class ResourceArticle(ResourceBase):
+    type: Literal["article"]
+    article_text: EditorData
+    
 class ResourceDetails(BaseModel):
     resource_id: str
     type: ResourceType
@@ -89,6 +157,9 @@ class ResourceDetails(BaseModel):
     status: ResourceStatus | None = None
     scale: ResourceScale | None = None
     speaker_degree: SpeakerDegree | None = None
+    thematic_weight: ThematicWeight | None = None
+    author_type: AuthorType | None = None
+    impact_scale: ImpactScale | None = None
     is_active: bool
     topics: List[ResourceTopicsResponse]
     indicators: List[ResourceIndicatorsInput]
@@ -115,12 +186,35 @@ class ResourceDetails(BaseModel):
 
 class ResourceDetailsResponse(BaseModel):
     message: str
-    resource_details: ResourceDetails
+    resource_details: Annotated[
+        ResourceEvent | ResourceBook | ResourceVideo | ResourceArticle, 
+        Field(discriminator="type")
+    ]
 
 
 class ActorInput(BaseModel):
     actor_id: str
     actor_type: ActorType
+    
+class ResourceEventInput(ResourceBaseInput):
+    description: str
+    sessions: List[SessionInput]
+    organizers: List[dict]
+    status: ResourceStatus
+    
+class ResourceBookInput(ResourceBaseInput):
+    description: str
+    authors: List[str]
+    publisher: str
+    published_date: datetime
+    isbn: str
+    
+class ResourceVideoInput(ResourceBaseInput):
+    description: str
+    content_link: str
+    
+class ResourceArticleInput(ResourceBaseInput):
+    article_text: EditorData
     
 class ResourceDetailsInput(BaseModel):
     type: ResourceType
@@ -138,6 +232,9 @@ class ResourceDetailsInput(BaseModel):
     status: ResourceStatus | None = None
     scale: ResourceScale | None = None
     speaker_degree: SpeakerDegree | None = None
+    thematic_weight: ThematicWeight | None = None
+    author_type: AuthorType | None = None
+    impact_scale: ImpactScale | None = None
     indicators: List[ResourceIndicatorsInput]
     topics: List[ResourceTopicsInput]
     @model_validator(mode="after")
@@ -151,4 +248,7 @@ class ResourceDetailsInput(BaseModel):
 class AllResourcesResponse(BaseModel):
     message: str
     count: int
-    resources: List[ResourceDetails]
+    resources: List[Annotated[
+        ResourceEvent | ResourceBook | ResourceVideo | ResourceArticle, 
+        Field(discriminator="type")
+    ]]
