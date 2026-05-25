@@ -140,6 +140,18 @@ class ResourceArticle(ResourceBase):
     type: Literal["article"]
     article_text: EditorData
     
+    @field_validator("article_text", mode="before")
+    @classmethod
+    def parse_article_text(cls, value):
+        if not value: 
+            return None
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return None 
+        return value
+    
 class ResourceDetails(BaseModel):
     resource_id: str
     type: ResourceType

@@ -13,6 +13,7 @@ async def topic_exists(topic_id: str):
 async def read_topics():
     query = """
     MATCH (t:Topic)
+    WHERE labels(t) = ['Topic']
     RETURN t.topic_id as topic_id, 
            t.code as code,
            t.name as name

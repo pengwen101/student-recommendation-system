@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import type { Resource } from '../../types.ts';
+import type { ResourceEvent, ResourceBook, ResourceVideo, ResourceArticle, ResourceType } from '../../types.ts';
 import { Button } from '../../components/Button';
 import { DataTable, type ColumnDef } from '../components/DataTable';
 import api from '../../api/axios.tsx';
@@ -8,20 +8,21 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPenToSquare, faCalendar } from '@fortawesome/free-regular-svg-icons';
 import toast from 'react-hot-toast';
 
-type ResourceType = 'event' | 'book' | 'video' | 'article';
+type AnyResource = ResourceEvent | ResourceArticle | ResourceBook | ResourceVideo;
+type ResourceTypeValue = typeof ResourceType[keyof typeof ResourceType];
 
 const Resources = () => {
     const location = useLocation();
     
     // Resource states
-    const [resourcesEvent, setResourcesEvent] = useState<Resource[]>([]);
-    const [resourcesBook, setResourcesBook] = useState<Resource[]>([]);
-    const [resourcesVideo, setResourcesVideo] = useState<Resource[]>([]);
-    const [resourcesArticle, setResourcesArticle] = useState<Resource[]>([]);
+    const [resourcesEvent, setResourcesEvent] = useState<ResourceEvent[]>([]);
+    const [resourcesBook, setResourcesBook] = useState<ResourceBook[]>([]);
+    const [resourcesVideo, setResourcesVideo] = useState<ResourceVideo[]>([]);
+    const [resourcesArticle, setResourcesArticle] = useState<ResourceArticle[]>([]);
     
     // UI states
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<ResourceType>('event');
+    const [activeTab, setActiveTab] = useState<ResourceTypeValue>("event");
 
     useEffect(() => {
         if (location.state?.successMessage) {
@@ -88,17 +89,17 @@ const Resources = () => {
     }, [activeTab, resourcesEvent, resourcesBook, resourcesVideo, resourcesArticle]);
 
     // Define table columns
-    const columns = useMemo<ColumnDef<Resource>[]>(() => [
+    const columns = useMemo<ColumnDef<AnyResource>[]>(() => [
         {
-            header: "Name",
+            header: "Title",
             cellClassName: "font-medium text-slate-900",
-            cell: (resource) => resource.name
+            cell: (resource) => resource.title // Updated from resource.name
         },
         {
             header: "Dates",
             cell: (resource) => {
-                // Return N/A gracefully if the resource is not an event / has no sessions
-                if (!resource.sessions || resource.sessions.length === 0) {
+                // Type guard: Check if 'sessions' exists on this specific resource type
+                if (!('sessions' in resource) || !resource.sessions || resource.sessions.length === 0) {
                      return <span className="text-slate-400 italic text-xs">N/A</span>;
                 }
 
@@ -164,7 +165,7 @@ const Resources = () => {
         }
     ], []);
 
-    const tabs: { label: string, value: ResourceType }[] = [
+    const tabs: { label: string, value: ResourceTypeValue }[] = [
         { label: 'Events', value: 'event' },
         { label: 'Books', value: 'book' },
         { label: 'Videos', value: 'video' },
@@ -205,10 +206,10 @@ const Resources = () => {
                 columns={columns}
                 keyExtractor={(item) => item.resource_id}
                 loading={loading}
-                searchPlaceholder={`Search by ${activeTab} name...`}
+                searchPlaceholder={`Search by ${activeTab} title...`}
                 emptyMessage={`No ${activeTab}s added yet.`}
                 searchPredicate={(item, searchTerm) => 
-                    item.name.toLowerCase().includes(searchTerm.toLowerCase())
+                    item.title.toLowerCase().includes(searchTerm.toLowerCase()) // Updated from item.name
                 }
             />
         </div>

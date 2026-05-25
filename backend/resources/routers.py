@@ -17,7 +17,7 @@ async def read_resource_details(resource_id: str):
     resource_details = await services.read_resource_details(resource_id)
     return {"message": "Resource details successfully retrieved.", "resource_details": resource_details}
 
-@resources_router.post("", response_model=ResourceDetailsResponse)
+@resources_router.post("/{type}", response_model=ResourceDetailsResponse)
 async def create_resource(type: ResourceType, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict = Depends(get_current_user)):
     resource_details = await services.create_resource(type, data, current_user)
     return {"message": "Resource successfully created.", "resource_details": resource_details}

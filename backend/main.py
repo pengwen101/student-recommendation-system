@@ -19,6 +19,7 @@ from backend.demography import routers as demography_routers
 from backend.analytics import routers as analytic_routers
 from backend.admins import routers as admin_routers
 from backend.organizers import routers as organizer_routers
+from backend.configs import routers as config_routers
 from backend.admins import services as admin_services
 from backend.admins import schemas as admin_schemas
 
@@ -156,3 +157,4 @@ app.include_router(curriculum_routers.curriculums_router)
 app.include_router(curriculum_routers.curriculum_versions_router)
 app.include_router(analytic_routers.analytic_router)
 app.include_router(demography_routers.demography_router)
+app.include_router(config_routers.configs_router)

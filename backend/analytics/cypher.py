@@ -19,7 +19,7 @@ async def support_lack_gap(curriculum_type: str, study_level_ids: list | None = 
     WITH c, student_count, lack_score, CASE WHEN student_count = 0 THEN 0 ELSE lack_score / student_count END AS avg_lack_score
 
     OPTIONAL MATCH (r:UniResource)-[rs:SUPPORTS]->(c)
-    WHERE $resource_types IS NULL OR r.type IN $resource_types
+    WHERE $resource_types IS NULL OR tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) IN $resource_types
     
     OPTIONAL MATCH (o:Organizer)-[]->(r)-[]->(sl)
     WHERE $organizer_ids IS NULL OR o.organizer_id IN $organizer_ids
@@ -49,7 +49,7 @@ async def resource_supporting_x(curriculum_id: str | None = None, study_level_id
     MATCH (n:Cpl|SubCpl|Quality|Indicator) WHERE $curriculum_id IS NULL OR n.cpl_id = $curriculum_id OR n.sub_cpl_id = $curriculum_id OR n.quality_id = $curriculum_id OR n.indicator_id = $curriculum_id
     
     MATCH (r:UniResource)-[:SUPPORTS]->(n)
-    WHERE $resource_types IS NULL OR r.type IN $resource_types
+    WHERE $resource_types IS NULL OR tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) IN $resource_types
     MATCH (r)-[]->(sl:StudyLevel)
     WHERE $study_level_ids IS NULL OR sl.study_level_id IN $study_level_ids
     
@@ -58,7 +58,7 @@ async def resource_supporting_x(curriculum_id: str | None = None, study_level_id
     MATCH (r)-[:COVERS]->(t:Topic)
     OPTIONAL MATCH (s:Student)-[:ATTENDS]->(r)
     
-    RETURN r.name as resource_name, r.type as resource_type, coalesce(collect(distinct o.name), []) as organizers, 
+    RETURN r.title as resource_title, tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) as resource_type, coalesce(collect(distinct o.name), []) as organizers, 
     coalesce(r.status, '-') as status, count(distinct s.nrp) as attendees, collect(distinct t.name) as topics
     
     """
@@ -70,7 +70,7 @@ async def organizer_support(curriculum_type: str, study_level_ids: str | None, r
     MATCH (o:Organizer)
     MATCH (c:{curriculum_type})
     OPTIONAL MATCH (o)-[]->(r:UniResource)-[rs:SUPPORTS]->(c)
-    WHERE $resource_types IS NULL OR r.type IN $resource_types
+    WHERE $resource_types IS NULL OR tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) IN $resource_types
     MATCH (r)-[]->(sl:StudyLevel)
     WHERE $study_level_ids IS NULL OR sl.study_level_id IN $study_level_ids
     WITH o, c, sum(rs.weight * r.internal_weight) as support_score
@@ -88,7 +88,7 @@ async def organizer_support(curriculum_type: str, study_level_ids: str | None, r
 async def resource_characteristic(study_level_ids: list | None = None, resource_types: str | None = None, organizer_ids: list | None = None):
     query = """
     MATCH (r:UniResource)-[rs:SUPPORTS]->(s:SubCpl)
-    WHERE $resource_types IS NULL OR r.type IN $resource_types
+    WHERE $resource_types IS NULL OR tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) IN $resource_types
     MATCH (r)-[]->(sl:StudyLevel)
     WHERE $study_level_ids IS NULL OR sl.study_level_id IN $study_level_ids 
     OPTIONAL MATCH (r)<-[]-(o:Organizer)
@@ -113,7 +113,7 @@ async def coverage_interest_gap(study_level_id: list | None = None, resource_typ
     OPTIONAL MATCH (r:UniResource)-[rc:COVERS]->(t)
     MATCH (o:Organizer)-[]->(r)-[]->(sl)
     
-    WHERE $resource_type IS NULL OR r.type = $resource_type
+    WHERE $resource_type IS NULL OR tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) = $resource_type
     WHERE $organizer_id IS NULL OR o.organizer_id = $organizer_id
   
     WITH t, interest_count, COUNT(DISTINCT r.resource_id) as coverage_count
@@ -136,7 +136,7 @@ async def resource_support(curriculum_type: str, curriculum_id: str, study_level
     OPTIONAL MATCH (r:UniResource)-[rs:SUPPORTS]->(c)
     OPTIONAL MATCH (o:Organizer)-[]->(r)-[]->(sl)
     WHERE $study_level_id IS NULL OR sl.study_level_id IN $study_level_id
-    WHERE $resource_type IS NULL OR r.type = $resource_type
+    WHERE $resource_type IS NULL OR tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) = $resource_type
     WHERE $organizer_id IS NULL OR o.organizer_id = $organizer_id
     
     RETURN c.code as code, c.name as name, sum(r.internal_weight * rs.weight) as support_score

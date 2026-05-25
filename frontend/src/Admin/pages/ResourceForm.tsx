@@ -50,14 +50,14 @@ function ResourceForm() {
         const topicsRes = await api.get("/topic");
         const organizersRes = await api.get("/organizer");
         const versionsRes = await api.get("/curriculum_version");
-        const resourceAssessmentsRes = await api.get(`/resource_assessment/${resourceType}`);
+        const resourceAssessmentsRes = await api.get(`/config/resource_assessments/${resourceType}`);
    
         const fetchedSubCpls = subcplsRes.data.subcpls;
         setSubCpls(subcplsRes.data.subcpls);
         setTopics(topicsRes.data.topics);
         setOrganizers(organizersRes.data.organizers);
         setVersions(versionsRes.data.curriculum_versions);
-        setResourceAssessments(resourceAssessmentsRes.data.resource_assessments);
+        setResourceAssessments(resourceAssessmentsRes.data);
 
         if (isEdit && resource_id) {
           const res = await api.get(`/resource/${resource_id}`);
@@ -609,7 +609,7 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
 
     if (resource.resource_assessments) {
       resource.resource_assessments.forEach((assessment, index) => {
-        if (assessment.resource_weight < 0 || assessment.resource_weight > 1) {
+        if (assessment.resource_weight <= 0 || assessment.resource_weight > 1) {
           newErrors[`resource_assessments_${index}`] = "Weight must be between 0 and 1.0.";
         }
       });
@@ -644,7 +644,8 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
     const resource_input = {
       //type: resource.type,
       title: resource.title,
-      description: resource.description,
+      ...(resourceType !== "article" ? {description: resource.description} : {}),
+      is_active: resource.is_active,
       ...(resourceType === 'event' && computedStatus ? { status: computedStatus } : {}),
       //...(resourceType === 'event' && resource.scale ? { scale: resource.scale } : {}),
       ...(resourceType === 'event' && resource.organizers ? { organizers: resource.organizers } : {}),
@@ -681,7 +682,7 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
       if (isEdit) {
         await api.put(`/resource/${resource.resource_id}`, resource_input);
       } else {
-        await api.post("/resource", resource_input);
+        await api.post(`/resource/${resourceType}`, resource_input);
       }
 
       navigate("/resource", {

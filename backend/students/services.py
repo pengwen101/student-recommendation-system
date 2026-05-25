@@ -5,6 +5,13 @@ from fastapi import HTTPException
 from backend.students.schemas import StudentTopicsResponse, TopicActionResponse, StudentTopicsInput, StudentIndicatorsInput
 from typing import List
 
+type_label_dict = {
+    "book": "Book",
+    "event": "Event",
+    "video": "Video",
+    "article": "Article"
+}
+
 async def read_student_topics(nrp: str):
     student_exists = await student_cypher.student_exists(nrp)
     if not student_exists:
@@ -94,7 +101,10 @@ async def has_indicators(nrp: str):
     return await student_cypher.has_indicators(nrp)
 
 async def get_student_recommendations(nrp: str, type: str):
+    label = type_label_dict[type]
+    if not label:
+        raise HTTPException(status_code=404, detail="Type not exist")
     student_exists = await student_cypher.student_exists(nrp)
     if not student_exists:
         raise HTTPException(status_code=404, detail="Student not found")
-    return await student_cypher.get_student_recommendations(nrp, type)
+    return await student_cypher.get_student_recommendations(nrp, label)

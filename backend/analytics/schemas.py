@@ -17,7 +17,7 @@ class SupportLackGap(BaseModel):
     avg_support_score: float
     
 class ResourceSupportingX(BaseModel):
-    resource_name: str
+    resource_title: str
     resource_type: ResourceType
     organizers: List[str]
     topics: List[str]

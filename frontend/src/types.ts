@@ -92,6 +92,7 @@ export interface ResourceAssessment {
     weight: number;
     display_name: string;
     resource_type: typeof ResourceType[keyof typeof ResourceType];
+    resource_weight: number;
 }
 
 export interface Resource {
@@ -151,6 +152,39 @@ export interface ResourceAssessmentInput {
     resource_weight: number;
 }
 
+export interface ResourceBase {
+    resource_id: string;
+    title: string;
+    is_active: boolean;
+    resource_assessments?: ResourceAssessment[];
+    topics: Topic[];
+    indicators: ResourceIndicator[];
+    calculations: ResourceSupportCalculations;
+}
+
+export interface ResourceEvent extends ResourceBase {
+    description: string;
+    sessions: Session[];
+    organizers: Organizer[];
+    status: typeof ResourceStatus[keyof typeof ResourceStatus];
+}
+
+export interface ResourceBook extends ResourceBase {
+    description: string;
+    authors: string[];
+    publisher: string;
+    published_date: string;
+}
+
+export interface ResourceVideo extends ResourceBase {
+    description: string;
+    content_link: string;
+}
+
+export interface ResourceArticle extends ResourceBase {
+    article_text: OutputData;
+}
+
 export interface ResourceBaseInput {
     title: string;
     is_active: boolean;
@@ -160,7 +194,7 @@ export interface ResourceBaseInput {
 }
 
 export interface ResourceEventInput extends ResourceBaseInput {
-    description: string
+    description: string;
     sessions: SessionInput[];
     organizers: ResourceOrganizerInput[];
     status: typeof ResourceStatus[keyof typeof ResourceStatus];
@@ -311,7 +345,7 @@ export interface SupportLackGap {
 }
 
 export interface ResourceSupportingX {
-    resource_name: string;
+    resource_title: string;
     resource_type: typeof ResourceType[keyof typeof ResourceType];
     organizers: string[];
     topics: string[];

@@ -35,12 +35,15 @@ create_update_base_query = """
         MERGE (r)-[rc:COVERS]->(t)
     }
     CALL (r) {
-        UNWIND CASE WHEN $assessments IS NULL THEN [] ELSE $assessments END AS ra_input
-        MATCH (ra:ResourceAssessment {resource_assessment_id: ra_input.resource_assessment_id})
-        MERGE (r)-[rh:HAS]->(ra)
-        SET rh.weight = toFloat(ra_input.resource_weight)
-        WITH r, SUM(toFloat(ra.weight) * toFloat(ra_input.resource_weight)) as internal_weight
-        SET r.internal_weight = internal_weight
+        SET r.internal_weight = CASE 
+            WHEN $resource_assessments IS NULL OR size($resource_assessments) = 0 THEN 1.0
+            ELSE REDUCE(total = 0.0, item IN $resource_assessments | total + toFloat(item.resource_weight))
+        END
+        WITH r
+        UNWIND COALESCE($resource_assessments, []) AS ra_input 
+        MATCH (ra:ResourceAssessment {resource_assessment_id: ra_input.resource_assessment_id}) 
+        MERGE (r)-[rh:HAS]->(ra) 
+        SET rh.weight = toFloat(ra_input.resource_weight) 
     }
 """
 
@@ -141,6 +144,7 @@ async def create_resource(resource_id: str, label: str, data: dict, current_user
     WITH r, coalesce(a, o) AS actor
     MERGE (r)-[u:UPDATED_BY]->(actor)
     SET u.updated_at = datetime({{timezone: 'Asia/Jakarta'}})
+    WITH r
     OPTIONAL MATCH (a:Admin {{admin_id: $creator_actor_id}})
     OPTIONAL MATCH (o:Organizer {{organizer_id: $creator_actor_id}})
     WITH r, coalesce(a, o) AS actor

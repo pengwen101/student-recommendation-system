@@ -333,7 +333,7 @@ export function ResourceSupportingXList({ data }: { data: ResourceSupportingX[] 
         <table className="w-full table-fixed divide-y divide-gray-200 text-sm text-left">
           <thead className="bg-gray-50">
             <tr>
-              <th scope="col" className="w-[25%] px-4 py-2.5 font-semibold text-gray-700 uppercase tracking-wider">Name</th>
+              <th scope="col" className="w-[25%] px-4 py-2.5 font-semibold text-gray-700 uppercase tracking-wider">Title</th>
               <th scope="col" className="w-[15%] px-4 py-2.5 font-semibold text-gray-700 uppercase tracking-wider">Type</th>
               <th scope="col" className="w-[20%] px-4 py-2.5 font-semibold text-gray-700 uppercase tracking-wider">Organizer</th>
               <th scope="col" className="w-[20%] px-4 py-2.5 font-semibold text-gray-700 uppercase tracking-wider text-left">Topics</th>
@@ -345,10 +345,10 @@ export function ResourceSupportingXList({ data }: { data: ResourceSupportingX[] 
             {paginatedData.length > 0 ? (
               paginatedData.map((item, idx) => {
                 return (
-                  <tr key={`${item.resource_name}-${idx}`} className="hover:bg-blue-50 transition-colors duration-150 ease-in-out">
+                  <tr key={`${item.resource_title}-${idx}`} className="hover:bg-blue-50 transition-colors duration-150 ease-in-out">
                     {/* Replaced truncate with break-words whitespace-normal */}
                     <td className="px-4 py-2.5 font-medium text-gray-900 break-words whitespace-normal align-top">
-                      {item.resource_name}
+                      {item.resource_title}
                     </td>
                     <td className="px-4 py-2.5 text-gray-700 capitalize break-words whitespace-normal align-top">
                       {item.resource_type}
