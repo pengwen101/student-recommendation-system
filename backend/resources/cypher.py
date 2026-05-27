@@ -1,6 +1,5 @@
 from backend.database import Neo4jConnection
 
-    
 update_cleanup_query = """
     OPTIONAL MATCH (r)<-[old_og:ORGANIZES]-(:Organizer) DELETE old_og WITH r
     OPTIONAL MATCH (r)-[old_rc:COVERS]->(:Topic) DELETE old_rc WITH r
@@ -188,7 +187,7 @@ async def update_resource(resource_id: str, data: dict, current_user: dict):
     {create_update_base_query}
     """
     resource_properties = {k: v for k, v in data.items() if k not in {"study_levels", "organizers", "sessions", "topics", "resource_assessments", "indicators", "published_date"}}
-    
+    print(data.get("study_levels"))
     params = {"resource_id": resource_id, 
               "resource_properties": resource_properties,
               "published_date": data.get("published_date"),
@@ -310,6 +309,43 @@ async def calculate_support_weights_old(resource_id: str, indicators: list[dict]
     """
    
     await Neo4jConnection.query(query, {"resource_id": resource_id, "indicators": indicators})
+    
+
+async def get_indicator_recommendation(target_words: list[str], method: str):
+    query = """
+    WITH $target_words AS target_words
+    WITH target_words, size(target_words) AS target_word_count
+    UNWIND target_words AS word
+    MATCH (w:ns2__LexicalEntry) WHERE lower(w.lemma) = lower(word)
+    CALL (w) {
+        MATCH (other:UniResource)-[r:LINKED_TO]->(w)
+        WHERE r.method = "noun_wordnet"
+        RETURN other
+        UNION
+        WITH w
+        MATCH (other:UniResource)-[:COVERS]->(:Topic)-[:LINKED_TO]->(w)
+        RETURN other
+    }
+    WITH other, 
+        target_word_count, 
+        target_words,
+        count(DISTINCT w) AS overlap_count
+
+    // WHERE toFloat(overlap_count) / target_word_count >= 0.2
+
+    MATCH (other)-[:SUPPORTS]->(suggested_indicator:Indicator)
+    RETURN other.resource_id AS similar_resource_id,
+        tolower(head([l IN labels(other) WHERE l <> 'UniResource'])) AS similar_resource_type,
+        other.title AS similar_resource_title,
+        overlap_count AS word_overlap_count,
+        target_words AS keywords,
+        collect(DISTINCT suggested_indicator.indicator_id) AS suggested_indicator_ids
+    ORDER BY overlap_count DESC
+    LIMIT 1
+    """
+    result = await Neo4jConnection.query(query, {"target_words": target_words, "method": method})
+    return result[0] if result else {}
+    
     
 async def set_resource_weight(resource_id: str | None = None):
     query = """ 

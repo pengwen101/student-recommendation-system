@@ -6,10 +6,17 @@ import os
 import httpx
 from deep_translator import GoogleTranslator
 import asyncio
+import re
+from keybert import KeyBERT
 
 nlp = spacy.load("en_core_web_sm")
 if "entityLinker" not in nlp.pipe_names:
     nlp.add_pipe("entityLinker", last=True)
+    
+# kw_model = KeyBERT()
+    
+    
+additional_stop_words = ["students", "student", "people"]
 
 async def seed_years_and_versions():
     query = """
@@ -197,17 +204,20 @@ async def seed_configs():
     
     await Neo4jConnection.query(query)
     
-async def translate_one_word(id_word):
-    en_word = await asyncio.to_thread(
-        GoogleTranslator(source='id', target='en').translate, 
-        id_word
-    )
-    return en_word
+async def translate_to_english(id_text):
+    try:
+        en_text = await asyncio.to_thread(
+            GoogleTranslator(target='en').translate, 
+            id_text
+        )
+        return en_text
+    except:
+        return ""
     
     
 async def get_q_code(keyword):
     headers = {
-        "Authorization": f"Bearer {os.getenv("WIKIDATA_ACCESS_TOKEN")}",
+        "Authorization": f"Bearer {os.getenv('WIKIDATA_ACCESS_TOKEN')}",
         "User-Agent": "SurabayaEventRecommender/1.0 (student.thesis@example.com)",
         "Content-Type": "application/json"
     }
@@ -227,23 +237,88 @@ async def get_q_code(keyword):
             )
             response.raise_for_status()
             result = response.json()
-            print(result)
+            
             if result.get('results'):
-                print(result['results'])
-                q_code = result['results'][0]['id']
-                label = result['results'][0]['display-label']['value']
-                description = result['results'][0]['description']['value']
+                first_result = result['results'][0]
+                q_code = first_result.get('id')
+                label = first_result.get('display-label', {}).get('value', 'No Label')
+                description = first_result.get('description', {}).get('value', 'No Description')
+                
                 return q_code, label, description
-            return None 
+            
+            return None, None, None
+            
         except httpx.HTTPStatusError as err:
             print(f"HTTP Error: {err}")
             print(f"Response Body: {err.response.text}")
-            return None
+            return None, None, None
         except Exception as e:
-            print(f"A general error occurred: {e}")
-            return None
-    
+            print(f"A general error occurred in get_q_code: {e}")
+            return None, None, None
+        
+async def get_noun_phrases(sentence, additional_stop_words):
+    doc = nlp(sentence)
+    result = []
 
+    for chunk in doc.noun_chunks:
+        is_all_stop_words = all(
+            (token.text.lower() in additional_stop_words or token.is_stop) 
+            for token in chunk
+        )
+        if not is_all_stop_words:
+            lemmas = [token.lemma_.lower() for token in chunk]
+            raw_phrase = " ".join(lemmas)
+            clean_phrase = re.sub(r'\s*-\s*', '-', raw_phrase)
+            result.append(clean_phrase)
+            
+    return result
+
+async def get_wikidata_noun(sentence, additional_stop_words):
+    doc=nlp(sentence)
+    result = []
+    for entity in doc._.linkedEntities:
+        span_text = entity.get_span().text
+        if span_text not in additional_stop_words:
+            q_id = f"Q{entity.get_id()}"
+            print(f"Linked: {span_text} -> {q_id} ({entity.get_description()})")
+            result.append(q_id)
+            
+    return result
+    
+        
+async def get_label_description(q_code):
+    headers = {
+        "Authorization": f"Bearer {os.getenv('WIKIDATA_ACCESS_TOKEN')}",
+        "User-Agent": "SurabayaEventRecommender/1.0 (student.thesis@example.com)",
+        "Content-Type": "application/json"
+    }
+    params = {
+        "_fields": "labels,descriptions"
+    }
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"https://www.wikidata.org/w/rest.php/wikibase/v1/entities/items/{q_code}", 
+                headers=headers, 
+                params=params, 
+                timeout=10.0
+            )
+            response.raise_for_status()
+            result = response.json()
+            label = result.get('labels', {}).get('en', 'No English Label')
+            description = result.get('descriptions', {}).get('en', 'No English Description')
+            
+            return label, description 
+            
+        except httpx.HTTPStatusError as err:
+            print(f"HTTP Error: {err}")
+            print(f"Response Body: {err.response.text}")
+            return None, None
+        except Exception as e:
+            print(f"A general error occurred in get_label_description: {e}")
+            return None, None
+    
 async def seed_topic_wikidata_id():
     query = """
     MATCH (t:Topic)
@@ -251,35 +326,364 @@ async def seed_topic_wikidata_id():
     """
     result = await Neo4jConnection.query(query)
     topics = [topic['name'] for topic in result]
+    
     for topic in topics:
         print(f"Processing topic {topic}...")
-        topic_en = await translate_one_word(topic)
+        topic_en = await translate_to_english(topic)
         print(f"Translated to {topic_en}")
         q_code, label, description = await get_q_code(topic_en)
-        print(f"QCode: {q_code}")
-        print(f"Label: {label}")
-        query = """
+        if not q_code:
+            print(f"Could not find Wikidata entry for {topic_en}. Skipping.")
+            continue
+            
+        print(f"QCode: {q_code} | Label: {label}")
+        
+        auto_mapping_query = """
         MATCH (t:Topic {name: $name})
-        WHERE NOT t:Wikidata
-        MERGE (w:Topic:Wikidata {wikidata_id: $id})
+        MERGE (w:WikidataLabel {wikidata_id: $id})
         SET w.name = $label
         SET w.description = $description
         MERGE (t)-[:LINKED_TO]->(w)
         """
         params = {"name": topic, "id": q_code, "label": label, "description": description}
-        await Neo4jConnection.query(query, params)
+        await Neo4jConnection.query(auto_mapping_query, params)
         
     manual_mapping = {
         "Pengembangan Diri": ["Q10998095"],
         "Keragaman & Perbedaan": ["Q1230584"],
         "Ekonomi & Bisnis": ["Q8134", "Q4830453"],
-        "Teologi & Filosofi": ["Q34178", "Q5891"]
+        "Teologi & Filosofi": ["Q34178", "Q5891"],
+        "Keterampilan Non-Teknis": ["Q15910354"]
     }
     
-# def seed_wikidata_terms(resource_keywords, student_keywords):
+    print("\n--- Starting Manual Override Mapping ---")
+    
+    for key, mappings in manual_mapping.items():
+        delete_query = """
+        MATCH (t:Topic)
+        WHERE t.name = $topic_name
+        OPTIONAL MATCH (t)-[r:LINKED_TO]->(d:WikidataLabel)
+        DELETE r, d
+        """
+        
+        await Neo4jConnection.query(delete_query, {"topic_name": key})
+        
+        for mapping in mappings:
+            label, description = await get_label_description(mapping)
+            
+            if not label:
+                print(f"Skipping manual map {mapping} for {key} due to API failure.")
+                continue
+                
+            manual_query = """
+            MATCH (t:Topic)
+            WHERE t.name = $topic_name
+            MERGE (w:WikidataLabel {wikidata_id: $q_code})
+            SET w.name = $label
+            SET w.description = $description
+            MERGE (t)-[:LINKED_TO]->(w)
+            """ 
+            await Neo4jConnection.query(manual_query, {
+                "topic_name": key, 
+                "q_code": mapping, 
+                "label": label, 
+                "description": description
+            })
+        
+        
+async def try_link_to_wordnet(topic_name, phrase_candidate):
+    
+    query = """
+    MATCH (t:Topic {name: $topic_name})
+    MATCH (w:ns2__LexicalEntry)
+    WHERE lower(w.lemma) = $phrase
+    MERGE (t)-[:LINKED_TO]->(w)
+    RETURN w.lemma AS matched_lemma
+    """
+    params = {
+        "topic_name": topic_name, 
+        "phrase": phrase_candidate,
+    }
+    
+    result = await Neo4jConnection.query(query, params)
+    return len(result) > 0
+
+async def seed_topic_wordnet():
+    query = """
+    MATCH (t:Topic)
+    RETURN t.name as name
+    """
+    result = await Neo4jConnection.query(query)
+    topics = [topic['name'] for topic in result]
+    
+    for topic in topics:
+        print(f"Processing topic {topic}...")
+        topic_en = await translate_to_english(topic)
+        print(f"Translated to {topic_en}")
+        noun_phrases = await get_noun_phrases(topic_en, additional_stop_words)
+        for phrase in noun_phrases:
+            words = phrase.split()
+            match_found = False
+            
+            while len(words) > 0:
+                candidate = " ".join(words)
+                print(f"  Trying WordNet match for: '{candidate}'")
+                
+                is_matched = await try_link_to_wordnet(topic, candidate)
+                
+                if is_matched:
+                    print(f"  ✅ Match found and linked: '{candidate}'")
+                    match_found = True
+                    break
+
+                dropped_word = words.pop()
+                print(f"  ❌ No match. Dropping '{dropped_word}'...")
+            
+            if not match_found:
+                print(f"  ⚠️ Could not map any part of '{phrase}' to WordNet.")
+        
+    manual_mapping = {
+        "Pengembangan Diri": ["self-improvement"],
+        "Integrasi Iman Ilmu": None,
+        "Keterampilan Non-Teknis": None
+    }
+    
+    print("\n--- Starting Manual Override Mapping ---")
+    
+    for key, mappings in manual_mapping.items():
+        delete_query = """
+        MATCH (t:Topic)
+        WHERE t.name = $topic_name
+        OPTIONAL MATCH (t)-[r:LINKED_TO]->(d:ns2__LexicalEntry)
+        DELETE r
+        """
+        
+        await Neo4jConnection.query(delete_query, {"topic_name": key})
+        if mappings is not None:
+            for phrase in mappings:
+                words = phrase.split()
+                match_found = False
+                
+                while len(words) > 0:
+                    candidate = " ".join(words)
+                    print(f"  Trying WordNet match for: '{candidate}'")
+                    
+                    is_matched = await try_link_to_wordnet(key, candidate)
+                    
+                    if is_matched:
+                        print(f"  ✅ Match found and linked: '{candidate}'")
+                        match_found = True
+                        break
+
+                    dropped_word = words.pop()
+                    print(f"  ❌ No match. Dropping '{dropped_word}'...")
+                
+                if not match_found:
+                    print(f"  ⚠️ Could not map any part of '{phrase}' to WordNet.")
+
+async def seed_resource_eng_description():
+    query = """
+    MATCH (r:UniResource)
+    RETURN r.resource_id as resource_id, r.title || " " || COALESCE(r.description, "") as resource_text
+    """
+    
+    resources = await Neo4jConnection.query(query)
+    print(resources)
+    for resource in resources:
+        resource_text = resource['resource_text'].strip()
+        resource_text = await translate_to_english(resource_text)
+        resource['resource_text'] = resource_text
+    
+    query = """
+    UNWIND $resources as resource
+    MATCH (r:UniResource {resource_id: resource.resource_id})
+    SET r.eng_text = resource.resource_text
+    """
+    
+    params = {"resources": resources}
+    await Neo4jConnection.query(query, params)
+    
+    
+async def link_wordnet(resource_id, noun_phrases, method):
+    for phrase in noun_phrases:
+        words = phrase.split()
+        match_found = False
+        
+        while len(words) > 0:
+            candidate = " ".join(words)
+            print(f"  Trying WordNet match for: '{candidate}'")
+            
+            query = """
+            MATCH (r:UniResource {resource_id: $resource_id})
+            MATCH (w:ns2__LexicalEntry)
+            WHERE lower(w.lemma) = $phrase AND w.partOfSpeech = "Noun"
+            MERGE (r)-[rl:LINKED_TO {method: $method}]->(w)
+            RETURN w.lemma AS matched_lemma
+            """
+            params = {
+                "resource_id": resource_id, 
+                "phrase": candidate,
+                "method":method
+            }
+            
+            result = await Neo4jConnection.query(query, params)
+            is_matched = len(result) > 0
+            
+            if is_matched:
+                print(f"  ✅ Match found and linked: '{candidate}'")
+                match_found = True
+                break
+
+            dropped_word = words.pop()
+            print(f"  ❌ No match. Dropping '{dropped_word}'...")
+        
+        if not match_found:
+            print(f"  ⚠️ Could not map any part of '{phrase}' to WordNet.")
+    
+async def seed_resource_words(additional_stop_words):
+    print("Starting seed...")
+    query = """
+    MATCH (r:UniResource)
+    RETURN r.resource_id as resource_id, r.title as resource_title, r.eng_text as english_text
+    """
+    resources = await Neo4jConnection.query(query)
+    
+    for resource in resources:
+        doc = nlp(resource['english_text'])
+        resource["nouns"] = []
+        resource["entities"] = []
+        # resource['keybert'] = []
+    
+        # using noun
+        for chunk in doc.noun_chunks:
+            root = chunk.root
+            if root.pos_ in ("PRON", "DET"):
+                continue
+            lemma = root.lemma_.lower()
+            if lemma not in additional_stop_words and lemma not in resource["nouns"]:
+                resource["nouns"].append(lemma)
+                
+        # using wikidata method
+        for entity in doc._.linkedEntities:
+            span_text = entity.get_span().text
+            if span_text.lower() not in additional_stop_words and span_text.lower() not in resource['entities']:
+                resource["entities"].append(span_text.lower())
+        
+        print("title:", resource['resource_title'])
+        print("nouns:", resource['nouns'])
+        print("entities:", resource['entities'])
+        # using keybert method
+        # keywords_tuple = kw_model.extract_keywords(resource['english_text'], keyphrase_ngram_range=(1, 2), stop_words=additional_stop_words)
+        # keywords = [keyword_tuple[0] for keyword_tuple in keywords_tuple]
+        # resource['keybert'].extend(keywords)
+        
+        await link_wordnet(resource['resource_id'], resource['nouns'], "noun_wordnet")
+        await link_wordnet(resource['resource_id'], resource['entities'], "entity_wordnet")
+        # await link_wordnet(resource['resource_id'], resource['keybert'], "keybert_wordnet")
+        
+    
+        # query = """
+        # MATCH (r:UniResource {resource_id: $resource_id})
+        # UNWIND $nouns as noun
+        # OPTIONAL MATCH (n:ns2__LexicalEntry) WHERE lower(n.lemma) = lower(noun)
+        # MERGE (r)-[:LINKED_TO]->(n)
+        
+        # WITH r
+        # UNWIND $entities as entity
+        # OPTIONAL MATCH (e:ns2__LexicalEntry) WHERE lower(e.lemma) = lower(entity)
+        # MERGE (r)-[:LINKED_TO]->(e)
+        # """
+        
+        # await Neo4jConnection.query(query)
+
+async def link_wikidata(resource_id, entities):
+    headers = {
+        "Authorization": f"Bearer {os.getenv('WIKIDATA_ACCESS_TOKEN')}",
+        "User-Agent": "SurabayaEventRecommender/1.0 (student.thesis@example.com)",
+        "Content-Type": "application/json"
+    }
+
+    
+    for entity in entities:
+        async with httpx.AsyncClient() as client:
+            try:
+                params = {
+                    "q": keyword,
+                    "limit": 1,
+                    "language": "en"
+                }
+                response = await client.get(
+                    "https://www.wikidata.org/w/rest.php/wikibase/v1/search/items", 
+                    headers=headers, 
+                    params=params, 
+                    timeout=10.0
+                )
+                response.raise_for_status()
+                result = response.json()
+                
+                if result.get('results'):
+                    first_result = result['results'][0]
+                    q_code = first_result.get('id')
+                    label = first_result.get('display-label', {}).get('value', 'No Label')
+                    description = first_result.get('description', {}).get('value', 'No Description')
+                    
+                    return q_code, label, description
+                
+                return None, None, None
+                
+            except httpx.HTTPStatusError as err:
+                print(f"HTTP Error: {err}")
+                print(f"Response Body: {err.response.text}")
+                return None, None, None
+            except Exception as e:
+                print(f"A general error occurred in get_q_code: {e}")
+                return None, None, None
+    
+        
+async def seed_resource_wikidata(additional_stop_words):
+    query = """
+    MATCH (r:UniResource)
+    RETURN r.resource_id as resource_id, r.eng_text as english_text
+    """
+    resources = await Neo4jConnection.query(query)
+    
+    for resource in resources:
+        doc = nlp(resource['english_text'])
+        resource["entities"] = []
+                
+        # using wikidata method
+        for entity in doc._.linkedEntities:
+            span_text = entity.get_span().text
+            if span_text.lower() not in additional_stop_words:
+                q_id = f"Q{entity.get_id()}"
+                print(f"Linked: {span_text} -> {q_id} ({entity.get_description()})")
+                resource["entities"].append(q_id)
+        await link_wikidata(resource['resource_id'], resource['entities'])
+        
+    
+        
     
     
 
+    
+# async def seed_wordnet_similarity():
+#     query = """
+#     MATCH (r:UniResource)-[]->(w:ns2__LexicalEntry)
+    
+#     RETURN r.resource_id as resource_id, r.title || " " || r.description as resource_text
+#     """
+    
+#     result = await Neo4jConnection.query(query)
+    
+#     for resource in result:
+#         resource_text = resource['resource_text']
+#         resource_text = await translate_to_english(resource_text)
+#         noun_phrases = await get_wikidata_noun(resource_text, additional_stop_words)
+        
+#         print("Resource text:", resource_text)
+#         print("Noun phrases:", noun_phrases)
+        
+        
 async def run_all_seeders():
     # print("Seeding Batch Year and Versions...")
     # await seed_years_and_versions()
@@ -296,8 +700,16 @@ async def run_all_seeders():
     # print("Seeding Relations...")
     # await seed_student_questions_relation("data/hasil_survei.parquet")
     
-    # print("Seeding Topic Wikidata from Topic...")
-    await seed_topic_wikidata_id()
+    # print("Seeding Wikidata from Topic...")
+    # await seed_topic_wikidata_id()
+    
+    # print("Seeding Wordnet from Topic...")
+    # await seed_topic_wordnet()
+    
+    # print("Seeding Resource English Description...")
+    # await seed_resource_eng_description()
+        
+    await seed_resource_words(additional_stop_words)
     
     print("All seeding complete!")
     

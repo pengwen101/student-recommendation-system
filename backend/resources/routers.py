@@ -1,11 +1,17 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Query
-from backend.resources.schemas import (AllResourcesResponse, ResourceDetailsResponse, ResourceEventInput, ResourceBookInput, ResourceVideoInput, ResourceArticleInput, ResourceType)
+from backend.resources.schemas import (AllResourcesResponse, ResourceDetailsResponse, ResourceEventInput, ResourceBookInput, ResourceVideoInput, ResourceArticleInput, ResourceType, IndicatorRecommendation)
 from backend.resources import services
 from backend.dependencies import get_current_user
 from typing import List
 
 resources_router = APIRouter(prefix="/resource", tags=["resource"])
 recommendation_configs_router = APIRouter(prefix="/recommendation-config", tags=["config"])
+
+
+@resources_router.get("/indicator_recommendation", response_model=IndicatorRecommendation)
+async def get_indicator_recommendation(text: str):
+    result = await services.get_indicator_recommendation(text)
+    return result
 
 @resources_router.get("", response_model=AllResourcesResponse)
 async def read_resources(type: ResourceType):

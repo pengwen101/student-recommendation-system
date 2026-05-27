@@ -62,3 +62,32 @@ async def delete_topic(topic_id: str):
     
     params = {"topic_id": topic_id}
     await Neo4jConnection.query(query, params)
+    
+    
+async def get_valid_noun_lemmas(noun_phrases: list[str]) -> list[str]:
+    valid_lemmas = [] 
+    for phrase in noun_phrases:
+        words = phrase.split()
+        while len(words) > 0:
+            candidate = " ".join(words).lower() 
+            print(f"  Trying WordNet match for: '{candidate}'")
+            query = """
+            MATCH (w:ns2__LexicalEntry)
+            WHERE lower(w.lemma) = $phrase AND w.partOfSpeech = "Noun"
+            RETURN w.lemma AS matched_lemma
+            LIMIT 1
+            """
+            params = {
+                "phrase": candidate
+            }
+            
+            result = await Neo4jConnection.query(query, params)
+            is_matched = len(result) > 0
+            
+            if is_matched:
+                matched_text = result[0]["matched_lemma"]
+                valid_lemmas.append(matched_text)
+                break  
+            words.pop()
+            
+    return valid_lemmas

@@ -132,80 +132,171 @@ async def get_similarity_wikidata(q_codes1, q_codes2):
       VALUES ?c2 {{ {vals2} }}
       ?c1 rdfs:label ?kw1L . FILTER(LANG(?kw1L) = "en")
       ?c2 rdfs:label ?kw2L . FILTER(LANG(?kw2L) = "en")
-      
+
       {{ FILTER(?c1 = ?c2) BIND("Exact Match" AS ?m) }}
-      
-      # --- PARENT CHECKS ---
+ 
       UNION
-      {{ ?c1 wdt:P279 ?c2 . 
-         BIND("Parent (1 hop)" AS ?m) }}
+      {{ 
+        VALUES (?p1 ?p1L) {{ (wdt:P279 "subclass of") (wdt:P31 "instance of") (wdt:P361 "part of") }}
+        ?c1 ?p1 ?c2 . 
+        BIND(CONCAT("Parent (1 hop via ", ?p1L, ")") AS ?m) 
+      }}
+      # 1 Hop DOWN (Inverse: KW2 "has part" KW1)
+      UNION
+      {{ 
+        VALUES (?p1 ?p1L) {{ (wdt:P527 "has part") }}
+        ?c2 ?p1 ?c1 . 
+        BIND(CONCAT("Parent (1 hop via inverse ", ?p1L, ")") AS ?m) 
+      }}
+ 
+      UNION
+      {{ 
+        VALUES (?p1 ?p1L) {{ (wdt:P279 "subclass of") (wdt:P31 "instance of") (wdt:P361 "part of") }}
+        VALUES (?p2 ?p2L) {{ (wdt:P279 "subclass of") (wdt:P31 "instance of") (wdt:P361 "part of") }}
+        ?c1 ?p1 ?mid1 . ?mid1 ?p2 ?c2 . 
+        ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
+        BIND(CONCAT("Parent (2 hops: [", ?p1L, "] -> ", STR(?mid1L), " -> [", ?p2L, "])") AS ?m) 
+      }}
+
+      UNION
+      {{ 
+        VALUES (?p1 ?p1L) {{ (wdt:P279 "subclass of") (wdt:P31 "instance of") (wdt:P361 "part of") }}
+        VALUES (?p2 ?p2L) {{ (wdt:P279 "subclass of") (wdt:P31 "instance of") (wdt:P361 "part of") }}
+        VALUES (?p3 ?p3L) {{ (wdt:P279 "subclass of") (wdt:P31 "instance of") (wdt:P361 "part of") }}
+        ?c1 ?p1 ?mid1 . ?mid1 ?p2 ?mid2 . ?mid2 ?p3 ?c2 . 
+        ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
+        ?mid2 rdfs:label ?mid2L . FILTER(LANG(?mid2L) = "en")
+        BIND(CONCAT("Parent (3 hops: [", ?p1L, "] -> ", STR(?mid1L), " -> [", ?p2L, "] -> ", STR(?mid2L), " -> [", ?p3L, "])") AS ?m) 
+      }}
+
+      UNION
+      {{ 
+        VALUES (?p1 ?p1L) {{ (wdt:P279 "subclass of") (wdt:P31 "instance of") (wdt:P361 "part of") }}
+        ?c2 ?p1 ?c1 . 
+        BIND(CONCAT("Child (1 hop via inverse ", ?p1L, ")") AS ?m) 
+      }}
+
+      UNION
+      {{ 
+        VALUES (?p1 ?p1L) {{ (wdt:P527 "has part") }}
+        ?c1 ?p1 ?c2 . 
+        BIND(CONCAT("Child (1 hop via ", ?p1L, ")") AS ?m) 
+      }}
+   
+      UNION
+      {{ 
+        VALUES (?p1 ?p1L) {{ (wdt:P279 "subclass of") (wdt:P31 "instance of") (wdt:P361 "part of") }}
+        VALUES (?p2 ?p2L) {{ (wdt:P279 "subclass of") (wdt:P31 "instance of") (wdt:P361 "part of") }}
+        ?c2 ?p1 ?mid1 . ?mid1 ?p2 ?c1 . 
+        ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
+        BIND(CONCAT("Child (2 hops inverse: [", ?p1L, "] -> ", STR(?mid1L), " -> [", ?p2L, "])") AS ?m) 
+      }}
+  
+      UNION
+      {{ 
+        VALUES (?p1 ?p1L) {{ (wdt:P279 "subclass of") (wdt:P31 "instance of") (wdt:P361 "part of") }}
+        VALUES (?p2 ?p2L) {{ (wdt:P279 "subclass of") (wdt:P31 "instance of") (wdt:P361 "part of") }}
+        VALUES (?p3 ?p3L) {{ (wdt:P279 "subclass of") (wdt:P31 "instance of") (wdt:P361 "part of") }}
+        ?c2 ?p1 ?mid1 . ?mid1 ?p2 ?mid2 . ?mid2 ?p3 ?c1 . 
+        ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
+        ?mid2 rdfs:label ?mid2L . FILTER(LANG(?mid2L) = "en")
+        BIND(CONCAT("Child (3 hops inverse: [", ?p1L, "] -> ", STR(?mid1L), " -> [", ?p2L, "] -> ", STR(?mid2L), " -> [", ?p3L, "])") AS ?m) 
+      }}
          
       UNION
-      {{ ?c1 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?c2 . 
-         ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
-         BIND(CONCAT("Parent (2 hops via: ", STR(?mid1L), ")") AS ?m) }}
-         
-      UNION
-      {{ ?c1 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?mid2 . ?mid2 wdt:P279 ?c2 . 
-         ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
-         ?mid2 rdfs:label ?mid2L . FILTER(LANG(?mid2L) = "en")
-         BIND(CONCAT("Parent (3 hops via: ", STR(?mid1L), " -> ", STR(?mid2L), ")") AS ?m) }}
-         
-      UNION
-      {{ ?c1 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?mid2 . ?mid2 wdt:P279 ?mid3 . ?mid3 wdt:P279 ?c2
-         ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
-         ?mid2 rdfs:label ?mid2L . FILTER(LANG(?mid2L) = "en")
-         ?mid3 rdfs:label ?mid3L . FILTER(LANG(?mid3L) = "en")
-         BIND(CONCAT("Parent (4 hops via: ", STR(?mid1L), " -> ", STR(?mid2L), " -> ", STR(?mid3L) ")") AS ?m) }}
-      
-      UNION
-      {{ ?c1 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?mid2 . ?mid2 wdt:P279 ?mid3 . ?mid3 wdt:P279 ?mid4 . ?mid4 wdt:P279 ?c2
-         ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
-         ?mid2 rdfs:label ?mid2L . FILTER(LANG(?mid2L) = "en")
-         ?mid3 rdfs:label ?mid3L . FILTER(LANG(?mid3L) = "en")
-         ?mid4 rdfs:label ?mid4L . FILTER(LANG(?mid4L) = "en")
-         BIND(CONCAT("Parent (4 hops via: ", STR(?mid1L), " -> ", STR(?mid2L), " -> ", STR(?mid3L), " -> ", STR(?mid4L) ")") AS ?m) }}
-      
-      # --- CHILD CHECKS ---
-      UNION
-      {{ ?c2 wdt:P279 ?c1 . 
-         BIND("Child (1 hop)" AS ?m) }}
-         
-      UNION
-      {{ ?c2 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?c1 . 
-         ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
-         BIND(CONCAT("Child (2 hops via: ", STR(?mid1L), ")") AS ?m) }}
-         
-      UNION
-      {{ ?c2 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?mid2 . ?mid2 wdt:P279 ?c1 . 
-         ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
-         ?mid2 rdfs:label ?mid2L . FILTER(LANG(?mid2L) = "en")
-         BIND(CONCAT("Child (3 hops via: ", STR(?mid1L), " -> ", STR(?mid2L), ")") AS ?m) }}
-         
-      UNION
-      {{ ?c2 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?mid2 . ?mid2 wdt:P279 ?mid3 . ?mid3 wdt:P279 ?c1
-         ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
-         ?mid2 rdfs:label ?mid2L . FILTER(LANG(?mid2L) = "en")
-         ?mid3 rdfs:label ?mid3L . FILTER(LANG(?mid3L) = "en")
-         BIND(CONCAT("Child (4 hops via: ", STR(?mid1L), " -> ", STR(?mid2L), " -> ", STR(?mid3L) ")") AS ?m) }}
-         
-      UNION
-      {{ ?c2 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?mid2 . ?mid2 wdt:P279 ?mid3 . ?mid3 wdt:P279 ?mid4 . ?mid4 wdt:P279 ?c1
-         ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
-         ?mid2 rdfs:label ?mid2L . FILTER(LANG(?mid2L) = "en")
-         ?mid3 rdfs:label ?mid3L . FILTER(LANG(?mid3L) = "en")
-         ?mid4 rdfs:label ?mid4L . FILTER(LANG(?mid4L) = "en")
-         BIND(CONCAT("Child (4 hops via: ", STR(?mid1L), " -> ", STR(?mid2L), " -> ", STR(?mid3L), " -> ", STR(?mid4L) ")") AS ?m) }}
-         
-      # --- SIBLING CHECK ---
-      UNION
-      {{ ?c1 wdt:P279 ?p . ?c2 wdt:P279 ?p . FILTER(?c1 != ?c2)
-         ?p rdfs:label ?pL . FILTER(LANG(?pL) = "en")
-         BIND(CONCAT("Sibling (Parent: ", STR(?pL), ")") AS ?m) }}
+      {{ 
+        VALUES (?p1 ?p1L) {{ (wdt:P279 "subclass of") (wdt:P31 "instance of") (wdt:P361 "part of") }}
+        VALUES (?p2 ?p2L) {{ (wdt:P279 "subclass of") (wdt:P31 "instance of") (wdt:P361 "part of") }}
+        ?c1 ?p1 ?parent . 
+        ?c2 ?p2 ?parent . 
+        FILTER(?c1 != ?c2)
+        ?parent rdfs:label ?parentL . FILTER(LANG(?parentL) = "en")
+        BIND(CONCAT("Sibling (Shared Parent: ", STR(?parentL), " via ", ?p1L, " / ", ?p2L, ")") AS ?m) 
+      }}
          
     }} GROUP BY ?kw1L ?kw2L
     """
     
+    # sparql_query = f"""
+    # SELECT (STR(?kw1L) AS ?keyword1) (STR(?kw2L) AS ?keyword2) (GROUP_CONCAT(DISTINCT ?m; separator=" | ") AS ?match_through)
+    # WHERE {{
+    #   VALUES ?c1 {{ {vals1} }}
+    #   VALUES ?c2 {{ {vals2} }}
+    #   ?c1 rdfs:label ?kw1L . FILTER(LANG(?kw1L) = "en")
+    #   ?c2 rdfs:label ?kw2L . FILTER(LANG(?kw2L) = "en")
+      
+    #   {{ FILTER(?c1 = ?c2) BIND("Exact Match" AS ?m) }}
+      
+    #   # --- PARENT CHECKS ---
+    #   UNION
+    #   {{ ?c1 wdt:P279 ?c2 . 
+    #      BIND("Parent (1 hop)" AS ?m) }}
+         
+    #   UNION
+    #   {{ ?c1 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?c2 . 
+    #      ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
+    #      BIND(CONCAT("Parent (2 hops via: ", STR(?mid1L), ")") AS ?m) }}
+         
+    #   UNION
+    #   {{ ?c1 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?mid2 . ?mid2 wdt:P279 ?c2 . 
+    #      ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
+    #      ?mid2 rdfs:label ?mid2L . FILTER(LANG(?mid2L) = "en")
+    #      BIND(CONCAT("Parent (3 hops via: ", STR(?mid1L), " -> ", STR(?mid2L), ")") AS ?m) }}
+         
+    #   UNION
+    #   {{ ?c1 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?mid2 . ?mid2 wdt:P279 ?mid3 . ?mid3 wdt:P279 ?c2 .
+    #      ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
+    #      ?mid2 rdfs:label ?mid2L . FILTER(LANG(?mid2L) = "en")
+    #      ?mid3 rdfs:label ?mid3L . FILTER(LANG(?mid3L) = "en")
+    #      BIND(CONCAT("Parent (4 hops via: ", STR(?mid1L), " -> ", STR(?mid2L), " -> ", STR(?mid3L), ")") AS ?m) }}
+      
+    #   UNION
+    #   {{ ?c1 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?mid2 . ?mid2 wdt:P279 ?mid3 . ?mid3 wdt:P279 ?mid4 . ?mid4 wdt:P279 ?c2 .
+    #      ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
+    #      ?mid2 rdfs:label ?mid2L . FILTER(LANG(?mid2L) = "en")
+    #      ?mid3 rdfs:label ?mid3L . FILTER(LANG(?mid3L) = "en")
+    #      ?mid4 rdfs:label ?mid4L . FILTER(LANG(?mid4L) = "en")
+    #      BIND(CONCAT("Parent (5 hops via: ", STR(?mid1L), " -> ", STR(?mid2L), " -> ", STR(?mid3L), " -> ", STR(?mid4L), ")") AS ?m) }}
+      
+    #   # --- CHILD CHECKS ---
+    #   UNION
+    #   {{ ?c2 wdt:P279 ?c1 . 
+    #      BIND("Child (1 hop)" AS ?m) }}
+         
+    #   UNION
+    #   {{ ?c2 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?c1 . 
+    #      ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
+    #      BIND(CONCAT("Child (2 hops via: ", STR(?mid1L), ")") AS ?m) }}
+         
+    #   UNION
+    #   {{ ?c2 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?mid2 . ?mid2 wdt:P279 ?c1 . 
+    #      ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
+    #      ?mid2 rdfs:label ?mid2L . FILTER(LANG(?mid2L) = "en")
+    #      BIND(CONCAT("Child (3 hops via: ", STR(?mid1L), " -> ", STR(?mid2L), ")") AS ?m) }}
+         
+    #   UNION
+    #   {{ ?c2 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?mid2 . ?mid2 wdt:P279 ?mid3 . ?mid3 wdt:P279 ?c1 .
+    #      ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
+    #      ?mid2 rdfs:label ?mid2L . FILTER(LANG(?mid2L) = "en")
+    #      ?mid3 rdfs:label ?mid3L . FILTER(LANG(?mid3L) = "en")
+    #      BIND(CONCAT("Child (4 hops via: ", STR(?mid1L), " -> ", STR(?mid2L), " -> ", STR(?mid3L), ")") AS ?m) }}
+         
+    #   UNION
+    #   {{ ?c2 wdt:P279 ?mid1 . ?mid1 wdt:P279 ?mid2 . ?mid2 wdt:P279 ?mid3 . ?mid3 wdt:P279 ?mid4 . ?mid4 wdt:P279 ?c1 .
+    #      ?mid1 rdfs:label ?mid1L . FILTER(LANG(?mid1L) = "en")
+    #      ?mid2 rdfs:label ?mid2L . FILTER(LANG(?mid2L) = "en")
+    #      ?mid3 rdfs:label ?mid3L . FILTER(LANG(?mid3L) = "en")
+    #      ?mid4 rdfs:label ?mid4L . FILTER(LANG(?mid4L) = "en")
+    #      BIND(CONCAT("Child (5 hops via: ", STR(?mid1L), " -> ", STR(?mid2L), " -> ", STR(?mid3L), " -> ", STR(?mid4L), ")") AS ?m) }}
+         
+    #   # --- SIBLING CHECK ---
+    #   UNION
+    #   {{ ?c1 wdt:P279 ?p . ?c2 wdt:P279 ?p . FILTER(?c1 != ?c2)
+    #      ?p rdfs:label ?pL . FILTER(LANG(?pL) = "en")
+    #      BIND(CONCAT("Sibling (Parent: ", STR(?pL), ")") AS ?m) }}
+         
+    # }} GROUP BY ?kw1L ?kw2L
+    # """
     # sparql_query = f"""
     # SELECT (STR(?kw1L) AS ?keyword1) (STR(?kw2L) AS ?keyword2) (GROUP_CONCAT(DISTINCT ?m; separator=" | ") AS ?match_through)
     # WHERE {{

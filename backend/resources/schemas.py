@@ -121,6 +121,7 @@ class ResourceEvent(ResourceBase):
     description: str
     sessions: List[Session]
     organizers: List[ResourceOrganizerDetails]
+    study_levels: List[StudyLevel]
     status: ResourceStatus
     
 class ResourceBook(ResourceBase):
@@ -213,6 +214,7 @@ class ResourceEventInput(ResourceBaseInput):
     sessions: List[SessionInput]
     organizers: List[dict]
     status: ResourceStatus
+    study_levels: List[StudyLevel]
     
 class ResourceBookInput(ResourceBaseInput):
     description: str
@@ -264,3 +266,11 @@ class AllResourcesResponse(BaseModel):
         ResourceEvent | ResourceBook | ResourceVideo | ResourceArticle, 
         Field(discriminator="type")
     ]]
+    
+class IndicatorRecommendation(BaseModel):
+    similar_resource_id: str
+    similar_resource_type: ResourceType
+    similar_resource_title: str
+    suggested_indicator_ids: List[str]
+    word_overlap_count: int
+    keywords: List[str]

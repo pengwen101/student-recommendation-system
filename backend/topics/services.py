@@ -32,3 +32,4 @@ async def delete_topic(topic_id: str):
     if not topic_exists:
         raise HTTPException(status_code=404, detail=f"Topic ID {topic_id} not found")
     await topic_cypher.delete_topic(topic_id)
+    

@@ -9,6 +9,14 @@ from backend.resources.schemas import ResourceDetailsResponse, AllResourcesRespo
 from typing import List
 import uuid
 import json
+import spacy
+from backend.topics import cypher as topics_cypher
+
+nlp = spacy.load("en_core_web_sm")
+if "entityLinker" not in nlp.pipe_names:
+    nlp.add_pipe("entityLinker", last=True)
+
+additional_stop_words = ["student", "students", "people"]
 
 type_label_dict = {
     "book": "Book",
@@ -72,6 +80,7 @@ async def update_resource(resource_id: str, data: ResourceEventInput | ResourceB
         raise HTTPException(status_code=404, detail="Resource not found")
         
     data_dict = data.model_dump(mode='json')
+    print(data_dict)
     if data_dict.get('sessions', None) is not None:
         for idx, session in enumerate(data_dict['sessions']):
             if data_dict['sessions'][idx]['session_id'] is None:
@@ -103,7 +112,7 @@ async def update_resource(resource_id: str, data: ResourceEventInput | ResourceB
             if not await organizer_cypher.organizer_exists(organizer_id):
                 raise HTTPException(status_code=404, detail=f"Organizer ID {organizer_id} not found")
     
-    if "study_level" in data_dict:   
+    if "study_levels" in data_dict:
         for study_level in data_dict.get('study_levels', []):
             study_level_id = study_level['study_level_id']
             if not await curriculum_cypher.study_level_exists(study_level_id):
@@ -138,3 +147,15 @@ async def set_resource_weight(resource_id: str | None):
         if not resource_exists:
             raise HTTPException(status_code=404, detail="Resource not found")
     await resource_cypher.set_resource_weight(resource_id)
+    
+async def get_indicator_recommendation(text: str):
+    doc = nlp(text)
+    noun_phrases = []
+    for entity in doc._.linkedEntities:
+        span_text = entity.get_span().text
+        if span_text.lower() not in additional_stop_words and span_text.lower() not in noun_phrases:
+            noun_phrases.append(span_text.lower())
+            
+    target_words = await topics_cypher.get_valid_noun_lemmas(noun_phrases)
+    result = await resource_cypher.get_indicator_recommendation(target_words, "entity_wordnet")
+    return result

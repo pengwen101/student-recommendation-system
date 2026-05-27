@@ -28,6 +28,11 @@ function ResourceForm() {
   const [topics, setTopics] = useState<Topic[] | null>(null);
   const [versions, setVersions] = useState<CurriculumVersion[] | null>(null);
   const [versionId, setVersionId] = useState<string>("1");
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [suggestedIndicatorIds, setSuggestedIndicatorIds] = useState<string[]>([]);
+  const [similarResourceTitle, setSimilarResourceTitle] = useState<string | null>(null);
+  const [similarResourceType, setSimilarResourceType] = useState<string | null>(null);
+  const [recommending, setRecommending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -519,6 +524,35 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
     }
 
     setErrors(newErrors);
+  };
+
+  const handleGetIndicatorRecommendation = () => {
+    const text = (resource?.title || "") + " " + (resource?.description || "");
+    
+    if (!text.trim()) {
+      toast.error("Please enter a title or description first to get recommendations.");
+      return;
+    }
+
+    setRecommending(true);
+    
+    api.get(`/resource/indicator_recommendation`, { params: { text } })
+      .then(res => {
+        const result = res.data;
+        setSuggestedIndicatorIds(result.suggested_indicator_ids || []);
+        setKeywords(result.keywords || []);
+        setSimilarResourceTitle(result.similar_resource_title || null);
+        setSimilarResourceType(result.similar_resource_type || null);
+        
+        toast.success("Recommendations generated!");
+      })
+      .catch(err => {
+        console.log(err);
+        toast.error("Failed to fetch recommendations.");
+      })
+      .finally(() => {
+        setRecommending(false);
+      });
   };
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -1139,7 +1173,7 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
                 <Select name="organizer" value={organizer.organizer_id || ""} onChange={ (e) => {handleOrganizerChange(index, e.target.value)}}>
                   <option value="" disabled>Select an organizer...</option>
                   { organizers?.map((organizer) => (
-                    <option value={organizer.organizer_id}>{organizer.name.charAt(0).toUpperCase() + organizer.name.slice(1)}</option>
+                    <option key={organizer.organizer_id} value={organizer.organizer_id}>{organizer.name.charAt(0).toUpperCase() + organizer.name.slice(1)}</option>
                   ))
                   }
                 </Select>
@@ -1287,14 +1321,40 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
 
 
       {/* SECTION 2: Sub-CPLs & Indicators */}
+      {/* SECTION 2: Sub-CPLs & Indicators */}
       <Pane variant="shadow" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 mb-1">Curriculum Mapping</h3>
-        <p className="text-sm text-slate-500">Select a Sub-CPL to reveal and assign its indicators.</p>
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Curriculum Mapping</h3>
+            <p className="text-sm text-slate-500">Select a Sub-CPL to reveal and assign its indicators.</p>
+            
+            {/* NEW: Similar Resource Display */}
+            {similarResourceTitle && similarResourceType && (
+              <div className="mt-3 inline-flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+                <span className="font-semibold uppercase tracking-wider text-[11px] text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
+                  {similarResourceType}
+                </span>
+                Based on similarities with: <span className="font-bold italic">{similarResourceTitle}</span>
+              </div>
+            )}
+          </div>
+          
+          <Button 
+            type="button" 
+            onClick={handleGetIndicatorRecommendation}
+            isLoading={recommending}
+            variant="outline"
+            size="sm"
+            className="text-amber-700 border-amber-200 hover:bg-amber-50 bg-amber-50/30"
+          >
+            ✨ Get Recommendations
+          </Button>
+        </div>
 
         <Select name="version_id" value={versionId || ""} onChange={ (e) => handleVersionChange(e.target.value)}>
           {
             versions?.map(version => (
-              <option value={version.curriculum_version_id}>{version.curriculum_version_id}</option>
+              <option key={version.curriculum_version_id} value={version.curriculum_version_id}>{version.curriculum_version_id}</option>
             ))
           }
         </Select>
@@ -1306,6 +1366,8 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
         <div className="space-y-3 mt-6">
           {subCpls?.map(subcpl => {
             const isSubCplSelected = clickedSubCpls?.some(clickedSubCpl => clickedSubCpl.sub_cpl_id == subcpl.sub_cpl_id);
+            const hasRecommended = subcpl.indicators?.some(i => suggestedIndicatorIds.includes(i.indicator_id));
+            const shouldRevealIndicators = isSubCplSelected || hasRecommended;
 
             return (
               <div 
@@ -1313,7 +1375,9 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
                 className={`border p-4 rounded-xl transition-all duration-200 ${
                   isSubCplSelected 
                     ? 'bg-primary-50/50 border-primary-200 shadow-sm' 
-                    : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    : hasRecommended 
+                      ? 'bg-amber-50/10 border-amber-300 shadow-sm'
+                      : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
                 <label className="flex items-center gap-3 font-semibold text-slate-800 cursor-pointer">
@@ -1329,24 +1393,33 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
                   {subcpl.name}
                 </label>
 
-                {isSubCplSelected && (
-                  <div className="mt-4 ml-8 p-4 bg-white border border-primary-100 rounded-lg shadow-inner">
-                    <h4 className="font-semibold text-xs uppercase tracking-wider text-primary-700 mb-3">Target Indicators</h4>
+                {/* Changed this condition to use the new shouldRevealIndicators variable */}
+                {shouldRevealIndicators && (
+                  <div className={`mt-4 ml-8 p-4 bg-white border rounded-lg shadow-inner ${hasRecommended ? 'border-amber-200' : 'border-primary-100'}`}>
+                    <h4 className={`font-semibold text-xs uppercase tracking-wider mb-3 ${hasRecommended ? 'text-amber-700' : 'text-primary-700'}`}>
+                      Target Indicators
+                    </h4>
                     
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                       {subcpl.indicators?.map(i => {
                         const isIndicatorChecked = resource?.indicators.some(resInd => resInd.indicator_id === i.indicator_id) || false;
+                        const isRecommended = suggestedIndicatorIds.includes(i.indicator_id);
 
                         return (
-                          <label key={i.indicator_id} className="flex items-start gap-3 cursor-pointer hover:bg-slate-50 p-2 rounded-md transition-colors group">
+                          <label key={i.indicator_id} className={`flex items-start gap-3 cursor-pointer p-2 rounded-md transition-colors group ${isRecommended && !isIndicatorChecked ? 'bg-amber-50/50 hover:bg-amber-100/50' : 'hover:bg-slate-50'}`}>
                             <input
                                type="checkbox"
                                checked={isIndicatorChecked}
                                onChange={() => handleIndicatorToggle(i.indicator_id)}
                                className="mt-0.5 w-4 h-4 text-primary-600 border-slate-300 rounded cursor-pointer focus:ring-primary-500"
                             />
-                            <span className={`text-sm leading-tight ${isIndicatorChecked ? 'text-slate-900 font-medium' : 'text-slate-600 group-hover:text-slate-900'}`}>
+                            <span className={`text-sm leading-tight flex items-center flex-wrap gap-1.5 ${isIndicatorChecked ? 'text-slate-900 font-medium' : 'text-slate-600 group-hover:text-slate-900'}`}>
                               {i.name}
+                              {isRecommended && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 whitespace-nowrap">
+                                  ✨ Recommended
+                                </span>
+                              )}
                             </span>
                           </label>
                         )
