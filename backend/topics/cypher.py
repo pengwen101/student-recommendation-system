@@ -70,7 +70,6 @@ async def get_valid_noun_lemmas(noun_phrases: list[str]) -> list[str]:
         words = phrase.split()
         while len(words) > 0:
             candidate = " ".join(words).lower() 
-            print(f"  Trying WordNet match for: '{candidate}'")
             query = """
             MATCH (w:ns2__LexicalEntry)
             WHERE lower(w.lemma) = $phrase AND w.partOfSpeech = "Noun"

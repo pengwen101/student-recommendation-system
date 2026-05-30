@@ -70,6 +70,9 @@ async def read_resources(label: str | None = None, resource_id: str | None = Non
     r.is_active as is_active,
     r.description as description,
     r.content_link as content_link,
+    r.target_words as target_words,
+    r.eng_text as eng_text,
+    r.text_hash as text_hash,
     r.article_text as article_text,
     r.isbn as isbn,
     r.authors as authors,
@@ -131,6 +134,17 @@ async def read_resources(label: str | None = None, resource_id: str | None = Non
     
     return response[0] if resource_id else response
 
+async def link_resource_keywords(resource_id, target_words):
+    query = """
+    
+    MATCH (r:UniResource {resource_id: $resource_id})
+    UNWIND $target_words as target_word
+    MATCH (w:ns2__LexicalEntry) WHERE lower(w.lemma) = lower(target_word) AND w.partOfSpeech = "Noun"
+    MERGE (r)-[rl:LINKED_TO {method: $method}]->(w)
+    """
+    
+    await Neo4jConnection.query(query, {"resource_id": resource_id, "target_words": target_words, "method": "entity_wordnet"})
+    
 
 async def create_resource(resource_id: str, label: str, data: dict, current_user: dict):
     query = f"""
@@ -152,7 +166,7 @@ async def create_resource(resource_id: str, label: str, data: dict, current_user
     WITH r
     {create_update_base_query}
     """
-    resource_properties = {k: v for k, v in data.items() if k not in {"study_levels", "organizers", "sessions", "topics", "resource_assessments", "indicators", "published_date"}}
+    resource_properties = {k: v for k, v in data.items() if k not in {"study_levels", "organizers", "sessions", "topics", "resource_assessments", "indicators", "published_date", "target_words"}}
     
     
     params = {"resource_id": resource_id, 
@@ -169,6 +183,7 @@ async def create_resource(resource_id: str, label: str, data: dict, current_user
     
     await Neo4jConnection.query(query, params)
     await calculate_support_weights(resource_id, data['indicators'])
+    await link_resource_keywords(resource_id, data["target_words"])
     
 async def update_resource(resource_id: str, data: dict, current_user: dict):
     query = f"""
@@ -186,8 +201,7 @@ async def update_resource(resource_id: str, data: dict, current_user: dict):
     WITH r
     {create_update_base_query}
     """
-    resource_properties = {k: v for k, v in data.items() if k not in {"study_levels", "organizers", "sessions", "topics", "resource_assessments", "indicators", "published_date"}}
-    print(data.get("study_levels"))
+    resource_properties = {k: v for k, v in data.items() if k not in {"study_levels", "organizers", "sessions", "topics", "resource_assessments", "indicators", "published_date", "target_words"}}
     params = {"resource_id": resource_id, 
               "resource_properties": resource_properties,
               "published_date": data.get("published_date"),
@@ -201,6 +215,8 @@ async def update_resource(resource_id: str, data: dict, current_user: dict):
     
     await Neo4jConnection.query(query, params)
     await calculate_support_weights(resource_id, data['indicators'])
+    await link_resource_keywords(resource_id, data["target_words"])
+        
     
 async def check_organizer_update_authorization(resource_id, organizer_id):
     query = """
@@ -316,7 +332,7 @@ async def get_indicator_recommendation(target_words: list[str], method: str):
     WITH $target_words AS target_words
     WITH target_words, size(target_words) AS target_word_count
     UNWIND target_words AS word
-    MATCH (w:ns2__LexicalEntry) WHERE lower(w.lemma) = lower(word)
+    MATCH (w:ns2__LexicalEntry) WHERE lower(w.lemma) = lower(word) AND w.partOfSpeech = "Noun"
     CALL (w) {
         MATCH (other:UniResource)-[r:LINKED_TO]->(w)
         WHERE r.method = "noun_wordnet"
@@ -338,7 +354,7 @@ async def get_indicator_recommendation(target_words: list[str], method: str):
         tolower(head([l IN labels(other) WHERE l <> 'UniResource'])) AS similar_resource_type,
         other.title AS similar_resource_title,
         overlap_count AS word_overlap_count,
-        target_words AS keywords,
+        target_words AS target_words,
         collect(DISTINCT suggested_indicator.indicator_id) AS suggested_indicator_ids
     ORDER BY overlap_count DESC
     LIMIT 1

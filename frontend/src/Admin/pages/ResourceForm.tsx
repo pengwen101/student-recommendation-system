@@ -28,7 +28,6 @@ function ResourceForm() {
   const [topics, setTopics] = useState<Topic[] | null>(null);
   const [versions, setVersions] = useState<CurriculumVersion[] | null>(null);
   const [versionId, setVersionId] = useState<string>("1");
-  const [keywords, setKeywords] = useState<string[]>([]);
   const [suggestedIndicatorIds, setSuggestedIndicatorIds] = useState<string[]>([]);
   const [similarResourceTitle, setSimilarResourceTitle] = useState<string | null>(null);
   const [similarResourceType, setSimilarResourceType] = useState<string | null>(null);
@@ -69,6 +68,7 @@ function ResourceForm() {
           const fetchedResource = res.data.resource_details;
           
           setResource(fetchedResource || null);
+          setResourceType(fetchedResource.type);
           if (fetchedResource && fetchedSubCpls) {
             const resourceIndicatorIds = fetchedResource.indicators.map(
               (indicator: { indicator_id: string }) => indicator.indicator_id
@@ -540,7 +540,10 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
       .then(res => {
         const result = res.data;
         setSuggestedIndicatorIds(result.suggested_indicator_ids || []);
-        setKeywords(result.keywords || []);
+        setResource(prev => {
+          if (!prev) return null;
+          return {...prev, keywords: result.keywords, eng_text: result.eng_text, text_hash: result.text_hash}
+        });
         setSimilarResourceTitle(result.similar_resource_title || null);
         setSimilarResourceType(result.similar_resource_type || null);
         
@@ -693,6 +696,9 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
       ...(resourceType === 'book' && resource.published_date ? { published_date: resource.published_date } : {}),
       ...(resourceType === 'video' && resource.content_link ? { content_link: resource.content_link } : {}),
       ...(resource.resource_assessments ? {resource_assessments: resource.resource_assessments}: {}),
+      ...(resource.target_words ? {target_words: resource.target_words}: {}),
+      ...(resource.eng_text ? {eng_text: resource.eng_text}: {}),
+      ...(resource.text_hash ? {text_hash: resource.text_hash}: {}),
 
       // ...((resourceType === 'book' || resourceType === "video") && resource.author_type ? { author_type: resource.author_type } : {}),
       // ...((resourceType === 'book' || resourceType === "video") && resource.impact_scale ? { impact_scale: resource.impact_scale } : {}),

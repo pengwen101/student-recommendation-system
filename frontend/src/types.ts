@@ -136,6 +136,9 @@ export interface ResourceInput {
     sessions?: SessionInput[],
     organizers?: ResourceOrganizerInput[],
     status?: typeof ResourceStatus[keyof typeof ResourceStatus];
+    target_words?: string[];
+    eng_text?: string;
+    text_hash?: string;
     // scale?: typeof ResourceScale[keyof typeof ResourceScale];
     // speaker_degree?: typeof SpeakerDegree[keyof typeof SpeakerDegree];
     // author_type?: typeof AuthorType[keyof typeof AuthorType];
@@ -189,6 +192,9 @@ export interface ResourceBaseInput {
     title: string;
     is_active: boolean;
     resource_assessments?: ResourceAssessmentInput[];
+    target_words?: string[];
+    eng_text?: string;
+    text_hash?: string;
     topics: ResourceTopic[];
     indicators: ResourceIndicator[];
 }

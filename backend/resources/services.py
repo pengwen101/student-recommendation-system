@@ -11,6 +11,9 @@ import uuid
 import json
 import spacy
 from backend.topics import cypher as topics_cypher
+from deep_translator import GoogleTranslator
+import asyncio
+import hashlib
 
 nlp = spacy.load("en_core_web_sm")
 if "entityLinker" not in nlp.pipe_names:
@@ -70,8 +73,20 @@ async def create_resource(type: str, data: ResourceEventInput | ResourceBookInpu
             study_level_id = study_level['study_level_id']
             if not await curriculum_cypher.study_level_exists(study_level_id):
                 raise HTTPException(status_code=404, detail=f"Study Level ID {study_level_id} not found")
-                
-    await resource_cypher.create_resource(new_resource_id, label, data_dict, current_user)
+    
+    generate_new_hash = True
+    if "text_hash" in data_dict:       
+        text_to_hash = f"{data_dict.get('title', '')} {data_dict.get('description', '')}"
+        new_text_hash = await asyncio.to_thread(lambda: hashlib.sha256(text_to_hash.encode('utf-8')).hexdigest())
+        if new_text_hash == data_dict['text_hash']:
+            generate_new_hash = False
+    if generate_new_hash:
+        target_words, eng_text, text_hash = await get_text_hash_eng_text_target_words((data_dict['title'] + " " + data_dict.get('description')))
+        data_dict['text_hash'] = text_hash
+        data_dict['eng_text'] = eng_text
+        data_dict['target_words'] = target_words
+    
+    await resource_cypher.update_resource(data_dict, current_user)
     return await read_resource_details(new_resource_id)
 
 async def update_resource(resource_id: str, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict):
@@ -80,7 +95,6 @@ async def update_resource(resource_id: str, data: ResourceEventInput | ResourceB
         raise HTTPException(status_code=404, detail="Resource not found")
         
     data_dict = data.model_dump(mode='json')
-    print(data_dict)
     if data_dict.get('sessions', None) is not None:
         for idx, session in enumerate(data_dict['sessions']):
             if data_dict['sessions'][idx]['session_id'] is None:
@@ -117,7 +131,19 @@ async def update_resource(resource_id: str, data: ResourceEventInput | ResourceB
             study_level_id = study_level['study_level_id']
             if not await curriculum_cypher.study_level_exists(study_level_id):
                 raise HTTPException(status_code=404, detail=f"Study Level ID {study_level_id} not found")
-                
+    
+    generate_new_hash = True
+    if "text_hash" in data_dict:       
+        text_to_hash = f"{data_dict.get('title', '')} {data_dict.get('description', '')}"
+        new_text_hash = await asyncio.to_thread(lambda: hashlib.sha256(text_to_hash.encode('utf-8')).hexdigest())
+        if new_text_hash == data_dict['text_hash']:
+            generate_new_hash = False
+
+    if generate_new_hash:
+        target_words, eng_text, text_hash = await get_text_hash_eng_text_target_words((data_dict['title'] + " " + data_dict.get('description')))
+        data_dict['text_hash'] = text_hash
+        data_dict['eng_text'] = eng_text
+        data_dict['target_words'] = target_words
     await resource_cypher.update_resource(resource_id, data_dict, current_user)
     return await read_resource_details(resource_id)
 
@@ -148,8 +174,11 @@ async def set_resource_weight(resource_id: str | None):
             raise HTTPException(status_code=404, detail="Resource not found")
     await resource_cypher.set_resource_weight(resource_id)
     
-async def get_indicator_recommendation(text: str):
-    doc = nlp(text)
+    
+async def get_text_hash_eng_text_target_words(text: str):
+    eng_text = await asyncio.to_thread(GoogleTranslator(target='en').translate, text)
+    text_hash = await asyncio.to_thread(lambda: hashlib.sha256(text.encode('utf-8')).hexdigest())
+    doc = nlp(eng_text)
     noun_phrases = []
     for entity in doc._.linkedEntities:
         span_text = entity.get_span().text
@@ -157,5 +186,12 @@ async def get_indicator_recommendation(text: str):
             noun_phrases.append(span_text.lower())
             
     target_words = await topics_cypher.get_valid_noun_lemmas(noun_phrases)
+    return target_words, eng_text, text_hash
+    
+async def get_indicator_recommendation(text: str):
+    target_words, eng_text, text_hash = await get_text_hash_eng_text_target_words(text)
     result = await resource_cypher.get_indicator_recommendation(target_words, "entity_wordnet")
+    result["eng_text"] = eng_text
+    result["text_hash"] = text_hash
+    result["target_words"] = target_words
     return result
