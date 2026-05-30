@@ -5,6 +5,13 @@ import type { SupportLackGap, Dashboard as DashboardType, Organizer, ResourceSup
 import toast from "react-hot-toast";
 import { DropdownFilter } from '../../../components/DropDownFilter';
 
+const CURRICULUM_HIERARCHY: Record<string, string> = {
+  'cpl': 'sub_cpl',
+  'sub_cpl': 'quality',
+  'quality': 'indicator',
+  'indicator': ""
+};
+
 interface EChartsClickEvent<T> {
   data?: T;
   dataIndex: number;
@@ -440,7 +447,9 @@ export function ResourceSupportingXList({ data }: { data: ResourceSupportingX[] 
 export default function SupportLackGap() {
   const [data, setData] = useState<DashboardType | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedCurriculumType, setSelectedCurriculumType] = useState<string[]>(["indicator"]);
+  const [selectedCurriculumType, setSelectedCurriculumType] = useState<string[]>(["cpl"]);
+  const [drillPath, setDrillPath] = useState<{ id: string, type: string, name: string }[]>([]);
+  const currentParentId = drillPath.length > 0 ? drillPath[drillPath.length - 1].id : null;
   const [selectedResourceType, setSelectedResourceType] = useState<string[]>(["book", "event", "article", "video"]);
   const [allOrganizers, setAllOrganizers] = useState<Organizer[]>([]);
   const [selectedStudyLevel, setSelectedStudyLevel] = useState<string[]>(["1", "2", "3", "4"]);
@@ -466,11 +475,15 @@ export default function SupportLackGap() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const params = { 
+        const params: DashboardParams = { 
           resource_types: selectedResourceType, 
           study_level_ids: selectedStudyLevel, 
-          organizer_ids: selectedOrganizer 
+          organizer_ids: selectedOrganizer
         };
+
+        if (currentParentId) {
+            params.curriculum_id = currentParentId;
+        }
 
         console.log(selectedResourceType);
         console.log(selectedStudyLevel);
@@ -499,7 +512,61 @@ export default function SupportLackGap() {
     if (selectedOrganizer.length > 0) {
        fetchData();
     }
-  }, [selectedCurriculumType, selectedOrganizer, selectedResourceType, selectedStudyLevel]);
+  }, [selectedCurriculumType, selectedOrganizer, selectedResourceType, selectedStudyLevel, currentParentId]);
+
+  const handleDrillDown = () => {
+    if (!selectedCurriculumId || !data) return;
+
+    const selectedItem = data.support_lack_gap.find(item => item.id === selectedCurriculumId);
+    const nextType = CURRICULUM_HIERARCHY[selectedCurriculumType[0]];
+
+    if (nextType && selectedItem) {
+        setDrillPath(prev => [...prev, { id: selectedCurriculumId, type: selectedCurriculumType[0], name: selectedItem.code }]);
+        setSelectedCurriculumType([nextType]);
+        setSelectedCurriculumId(null);
+    }
+  };
+
+  const handleBreadcrumbClick = (index: number) => {
+    // If clicking "Home" (index -1)
+    if (index === -1) {
+        setDrillPath([]);
+        setSelectedCurriculumType(['indicator']); // Or whatever your default root is
+        setSelectedCurriculumId(null);
+        return;
+    }
+
+    // Navigate to a specific point in the path
+    const newPath = drillPath.slice(0, index + 1);
+    const targetNode = newPath[newPath.length - 1];
+    
+    setDrillPath(newPath.slice(0, -1)); // Remove the target node from the path as it becomes the active view parent
+    setSelectedCurriculumType([CURRICULUM_HIERARCHY[newPath.length > 1 ? newPath[newPath.length - 2].type : 'cpl']]); // Re-calculate type based on parent
+    
+    // Simpler fallback if the above type calculation gets messy: Just store the active type in the breadcrumb too.
+    // Let's refine how we handle the breadcrumb click for safety:
+    
+    const targetType = CURRICULUM_HIERARCHY[targetNode.type]; 
+    setDrillPath(newPath);
+    setSelectedCurriculumType([targetType]);
+    setSelectedCurriculumId(null);
+  };
+  
+  // Safe Breadcrumb navigation
+  const navigateToLevel = (levelIndex: number) => {
+      if (levelIndex === -1) {
+          setDrillPath([]);
+          setSelectedCurriculumType(['cpl']);
+      } else {
+          // Keep path up to the clicked level
+          const newPath = drillPath.slice(0, levelIndex + 1);
+          setDrillPath(newPath);
+          // The type to view is the child of the clicked breadcrumb
+          const parentType = newPath[newPath.length - 1].type;
+          setSelectedCurriculumType([CURRICULUM_HIERARCHY[parentType]]);
+      }
+      setSelectedCurriculumId(null);
+  }
 
   // Detail Fetch: Triggered when a point on the scatter plot is selected/deselected
   useEffect(() => {
@@ -603,6 +670,61 @@ export default function SupportLackGap() {
           multiSelect={true}
         />
       </div>
+
+      {/* Breadcrumbs */}
+      <div className="flex items-center gap-2 mb-4 text-sm">
+          <button 
+              onClick={() => navigateToLevel(-1)}
+              className={`hover:text-blue-600 transition-colors ${drillPath.length === 0 ? 'font-bold text-gray-800' : 'text-gray-500'}`}
+          >
+              Root (CPL)
+          </button>
+          
+          {drillPath.map((crumb, index) => (
+              <span key={crumb.id} className="flex items-center gap-2">
+                  <span className="text-gray-400">/</span>
+                  <button 
+                      onClick={() => navigateToLevel(index)}
+                      className={`hover:text-blue-600 transition-colors ${index === drillPath.length - 1 ? 'font-bold text-gray-800' : 'text-gray-500'}`}
+                  >
+                      {crumb.name}
+                  </button>
+              </span>
+          ))}
+      </div>
+
+      {/* Contextual Action Bar (Appears when a node is selected) */}
+      {selectedCurriculumId && data && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center gap-4">
+                  <div>
+                      <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Selected Node</span>
+                      <h3 className="font-bold text-gray-900">
+                          {data.support_lack_gap.find(i => i.id === selectedCurriculumId)?.name}
+                      </h3>
+                  </div>
+              </div>
+              
+              <div className="flex gap-3">
+                  <button 
+                      onClick={() => setSelectedCurriculumId(null)}
+                      className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                  >
+                      Clear Selection
+                  </button>
+                  
+                  {/* Only show drill down if there is a level below this one */}
+                  {CURRICULUM_HIERARCHY[selectedCurriculumType[0]] && (
+                      <button 
+                          onClick={handleDrillDown}
+                          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                      >
+                          Drill Down to {CURRICULUM_HIERARCHY[selectedCurriculumType[0]].replace('_', '-').toUpperCase()}
+                      </button>
+                  )}
+              </div>
+          </div>
+      )}
 
       {/* Grid Layout */}
       {data && (

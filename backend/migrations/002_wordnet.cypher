@@ -32,3 +32,7 @@ CALL apoc.periodic.iterate(
    MERGE (le)-[:ns2__canonicalForm]->(f)",
   {batchSize: 5000, parallel: false}
 );
+
+CREATE INDEX lexical_entry_lemma IF NOT EXISTS FOR (w:ns2__LexicalEntry) ON (w.lemma);
+MATCH (w:ns2__LexicalEntry) SET w.lower_lemma = lower(w.lemma);
+CREATE INDEX lexical_lower_lemma IF NOT EXISTS FOR (w:ns2__LexicalEntry) ON (w.lower_lemma);

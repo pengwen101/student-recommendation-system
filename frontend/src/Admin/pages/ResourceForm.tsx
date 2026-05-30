@@ -873,6 +873,7 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
               onChange={onChange}
             />
             <Button
+              type="button"
               isLoading={searching}
               onClick={() => fetchBookInfo(resource?.isbn)}
               size="default"

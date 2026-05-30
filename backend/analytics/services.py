@@ -8,9 +8,9 @@ CURRICULUM_TYPE_LABEL_MAP = {
     "indicator": "Indicator"
 }
 
-async def support_lack_gap(curriculum_type: str, study_level_ids: list | None = None, resource_types: list | None = None, organizer_ids: list | None = None):
+async def support_lack_gap(curriculum_type: str, curriculum_id: str | None = None, study_level_ids: list | None = None, resource_types: list | None = None, organizer_ids: list | None = None):
     target_label = CURRICULUM_TYPE_LABEL_MAP[curriculum_type]
-    return await analytic_cypher.support_lack_gap(target_label, study_level_ids, resource_types, organizer_ids)
+    return await analytic_cypher.support_lack_gap(target_label, curriculum_id, study_level_ids, resource_types, organizer_ids)
 
 async def resource_supporting_x(curriculum_id: str | None = None, study_level_ids: list | None = None, resource_types: list | None = None, organizer_ids: list | None = None):
     return await analytic_cypher.resource_supporting_x(curriculum_id, study_level_ids, resource_types, organizer_ids)

@@ -7,10 +7,11 @@ analytic_router = APIRouter(prefix="/analytic", tags=["analytic"])
 
 @analytic_router.get("/support_lack_gap/{curriculum_type}", response_model=List[SupportLackGap])
 async def support_lack_gap(curriculum_type: CurriculumType, 
+                           curriculum_id: str | None = Query(default=None),
                            study_level_ids: list[str] | None = Query(default=None), 
                             resource_types: list[str] | None = Query(default=None), 
                             organizer_ids: list[str] | None = Query(default=None)):
-    result = await services.support_lack_gap(curriculum_type, study_level_ids, resource_types, organizer_ids)
+    result = await services.support_lack_gap(curriculum_type, curriculum_id, study_level_ids, resource_types, organizer_ids)
     return result
 
 @analytic_router.get("/resource_supporting_x", response_model=List[ResourceSupportingX])

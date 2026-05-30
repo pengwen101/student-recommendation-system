@@ -65,14 +65,13 @@ const Resources = () => {
         const startDate = new Date(startStr);
         const endDate = new Date(endStr);
         
-        const datePart = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const startTimePart = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-        const endTimePart = endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        const startDatePart = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const endDatePart = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
         return (
             <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <FontAwesomeIcon icon={faCalendar} className="opacity-70" />
-                <span>{datePart}, {startTimePart} - {endTimePart}</span>
+                <span>{startDatePart} - {endDatePart}</span>
             </div>
         );
     };

@@ -14,6 +14,7 @@ from backend.topics import cypher as topics_cypher
 from deep_translator import GoogleTranslator
 import asyncio
 import hashlib
+import time
 
 nlp = spacy.load("en_core_web_sm")
 if "entityLinker" not in nlp.pipe_names:
@@ -176,16 +177,21 @@ async def set_resource_weight(resource_id: str | None):
     
     
 async def get_text_hash_eng_text_target_words(text: str):
+    start_time = time.perf_counter()
     eng_text = await asyncio.to_thread(GoogleTranslator(target='en').translate, text)
+    print(f"[TIME] Translate to english: {time.perf_counter() - start_time:.4f} seconds")
     text_hash = await asyncio.to_thread(lambda: hashlib.sha256(text.encode('utf-8')).hexdigest())
+    start_time = time.perf_counter()
     doc = nlp(eng_text)
     noun_phrases = []
     for entity in doc._.linkedEntities:
         span_text = entity.get_span().text
         if span_text.lower() not in additional_stop_words and span_text.lower() not in noun_phrases:
             noun_phrases.append(span_text.lower())
-            
+    print(f"[TIME] Find entities: {time.perf_counter() - start_time:.4f} seconds")
+    start_time = time.perf_counter()
     target_words = await topics_cypher.get_valid_noun_lemmas(noun_phrases)
+    print(f"[TIME] Find valid entities in WordNet: {time.perf_counter() - start_time:.4f} seconds")
     return target_words, eng_text, text_hash
     
 async def get_indicator_recommendation(text: str):

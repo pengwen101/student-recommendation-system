@@ -1,12 +1,9 @@
 from backend.database import Neo4jConnection
+import time
 
 update_cleanup_query = """
-    OPTIONAL MATCH (r)<-[old_og:ORGANIZES]-(:Organizer) DELETE old_og WITH r
-    OPTIONAL MATCH (r)-[old_rc:COVERS]->(:Topic) DELETE old_rc WITH r
-    OPTIONAL MATCH (r)-[old_rs:SUPPORTS]->(n) DELETE old_rs WITH r
-    OPTIONAL MATCH (r)-[old_hs:HAS_SESSION]->(:Session) DELETE old_hs WITH r
-    OPTIONAL MATCH (r)-[old_af:AVAILABLE_FOR]->(:StudyLevel) DELETE old_af WITH r
-    OPTIONAL MATCH (r)-[old_ra:HAS]->(:ResourceAssessment) DELETE old_ra 
+    OPTIONAL MATCH (r)-[old_rel:ORGANIZES|COVERS|SUPPORTS|HAS_SESSION|AVAILABLE_FOR|HAS|LINKED_TO]-()
+    DELETE old_rel
 """
 
 create_update_base_query = """
@@ -135,16 +132,22 @@ async def read_resources(label: str | None = None, resource_id: str | None = Non
     return response[0] if resource_id else response
 
 async def link_resource_keywords(resource_id, target_words):
+    if not target_words:
+        return
+        
     query = """
-    
     MATCH (r:UniResource {resource_id: $resource_id})
     UNWIND $target_words as target_word
-    MATCH (w:ns2__LexicalEntry) WHERE lower(w.lemma) = lower(target_word) AND w.partOfSpeech = "Noun"
+    MATCH (w:ns2__LexicalEntry {partOfSpeech: "Noun"}) 
+    WHERE w.lemma = target_word
+    
     MERGE (r)-[rl:LINKED_TO {method: $method}]->(w)
     """
-    
-    await Neo4jConnection.query(query, {"resource_id": resource_id, "target_words": target_words, "method": "entity_wordnet"})
-    
+    await Neo4jConnection.query(query, {
+        "resource_id": resource_id, 
+        "target_words": target_words, 
+        "method": "entity_wordnet"
+    })
 
 async def create_resource(resource_id: str, label: str, data: dict, current_user: dict):
     query = f"""
@@ -192,7 +195,7 @@ async def update_resource(resource_id: str, data: dict, current_user: dict):
     SET r.published_date =  datetime($published_date + '[Asia/Jakarta]')
     WITH r
     {update_cleanup_query}
-    WITH r
+    WITH DISTINCT r
     OPTIONAL MATCH (a:Admin {{admin_id: $updater_actor_id}})
     OPTIONAL MATCH (o:Organizer {{organizer_id: $updater_actor_id}})
     WITH r, coalesce(a, o) AS actor
@@ -212,10 +215,15 @@ async def update_resource(resource_id: str, data: dict, current_user: dict):
               "updater_actor_id": current_user['sub'],
               "resource_assessments": data['resource_assessments']
               }
-    
+    start_time = time.perf_counter()
     await Neo4jConnection.query(query, params)
+    print(f"[TIME] Neo4j Connection Query took: {time.perf_counter() - start_time:.4f} seconds")
+    start_time = time.perf_counter()
     await calculate_support_weights(resource_id, data['indicators'])
+    print(f"[TIME] Calculate Support Weights took: {time.perf_counter() - start_time:.4f} seconds")
+    start_time = time.perf_counter()
     await link_resource_keywords(resource_id, data["target_words"])
+    print(f"[TIME] Link Resource Keywords took: {time.perf_counter() - start_time:.4f} seconds")
         
     
 async def check_organizer_update_authorization(resource_id, organizer_id):

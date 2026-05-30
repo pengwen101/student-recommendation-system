@@ -1,33 +1,56 @@
 from backend.database import Neo4jConnection
 
 
-async def support_lack_gap(curriculum_type: str, study_level_ids: list | None = None, resource_types: list | None = None, organizer_ids: list | None = None):
+async def support_lack_gap(curriculum_type: str, curriculum_id: str | None = None, study_level_ids: list | None = None, resource_types: list | None = None, organizer_ids: list | None = None):
     query = f"""
     MATCH (c:{curriculum_type})
+    WHERE $curriculum_id IS NULL
+    OR EXISTS {{
+           MATCH (c)<-[*1..3]-(parent)
+           WHERE COALESCE(parent.cpl_id, parent.sub_cpl_id, parent.quality_id, parent.indicator_id) = $curriculum_id
+       }}
     MATCH (cst:Config:StudentTarget)
-    
-    OPTIONAL MATCH (s:Student)-[rh:HAS]->(c)
-    MATCH (s)-[]->(sl:StudyLevel)
-    WHERE $study_level_ids IS NULL OR sl.study_level_id IN $study_level_ids
+ 
+    CALL {{
+        WITH c, cst
+        OPTIONAL MATCH (s:Student)-[rh:HAS]->(c)
+        WHERE ($study_level_ids IS NULL OR EXISTS {{
+            MATCH (s)-[:CURRENTLY_IN]->(sl:StudyLevel)
+            WHERE sl.study_level_id IN $study_level_ids
+        }})
         
-    WITH c, sum(CASE WHEN cst.target_score - rh.weight > 0 THEN 1 ELSE 0 END) as student_count, sum(
-        CASE WHEN cst.target_score - rh.weight < 0 THEN 0
-        ELSE cst.target_score - rh.weight
-        END
-    ) AS lack_score
-    
-    WITH c, student_count, lack_score, CASE WHEN student_count = 0 THEN 0 ELSE lack_score / student_count END AS avg_lack_score
+        WITH c, cst, rh
+        WHERE rh IS NOT NULL
+        
+        RETURN 
+            sum(CASE WHEN cst.target_score - rh.weight > 0 THEN 1 ELSE 0 END) as student_count,
+            sum(CASE WHEN cst.target_score - rh.weight < 0 THEN 0 ELSE cst.target_score - rh.weight END) AS lack_score
+    }}
+ 
+    WITH c, coalesce(student_count, 0) as student_count, coalesce(lack_score, 0) as lack_score,
+         CASE WHEN student_count = 0 THEN 0 ELSE lack_score / student_count END AS avg_lack_score
 
-    OPTIONAL MATCH (r:UniResource)-[rs:SUPPORTS]->(c)
-    WHERE $resource_types IS NULL OR tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) IN $resource_types
-    
-    OPTIONAL MATCH (o:Organizer)-[]->(r)-[]->(sl)
-    WHERE $organizer_ids IS NULL OR o.organizer_id IN $organizer_ids
-  
-    WITH c, student_count, lack_score, avg_lack_score, 
-    count(DISTINCT r.resource_id) as resource_count,
-    sum(rs.weight * r.internal_weight) as support_score, 
-    coalesce(avg(rs.weight * r.internal_weight), 0) as avg_support_score
+    CALL {{
+        WITH c
+        OPTIONAL MATCH (r:UniResource)-[rs:SUPPORTS]->(c)
+        WITH r, rs WHERE r IS NOT NULL
+        WITH r, rs, tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) AS r_type 
+        WHERE ($resource_types IS NULL OR r_type IN $resource_types)
+        AND ($organizer_ids IS NULL OR r_type <> 'event' OR EXISTS {{
+            MATCH (o:Organizer)-[:ORGANIZES]->(r)
+            WHERE o.organizer_id IN $organizer_ids
+        }})
+        AND ($study_level_ids IS NULL OR r_type <> 'event' OR EXISTS {{
+            MATCH (r)-[:AVAILABLE_FOR]->(sl:StudyLevel)
+            WHERE sl.study_level_id IN $study_level_ids
+        }})
+        WITH r, rs WHERE r IS NOT NULL
+        
+        RETURN 
+            count(DISTINCT r.resource_id) as resource_count,
+            sum(rs.weight * r.internal_weight) as support_score, 
+            coalesce(avg(rs.weight * r.internal_weight), 0) as avg_support_score
+    }}
  
     RETURN
         COALESCE(c.cpl_id, c.sub_cpl_id, c.quality_id, c.indicator_id) AS id,
@@ -36,31 +59,44 @@ async def support_lack_gap(curriculum_type: str, study_level_ids: list | None = 
         student_count,
         lack_score,
         avg_lack_score,
-        resource_count,
-        support_score,
-        avg_support_score
+        coalesce(resource_count, 0) as resource_count,
+        coalesce(support_score, 0) as support_score,
+        coalesce(avg_support_score, 0) as avg_support_score
     """
     
-    result = await Neo4jConnection.query(query, {"study_level_ids": study_level_ids, "resource_types": resource_types, "organizer_ids": organizer_ids})
+    result = await Neo4jConnection.query(query, {"curriculum_id": curriculum_id, "study_level_ids": study_level_ids, "resource_types": resource_types, "organizer_ids": organizer_ids})
     return result
 
 async def resource_supporting_x(curriculum_id: str | None = None, study_level_ids: list | None = None, resource_types: list | None = None, organizer_ids: list | None = None):
     query = f"""
-    MATCH (n:Cpl|SubCpl|Quality|Indicator) WHERE $curriculum_id IS NULL OR n.cpl_id = $curriculum_id OR n.sub_cpl_id = $curriculum_id OR n.quality_id = $curriculum_id OR n.indicator_id = $curriculum_id
+    MATCH (n:Cpl|SubCpl|Quality|Indicator) 
+    WHERE $curriculum_id IS NULL 
+       OR n.cpl_id = $curriculum_id 
+       OR n.sub_cpl_id = $curriculum_id 
+       OR n.quality_id = $curriculum_id 
+       OR n.indicator_id = $curriculum_id
     
     MATCH (r:UniResource)-[:SUPPORTS]->(n)
-    WHERE $resource_types IS NULL OR tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) IN $resource_types
-    MATCH (r)-[]->(sl:StudyLevel)
-    WHERE $study_level_ids IS NULL OR sl.study_level_id IN $study_level_ids
-    
-    OPTIONAL MATCH (r)<-[:ORGANIZES]-(o:Organizer)
-    WHERE $organizer_ids IS NULL OR o.organizer_id IN $organizer_ids
-    MATCH (r)-[:COVERS]->(t:Topic)
-    OPTIONAL MATCH (s:Student)-[:ATTENDS]->(r)
-    
-    RETURN r.title as resource_title, tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) as resource_type, coalesce(collect(distinct o.name), []) as organizers, 
-    coalesce(r.status, '-') as status, count(distinct s.nrp) as attendees, collect(distinct t.name) as topics
-    
+    WITH r, tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) AS r_type 
+    WHERE ($resource_types IS NULL OR r_type IN $resource_types)
+      
+      AND ($study_level_ids IS NULL OR r_type <> 'event' OR EXISTS {{
+          MATCH (r)-[:AVAILABLE_FOR]->(sl:StudyLevel)
+          WHERE sl.study_level_id IN $study_level_ids
+      }})
+      
+      AND ($organizer_ids IS NULL OR r_type <> 'event' OR EXISTS {{
+          MATCH (r)<-[:ORGANIZES]-(o:Organizer)
+          WHERE o.organizer_id IN $organizer_ids
+      }})
+
+    RETURN 
+        r.title as resource_title, 
+        tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) as resource_type, 
+        coalesce(r.status, '-') as status, 
+        [(r)<-[:ORGANIZES]-(o:Organizer) | o.name] AS organizers,
+        [(r)-[:COVERS]->(t:Topic) | t.name] AS topics,
+        COUNT {{ (s:Student)-[:ATTENDS]->(r) }} AS attendees
     """
     result = await Neo4jConnection.query(query, {"curriculum_id": curriculum_id, "study_level_ids": study_level_ids, "resource_types": resource_types, "organizer_ids": organizer_ids})
     return result
