@@ -121,19 +121,35 @@ async def organizer_support(curriculum_type: str, study_level_ids: str | None, r
     return result
 
 
-async def resource_characteristic(study_level_ids: list | None = None, resource_types: str | None = None, organizer_ids: list | None = None):
+async def resource_characteristic(study_level_ids: list | None = None, resource_types: list | None = None, organizer_ids: list | None = None):
     query = """
-    MATCH (r:UniResource)-[rs:SUPPORTS]->(s:SubCpl)
-    WHERE $resource_types IS NULL OR tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) IN $resource_types
-    MATCH (r)-[]->(sl:StudyLevel)
-    WHERE $study_level_ids IS NULL OR sl.study_level_id IN $study_level_ids 
-    OPTIONAL MATCH (r)<-[]-(o:Organizer)
-    WHERE $organizer_ids IS NULL OR o.organizer_id IN $organizer_ids
+    MATCH (r:UniResource)
+    WITH r, tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) AS r_type
+    WHERE ($resource_types IS NULL OR r_type IN $resource_types)
+    
+    AND ($study_level_ids IS NULL OR r_type <> 'event' OR EXISTS {
+        MATCH (r)-[:AVAILABLE_FOR]->(sl:StudyLevel)
+        WHERE sl.study_level_id IN $study_level_ids
+    })
+    
+    AND ($organizer_ids IS NULL OR r_type <> 'event' OR EXISTS {
+        MATCH (r)<-[:ORGANIZES]-(o:Organizer)
+        WHERE o.organizer_id IN $organizer_ids
+    })
+    
+    MATCH (r)-[rs:SUPPORTS]->(s:SubCpl)
         
-    RETURN r.resource_id as resource_id, COUNT(DISTINCT s) as sub_cpl_count, AVG(rs.weight) as sub_cpl_avg_support
+    RETURN 
+        r.resource_id as resource_id, 
+        COUNT(DISTINCT s) as sub_cpl_count, 
+        AVG(rs.weight) as sub_cpl_avg_support
     """
     
-    result = await Neo4jConnection.query(query, {"resource_types": resource_types, "study_level_ids": study_level_ids, "organizer_ids": organizer_ids})
+    result = await Neo4jConnection.query(query, {
+        "resource_types": resource_types, 
+        "study_level_ids": study_level_ids, 
+        "organizer_ids": organizer_ids
+    })
     return result
 
 async def coverage_interest_gap(study_level_id: list | None = None, resource_type: str | None = None, organizer_id: str | None = None):

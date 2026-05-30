@@ -4,7 +4,6 @@ import api from "../../../api/axios";
 import type { ResourceCharacteristic, Organizer, Resource } from '../../../types';
 import toast from "react-hot-toast";
 import { DropdownFilter } from '../../../components/DropDownFilter';
-import { type CallbackDataParams } from 'echarts/types/dist/shared';
 
 interface ResourceCharacteristicPayload {
   value: [number, number];
@@ -62,7 +61,7 @@ export function ResourceCharacteristicChart({ data, selectedId, onSelect }: { da
           return `
           <div class="max-w-xs whitespace-normal wrap-break-word text-sm">
             Support Count: <span class="font-bold">${sub_cpl_count}</span><br/>
-            Average Support: <span class="font-bold">${sub_cpl_avg_support}</span>
+            Average Support: <span class="font-bold">${sub_cpl_avg_support.toFixed(3)}</span>
           </div>
         `;
         },
@@ -97,83 +96,38 @@ export function ResourceCharacteristicChart({ data, selectedId, onSelect }: { da
   return <ReactECharts option={option} onEvents={onEvents} style={{ height: '300px' }} />;
 }
 
-export function Support({ data }: { data: { code: string; weight: number; name?: string; [key: string]: string | number | undefined }[] }) {
-  const option = useMemo(() => {
-    if (!data || data.length === 0) return {};
+// Support Table Component to replace the Bar Chart
+export function SupportTable({ data }: { data: { code: string; weight: number; name?: string; [key: string]: string | number | undefined }[] }) {
+  if (!data || data.length === 0) return null;
 
-    // Sort data descending (highest weight first)
-    const sortedData = [...data].sort((a, b) => b.weight - a.weight);
+  // Sort data descending (highest weight first)
+  const sortedData = [...data].sort((a, b) => b.weight - a.weight);
 
-    return {
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: {
-          type: 'shadow'
-        },
-        // Custom formatter to show the name and weight when hovered
-        formatter: (params: CallbackDataParams | CallbackDataParams[]) => {
-          const item = (Array.isArray(params) ? params[0].data : params.data) as { name?: string; code?: string; weight?: number };
-          if (!item) return '';
-          
-          const displayName = item.name ? item.name : item.code;
-          return `
-            <div class="text-sm">
-              <div class="font-bold border-b border-gray-300 pb-1 mb-1 whitespace-normal max-w-xs break-words">
-                ${displayName}
-              </div>
-              <div>
-                Weight: <span class="font-semibold">${item.weight}</span>
-              </div>
-            </div>
-          `;
-        }
-      },
-      grid: {
-        left: '3%',
-        right: '4%',
-        bottom: '5%',
-        top: '5%',
-        containLabel: true
-      },
-      dataset: {
-        source: sortedData
-      },
-      xAxis: {
-        type: 'value',
-        splitLine: {
-          lineStyle: { type: 'dashed', color: '#e5e7eb' }
-        }
-      },
-      yAxis: {
-        type: 'category',
-        inverse: true, // Renders the first item in our sorted array at the top
-        axisLabel: {
-          color: '#6b7280',
-          fontSize: 11,
-          width: 100, // Optional: prevents extremely long codes from pushing the chart too far right
-          overflow: 'truncate'
-        },
-        axisTick: { alignWithLabel: true }
-      },
-      series: [
-        {
-          name: 'Support Weight',
-          type: 'bar',
-          barWidth: '50%',
-          encode: {
-            x: 'weight',
-            y: 'code'
-          },
-          itemStyle: {
-            color: '#3b82f6',
-            borderRadius: [0, 4, 4, 0] // Rounded right corners for horizontal bars
-          }
-        }
-      ]
-    };
-  }, [data]);
-
-  return <ReactECharts option={option} style={{ height: '280px', width: '100%' }} />;
+  return (
+    <div className="overflow-hidden border border-gray-200 rounded-lg shadow-sm max-h-[300px] overflow-y-auto">
+      <table className="w-full text-left text-sm divide-y divide-gray-200">
+        <thead className="bg-gray-50 sticky top-0 z-10">
+          <tr>
+            <th scope="col" className="px-4 py-3 font-semibold text-gray-700 w-3/4">Name</th>
+            <th scope="col" className="px-4 py-3 font-semibold text-gray-700 w-1/4 text-right">Support Score</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100 bg-white">
+          {sortedData.map((item, index) => (
+            <tr key={`${item.code}-${index}`} className="hover:bg-gray-50 transition-colors">
+              <td className="px-4 py-3 text-gray-900 break-words whitespace-normal">
+                {item.name ? item.name : item.code}
+                {item.name && <span className="block text-xs text-gray-400 mt-0.5">{item.code}</span>}
+              </td>
+              <td className="px-4 py-3 text-gray-700 text-right font-medium tabular-nums align-top">
+                {Number(item.weight).toFixed(4)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 // Types for our View Toggle
@@ -328,8 +282,9 @@ export default function ResourceCharacteristic() {
                       {selectedResourceDetail && (
                         <>
                           <div className="mb-5">
+                            {/* Added Title Here */}
                             <h2 className="text-xl font-bold text-gray-800 break-words mb-4">
-                              {selectedResourceDetail.name}
+                              {selectedResourceDetail.title || "Untitled Resource"}
                             </h2>
                             
                             <div className="flex flex-wrap gap-x-8 gap-y-4">
@@ -379,12 +334,12 @@ export default function ResourceCharacteristic() {
                               </div>
                             </div>
                             
-                            {/* Render the Bar Chart or Empty State */}
+                            {/* Render the Table or Empty State */}
                             <div className="min-h-[280px]">
-                              {selectedResourceDetail.calculations && selectedResourceDetail.calculations[supportView] ? (
-                                <Support data={selectedResourceDetail.calculations[supportView] as []} />
+                              {selectedResourceDetail.calculations && selectedResourceDetail.calculations[supportView] && (selectedResourceDetail.calculations[supportView] as []).length > 0 ? (
+                                <SupportTable data={selectedResourceDetail.calculations[supportView] as []} />
                               ) : (
-                                <div className="h-full flex items-center justify-center text-sm text-gray-400 italic border-2 border-dashed border-gray-100 rounded-lg">
+                                <div className="h-full flex items-center justify-center text-sm text-gray-400 italic border-2 border-dashed border-gray-100 rounded-lg min-h-[200px]">
                                   No {viewToLabel(supportView)} data available for this resource.
                                 </div>
                               )}

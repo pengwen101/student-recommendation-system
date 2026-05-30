@@ -527,30 +527,30 @@ export default function SupportLackGap() {
     }
   };
 
-  const handleBreadcrumbClick = (index: number) => {
-    // If clicking "Home" (index -1)
-    if (index === -1) {
-        setDrillPath([]);
-        setSelectedCurriculumType(['indicator']); // Or whatever your default root is
-        setSelectedCurriculumId(null);
-        return;
-    }
+  // const handleBreadcrumbClick = (index: number) => {
+  //   // If clicking "Home" (index -1)
+  //   if (index === -1) {
+  //       setDrillPath([]);
+  //       setSelectedCurriculumType(['indicator']); // Or whatever your default root is
+  //       setSelectedCurriculumId(null);
+  //       return;
+  //   }
 
-    // Navigate to a specific point in the path
-    const newPath = drillPath.slice(0, index + 1);
-    const targetNode = newPath[newPath.length - 1];
+  //   // Navigate to a specific point in the path
+  //   const newPath = drillPath.slice(0, index + 1);
+  //   const targetNode = newPath[newPath.length - 1];
     
-    setDrillPath(newPath.slice(0, -1)); // Remove the target node from the path as it becomes the active view parent
-    setSelectedCurriculumType([CURRICULUM_HIERARCHY[newPath.length > 1 ? newPath[newPath.length - 2].type : 'cpl']]); // Re-calculate type based on parent
+  //   setDrillPath(newPath.slice(0, -1)); // Remove the target node from the path as it becomes the active view parent
+  //   setSelectedCurriculumType([CURRICULUM_HIERARCHY[newPath.length > 1 ? newPath[newPath.length - 2].type : 'cpl']]); // Re-calculate type based on parent
     
-    // Simpler fallback if the above type calculation gets messy: Just store the active type in the breadcrumb too.
-    // Let's refine how we handle the breadcrumb click for safety:
+  //   // Simpler fallback if the above type calculation gets messy: Just store the active type in the breadcrumb too.
+  //   // Let's refine how we handle the breadcrumb click for safety:
     
-    const targetType = CURRICULUM_HIERARCHY[targetNode.type]; 
-    setDrillPath(newPath);
-    setSelectedCurriculumType([targetType]);
-    setSelectedCurriculumId(null);
-  };
+  //   const targetType = CURRICULUM_HIERARCHY[targetNode.type]; 
+  //   setDrillPath(newPath);
+  //   setSelectedCurriculumType([targetType]);
+  //   setSelectedCurriculumId(null);
+  // };
   
   // Safe Breadcrumb navigation
   const navigateToLevel = (levelIndex: number) => {

@@ -98,7 +98,7 @@ export interface ResourceAssessment {
 export interface Resource {
     resource_id: string;
     type: typeof ResourceType[keyof typeof ResourceType];
-    name: string;
+    title: string;
     description?: string;
     authors?: string[];
     publisher?: string;
