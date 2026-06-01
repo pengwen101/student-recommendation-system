@@ -250,11 +250,6 @@ function ResourceDetails() {
                                         <div className="text-sm text-slate-500 italic">No scheduled dates found.</div>
                                     )}
                                 </div>
-                                {(resource as ResourceEvent).status === 'open' && (
-                                    <button className="w-full mt-6 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2.5 px-4 rounded-xl transition-colors shadow-sm">
-                                        Register Event
-                                    </button>
-                                )}
                             </>
                         )}
 
