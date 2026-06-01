@@ -40,6 +40,7 @@ class OrganizerSupport(BaseModel):
     organizer_name: str
     curriculum_id: str
     curriculum_code: str
+    curriculum_name: str
     support_score: float
     
 class StudentMastery(BaseModel):

@@ -375,5 +375,6 @@ export interface OrganizerSupport {
     organizer_name: string;
     curriculum_id: string;
     curriculum_code: string;
+    curriculum_name: string;
     support_score: number;
 }

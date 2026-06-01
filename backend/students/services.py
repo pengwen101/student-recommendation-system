@@ -4,6 +4,8 @@ from backend.topics import cypher as topic_cypher
 from fastapi import HTTPException
 from backend.students.schemas import StudentTopicsResponse, TopicActionResponse, StudentTopicsInput, StudentIndicatorsInput
 from typing import List
+import pandas as pd
+import io
 
 type_label_dict = {
     "book": "Book",
@@ -108,3 +110,20 @@ async def get_student_recommendations(nrp: str, type: str):
     if not student_exists:
         raise HTTPException(status_code=404, detail="Student not found")
     return await student_cypher.get_student_recommendations(nrp, label)
+
+async def record_student_attendance(resource_id: str, file_contents: bytes, filename: str) -> dict:
+    try:
+        if filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(file_contents))
+        else:
+            df = pd.read_excel(io.BytesIO(file_contents))
+    except Exception:
+        raise ValueError("Failed to parse the file. Ensure it is a valid, uncorrupted CSV or Excel format.")
+    nrp_col = next((col for col in df.columns if str(col).strip().lower() == 'nrp'), df.columns[0])
+    nrps = df[nrp_col].dropna().astype(str).str.strip().tolist()
+    if not nrps:
+        raise ValueError("No valid NRPs found in the uploaded file.")
+    missing_nrps = await student_cypher.check_missing_nrps(nrps)
+    if missing_nrps:
+        raise ValueError(f"The following NRPs do not exist in the database: {', '.join(missing_nrps)}")
+    await student_cypher.record_student_attendance(resource_id, nrps)

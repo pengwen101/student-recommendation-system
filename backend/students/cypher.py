@@ -115,39 +115,56 @@ async def has_indicators(nrp: str):
 async def get_student_recommendations(nrp: str, label: str):
     query = f"""
         MATCH (s:Student {{nrp: $nrp}})
-        OPTIONAL MATCH (s)-[rl:HAS]->(:Indicator)
         MATCH (st:Config:StudentTarget)
-        WITH s, CASE 
-        WHEN (st.target_score - rl.weight) > 0 THEN (st.target_score - rl.weight) 
-        ELSE 0 
-        END AS lack_weight
-        WITH s, sum(coalesce(lack_weight, 0)) as total_lack_weight, lack_weight
-        OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(:Topic)
-        WITH s, total_lack_weight, count(ri) as total_interest_count, lack_weight
+        MATCH (cf:Config:RecommendationWeight)
+        CALL {{
+            WITH s, st
+            OPTIONAL MATCH (s)-[rl:HAS]->(:Indicator)
+            RETURN sum(CASE 
+                WHEN rl IS NOT NULL AND (st.target_score - rl.weight) > 0 
+                THEN (st.target_score - rl.weight) 
+                ELSE 0.0 END) AS total_lack_weight
+        }}
+        CALL {{
+            WITH s
+            OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(:Topic)
+            RETURN count(ri) AS total_interest_count
+        }}
 
         MATCH (s)-[:CURRENTLY_IN]->(:StudyLevel)<-[:AVAILABLE_FOR]-(r:UniResource:{label})
-        OPTIONAL MATCH (s)-[rl:HAS]->(i:Indicator)<-[rp:SUPPORTS]-(r)
-        WITH s, r, total_lack_weight, total_interest_count, lack_weight,
-            sum(
-                CASE 
-                    WHEN rl IS NULL OR rp IS NULL THEN 0.0
-                    WHEN lack_weight < rp.weight
-                    THEN lack_weight
-                    ELSE rp.weight
-                END
-            ) as indicator_intersection
-
-        OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(t:Topic)<-[rt:COVERS]-(r)
-        WITH s, r, total_lack_weight, total_interest_count, indicator_intersection,
-            sum(
-                CASE 
-                    WHEN ri IS NULL OR rt IS NULL THEN 0.0
-                    ELSE 1.0
-                END
-            ) as topic_intersection
+        WHERE r.is_active = true
+        CALL {{
+            WITH s, r, st
+            OPTIONAL MATCH (s)-[rl:HAS]->(i:Indicator)<-[rp:SUPPORTS]-(r)
+            WITH rl, rp, st,
+                 CASE 
+                    WHEN rl IS NOT NULL AND (st.target_score - rl.weight) > 0 
+                    THEN (st.target_score - rl.weight) 
+                    ELSE 0.0 END AS specific_lack_weight
             
-        MATCH (cf:Config:RecommendationWeight)
+            RETURN sum(CASE 
+                WHEN rl IS NULL OR rp IS NULL THEN 0.0
+                WHEN specific_lack_weight < rp.weight THEN specific_lack_weight
+                ELSE rp.weight END) AS indicator_intersection
+        }}
 
+        CALL {{
+            WITH s, r
+            OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(t:Topic)<-[rt:COVERS]-(r)
+            RETURN sum(CASE WHEN ri IS NULL OR rt IS NULL THEN 0.0 ELSE 1.0 END) AS topic_intersection
+        }}
+
+        WITH s, r, cf, total_lack_weight, total_interest_count, indicator_intersection, topic_intersection,
+             ((
+                cf.need_weight * (CASE WHEN total_lack_weight > 0 THEN indicator_intersection / total_lack_weight ELSE 0.0 END) 
+             ) + (
+                cf.interest_weight * (CASE WHEN total_interest_count > 0 THEN topic_intersection / total_interest_count ELSE 0.0 END)
+             )) * coalesce(r.internal_weight, 1.0) AS score
+             
+        ORDER BY score DESC
+        LIMIT 10
+
+        // 7. Return with fast Pattern Comprehensions (No Cartesian Products!)
         RETURN {{
             resource_id: r.resource_id, 
             type: tolower(head([l IN labels(r) WHERE l <> 'UniResource'])),
@@ -181,9 +198,6 @@ async def get_student_recommendations(nrp: str, label: str):
                 weight: toFloat(ra.weight),
                 resource_weight: toFloat(rh.weight)
             }}],
-            indicators: [(r)-[rsi:SUPPORTS]->(i:Indicator) | {{
-                indicator_id: i.indicator_id
-            }}],
             topics: [(r)-[rc:COVERS]->(t:Topic) | {{
                 topic_id: t.topic_id, 
                 code: t.code,
@@ -202,26 +216,83 @@ async def get_student_recommendations(nrp: str, label: str):
                     name: q.name, 
                     weight: toFloat(rsq.weight)
                 }}],
-                subcpls: [(r)-[rss:SUPPORTS]->(s:SubCpl) | {{
-                    sub_cpl_id: s.sub_cpl_id,
-                    code: s.code,
-                    name: s.name, 
+                subcpls: [(r)-[rss:SUPPORTS]->(sc:SubCpl) | {{
+                    sub_cpl_id: sc.sub_cpl_id,
+                    code: sc.code,
+                    name: sc.name, 
                     weight: toFloat(rss.weight)
                 }}]
             }}
-                }} AS resource,
-                ((
-                    cf.need_weight * (CASE WHEN total_lack_weight > 0 
-                                THEN indicator_intersection / total_lack_weight 
-                                ELSE 0.0 END) 
-                ) + (
-                    cf.interest_weight * (CASE WHEN total_interest_count > 0 
-                                THEN topic_intersection / total_interest_count 
-                                ELSE 0.0 END)
-                )) * r.internal_weight AS score
-                ORDER BY score DESC
-                LIMIT 10
+        }} AS resource, score
     """
-    params = {"nrp": nrp, "type": type}
+    params = {"nrp": nrp}
     response = await Neo4jConnection.query(query, params)
     return response
+
+async def record_student_attendance(resource_id: str, nrps: list[str]):
+    query = """
+        MATCH (r:UniResource {resource_id: $resource_id})
+        MATCH (st:Config:StudentTarget)
+        MATCH (cf:Config:RecommendationWeight)
+        UNWIND $nrps AS nrp
+        MATCH (s:Student {nrp: nrp})
+        CALL (s, st) {
+            OPTIONAL MATCH (s)-[rl:HAS]->(:Indicator)
+            RETURN sum(CASE 
+                WHEN rl IS NOT NULL AND (st.target_score - rl.weight) > 0 
+                THEN (st.target_score - rl.weight) 
+                ELSE 0.0 END) AS total_lack_weight
+        }
+        CALL (s) {
+            OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(:Topic)
+            RETURN count(ri) AS total_interest_count
+        }
+        CALL (s, r, st) {
+            OPTIONAL MATCH (s)-[rl:HAS]->(i:Indicator)<-[rp:SUPPORTS]-(r)
+            WITH rl, rp, st,
+                 CASE 
+                    WHEN rl IS NOT NULL AND (st.target_score - rl.weight) > 0 
+                    THEN (st.target_score - rl.weight) 
+                    ELSE 0.0 END AS specific_lack_weight
+            
+            RETURN sum(CASE 
+                WHEN rl IS NULL OR rp IS NULL THEN 0.0
+                WHEN specific_lack_weight < rp.weight THEN specific_lack_weight
+                ELSE rp.weight END) AS indicator_intersection
+        }
+        CALL (s, r) {
+            OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(t:Topic)<-[rt:COVERS]-(r)
+            RETURN sum(CASE WHEN ri IS NULL OR rt IS NULL THEN 0.0 ELSE 1.0 END) AS topic_intersection
+        }
+        WITH s, r, 
+             ((
+                cf.need_weight * (CASE WHEN total_lack_weight > 0 THEN indicator_intersection / total_lack_weight ELSE 0.0 END) 
+             ) + (
+                cf.interest_weight * (CASE WHEN total_interest_count > 0 THEN topic_intersection / total_interest_count ELSE 0.0 END)
+             )) * coalesce(r.internal_weight, 1.0) AS final_score
+    
+        MERGE (s)-[att:ATTENDED]->(r)
+        SET att.recommendation_score = final_score,
+            att.recorded_at = datetime({timezone: 'Asia/Jakarta'})
+    """
+    
+    params = {
+        "resource_id": resource_id,
+        "nrps": nrps
+    }
+    
+    await Neo4jConnection.query(query, params)
+    
+async def check_missing_nrps(nrps: list[str]) -> list[str]:
+    query = """
+        UNWIND $nrps AS nrp
+        OPTIONAL MATCH (s:Student {nrp: nrp})
+        WITH nrp, s
+        WHERE s IS NULL
+        RETURN nrp AS missing_nrp
+    """
+    result = await Neo4jConnection.query(query, {"nrps": nrps})
+    if not result:
+        return []
+        
+    return [row["missing_nrp"] for row in result]

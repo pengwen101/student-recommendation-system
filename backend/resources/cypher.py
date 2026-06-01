@@ -33,7 +33,16 @@ create_update_base_query = """
     CALL (r) {
         SET r.internal_weight = CASE 
             WHEN $resource_assessments IS NULL OR size($resource_assessments) = 0 THEN 1.0
-            ELSE REDUCE(total = 0.0, item IN $resource_assessments | total + toFloat(item.resource_weight))
+            ELSE REDUCE(
+                total = 0.0, 
+                item IN $resource_assessments | 
+                total + (
+                    toFloat(item.resource_weight) * COALESCE(
+                        HEAD([(ra:ResourceAssessment {resource_assessment_id: item.resource_assessment_id}) | toFloat(ra.weight)]), 
+                        0.0
+                    )
+                )
+            )
         END
         WITH r
         UNWIND COALESCE($resource_assessments, []) AS ra_input 

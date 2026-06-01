@@ -144,7 +144,6 @@ export default function OrganizerSupportDashboard() {
 
   // Global Filters
   const [selectedCurriculumType, setSelectedCurriculumType] = useState<string[]>(["sub_cpl"]);
-  const [selectedResourceType, setSelectedResourceType] = useState<string[]>(["book", "event", "article", "video"]);
   const [selectedStudyLevel, setSelectedStudyLevel] = useState<string[]>(["1", "2", "3", "4"]);
 
   // Local Heatmap Selection Filters (For drilling down into the table)
@@ -157,10 +156,8 @@ export default function OrganizerSupportDashboard() {
       try {
         setLoadingMap(true);
         const params = new URLSearchParams();
-        // Since curriculum_type is required, we pass the first selected element
         params.append("curriculum_type", selectedCurriculumType[0] || 'sub_cpl');
         selectedStudyLevel.forEach(l => params.append("study_level_ids", l));
-        selectedResourceType.forEach(t => params.append("resource_types", t));
 
         const res = await api.get('/analytic/organizer_support', { params });
         setHeatmapData(res.data);
@@ -171,18 +168,18 @@ export default function OrganizerSupportDashboard() {
       }
     };
     fetchHeatmap();
-  }, [selectedCurriculumType, selectedStudyLevel, selectedResourceType]);
+  }, [selectedCurriculumType, selectedStudyLevel]);
 
-  // 2. Fetch Table Data (Reacts to global filters AND heatmap clicks)
+  // 2. Fetch Table Data
   useEffect(() => {
     const fetchTable = async () => {
       try {
         setLoadingTable(true);
         const params = new URLSearchParams();
         selectedStudyLevel.forEach(l => params.append("study_level_ids", l));
-        selectedResourceType.forEach(t => params.append("resource_types", t));
+        const resourceTypes = ["event"];
+        resourceTypes.forEach(t => params.append("resource_types", t));
         
-        // Append drill-down filters if they exist
         if (activeOrganizerId) params.append("organizer_ids", activeOrganizerId);
         if (activeCurriculumId) params.append("curriculum_id", activeCurriculumId);
 
@@ -195,7 +192,21 @@ export default function OrganizerSupportDashboard() {
       }
     };
     fetchTable();
-  }, [selectedStudyLevel, selectedResourceType, activeOrganizerId, activeCurriculumId]);
+  }, [selectedStudyLevel, activeOrganizerId, activeCurriculumId]);
+
+  // --- DYNAMIC HEIGHT CALCULATION ---
+  const dynamicHeight = useMemo(() => {
+    if (!heatmapData || heatmapData.length === 0) return 400; // Minimum default
+    
+    // Find unique Y-axis items
+    const uniqueCurriculums = new Set(heatmapData.map(d => d.curriculum_id));
+    
+    const ROW_HEIGHT = 30; // Pixels per row
+    const CHART_PADDING = 150; // Padding for top/bottom margins, labels, and title
+    
+    return Math.max(400, (uniqueCurriculums.size * ROW_HEIGHT) + CHART_PADDING);
+  }, [heatmapData]);
+
 
   // --- ECHARTS CONFIGURATION ---
   const { chartOption, uniqueOrganizers, uniqueCurriculums } = useMemo(() => {
@@ -203,16 +214,14 @@ export default function OrganizerSupportDashboard() {
       return { chartOption: {}, uniqueOrganizers: [], uniqueCurriculums: [] };
     }
 
-    // Extract unique axes
     const orgs = Array.from(new Map(heatmapData.map(d => [d.organizer_id, { id: d.organizer_id, name: d.organizer_name }])).values());
-    const currs = Array.from(new Map(heatmapData.map(d => [d.curriculum_id, { id: d.curriculum_id, code: d.curriculum_code }])).values());
+    const currs = Array.from(new Map(heatmapData.map(d => [d.curriculum_id, { id: d.curriculum_id, code: d.curriculum_code, name: d.curriculum_name }])).values());
 
     const orgMap = new Map(orgs.map((o, i) => [o.id, i]));
     const currMap = new Map(currs.map((c, i) => [c.id, i]));
 
     let maxScore = 0;
 
-    // Build the matrix [xIndex, yIndex, value, organizer_id, curriculum_id]
     const matrix = heatmapData.map(item => {
       if (item.support_score > maxScore) maxScore = item.support_score;
       return [
@@ -234,6 +243,9 @@ export default function OrganizerSupportDashboard() {
               <div class="font-bold border-b border-gray-300 pb-1 mb-1">Support Detail</div>
               <div>Organizer: <span class="font-semibold">${orgs[xIdx].name}</span></div>
               <div>Curriculum: <span class="font-semibold">${currs[yIdx].code}</span></div>
+              <div class="max-w-xs whitespace-normal">
+                Name: <span class="font-semibold break-words">${currs[yIdx].name}</span>
+              </div>
               <div class="mt-1">Score: <span class="font-bold text-blue-600">${score.toFixed(2)}</span></div>
               <div class="text-[10px] text-gray-400 mt-2 italic">Click to filter table</div>
             </div>
@@ -241,22 +253,23 @@ export default function OrganizerSupportDashboard() {
         }
       },
       grid: {
-        height: '70%',
-        top: '10%',
+        top: '60px',
+        bottom: '80px', 
         left: '10%',
-        right: '15%' // Leave room for visualMap
+        right: '15%', 
+        containLabel: true 
       },
       xAxis: {
         type: 'category',
         data: orgs.map(o => o.name),
-        triggerEvent: true, // Allows clicking the axis label directly
+        triggerEvent: true,
         axisLabel: { interval: 0, rotate: 45, width: 120, overflow: 'truncate', cursor: 'pointer' },
         splitArea: { show: true }
       },
       yAxis: {
         type: 'category',
         data: currs.map(c => c.code),
-        triggerEvent: true, // Allows clicking the axis label directly
+        triggerEvent: true,
         axisLabel: { cursor: 'pointer' },
         splitArea: { show: true }
       },
@@ -270,7 +283,7 @@ export default function OrganizerSupportDashboard() {
         precision: 1,
         dimension: 2,
         inRange: {
-          color: ['#eff6ff', '#93c5fd', '#3b82f6', '#1d4ed8'] // Light blue to dark blue
+          color: ['#eff6ff', '#93c5fd', '#3b82f6', '#1d4ed8']
         }
       },
       series: [{
@@ -300,18 +313,15 @@ export default function OrganizerSupportDashboard() {
     return { chartOption: option, uniqueOrganizers: orgs, uniqueCurriculums: currs };
   }, [heatmapData]);
 
-  // Handle clicks on cells, X-axis labels, and Y-axis labels
   const onEvents = useMemo(() => ({
     click: (params: CallbackDataParams) => {
       if (params.componentType === 'series') {
-        // Cell Click: Has index [x, y, value, org_id, curr_id]
         const data = params.data as HeatmapDataPoint;
         setActiveOrganizerId(data[3]);
         setActiveCurriculumId(data[4]);
         toast.success(`Filtered by intersection`);
       } 
       else if (params.componentType === 'xAxis') {
-        // X-Axis Click (Organizer)
         const orgName = params.value;
         const org = uniqueOrganizers.find(o => o.name === orgName);
         if (org) {
@@ -321,7 +331,6 @@ export default function OrganizerSupportDashboard() {
         }
       } 
       else if (params.componentType === 'yAxis') {
-        // Y-Axis Click (Curriculum)
         const currCode = params.value;
         const curr = uniqueCurriculums.find(c => c.code === currCode);
         if (curr) {
@@ -362,18 +371,6 @@ export default function OrganizerSupportDashboard() {
           multiSelect={false}
         />
         <DropdownFilter 
-          title="Resource Type"
-          options={[
-            { label: 'Event', value: 'event' },
-            { label: 'Book', value: 'book' },
-            { label: 'Article', value: 'article' },
-            { label: 'Video', value: 'video' }
-          ]}
-          selectedValues={selectedResourceType}
-          onChange={setSelectedResourceType}
-          multiSelect={true}
-        />
-        <DropdownFilter 
           title="Study Level"
           options={[
             { label: 'Level 1', value: '1' },
@@ -389,12 +386,11 @@ export default function OrganizerSupportDashboard() {
 
       <div className="flex flex-col gap-6">
         {/* Heatmap Section */}
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative">
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative w-full overflow-x-auto">
           {loadingMap && <div className="absolute inset-0 bg-white/40 z-10 flex items-center justify-center rounded-xl backdrop-blur-[1px] font-medium text-gray-500">Loading Map...</div>}
           
-          <div className="flex justify-between items-center mb-2 px-4">
+          <div className="flex justify-between items-center mb-2 px-4 sticky left-0">
             <h3 className="font-bold text-gray-700">Support Intensity</h3>
-            {/* Show 'Clear Selection' button only when a cell/axis is actively clicked */}
             {(activeOrganizerId || activeCurriculumId) && (
               <button 
                 onClick={clearSelection}
@@ -405,8 +401,15 @@ export default function OrganizerSupportDashboard() {
             )}
           </div>
 
+          {/* DYNAMIC HEIGHT IMPLEMENTATION */}
           {heatmapData.length > 0 ? (
-            <ReactECharts option={chartOption} onEvents={onEvents} style={{ height: '400px', width: '100%' }} />
+            <div className="min-w-[600px]">
+                <ReactECharts 
+                  option={chartOption} 
+                  onEvents={onEvents} 
+                  style={{ height: `${dynamicHeight}px`, width: '100%' }} 
+                />
+            </div>
           ) : (
             <div className="h-[400px] flex items-center justify-center text-gray-400 italic">No heatmap data available.</div>
           )}

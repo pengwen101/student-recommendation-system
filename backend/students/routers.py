@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status, UploadFile, File, HTTPException
 from backend.students.schemas import (TopicActionResponse, StudentRecommendationsResponse,\
                                     IndicatorActionResponse, StudentIndicatorsInputBatch, StudentTopicsInputBatch, SubCplActionResponse, CplActionResponse)
 from backend.students import services
@@ -10,6 +10,7 @@ recommendations_router = APIRouter(prefix="/student/recommendations", tags=["stu
 indicators_router = APIRouter(prefix="/student/indicators", tags=["student_indicators"])
 subcpls_router = APIRouter(prefix="/student/subcpls", tags=["student_subcpls"])
 cpls_router = APIRouter(prefix="/student/cpls", tags=["student_cpls"])
+attendance_router = APIRouter(prefix="/student/attendance", tags=["student_attendance"])
 
 @topics_router.get("/{nrp}", response_model=TopicActionResponse)
 async def read_student_topics(nrp: str):
@@ -63,3 +64,19 @@ async def has_student_indicators(nrp: str):
 async def get_student_recommendations(nrp: str, type: ResourceType):
     recommendations = await services.get_student_recommendations(nrp, type)
     return {"message": "Student recommendations successfully retrieved.", "count": len(recommendations), "recommendations": recommendations}
+
+@attendance_router.post("/{resource_id}")
+async def record_student_attendance(resource_id: str, file: UploadFile = File(...)):
+    if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
+        raise HTTPException(
+            status_code=400, 
+            detail="Invalid file type. Please upload an Excel (.xlsx or .xls) or CSV (.csv) file."
+        )
+    try:
+        contents = await file.read()
+        result = await services.record_student_attendance(resource_id, contents, file.filename)
+        return result
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
