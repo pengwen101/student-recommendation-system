@@ -1,0 +1,413 @@
+import { useState, useEffect, useMemo } from "react";
+import api from "../../api/axios";
+import toast from "react-hot-toast";
+
+// --- Types ---
+interface RecommendationWeight {
+  need_weight: number;
+  interest_weight: number;
+}
+
+interface ResourceAssessment {
+  resource_assessment_id: string;
+  resource_type: string;
+  display_name: string;
+  weight: number;
+}
+
+const RESOURCE_TYPES = ["event", "book", "article", "video"];
+
+export default function ConfigurationDashboard() {
+  const [loading, setLoading] = useState(true);
+
+  // Global Config State
+  const [studentTarget, setStudentTarget] = useState<number>(0);
+  const [recWeight, setRecWeight] = useState<RecommendationWeight>({ need_weight: 0.5, interest_weight: 0.5 });
+
+  // Resource Assessment State
+  const [selectedType, setSelectedType] = useState<string>("event");
+  const [assessments, setAssessments] = useState<ResourceAssessment[]>([]);
+  
+  // Form States
+  const [newDisplayName, setNewDisplayName] = useState("");
+  const [newWeight, setNewWeight] = useState<number>(0);
+  
+  // Explicit Edit States
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editData, setEditData] = useState<{ display_name: string; weight: number }>({ display_name: "", weight: 0 });
+
+  // --- Fetch Data ---
+  useEffect(() => {
+    fetchGlobalConfigs();
+  }, []);
+
+  useEffect(() => {
+    fetchAssessments(selectedType);
+  }, [selectedType]);
+
+  const fetchGlobalConfigs = async () => {
+    try {
+      const [targetRes, weightRes] = await Promise.all([
+        api.get("/config/student_target"),
+        api.get("/config/recommendation_weight")
+      ]);
+      setStudentTarget(targetRes.data.target_score || targetRes.data);
+      setRecWeight(weightRes.data);
+    } catch {
+      toast.error("Failed to load global configurations.");
+    }
+  };
+
+  const fetchAssessments = async (type: string) => {
+    try {
+      setLoading(true);
+      const res = await api.get(`/config/resource_assessments?type=${type}`);
+      setAssessments(res.data);
+      setEditingId(null); // Clear any active edits when switching tabs
+    } catch {
+      toast.error(`Failed to load assessments for ${type}.`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- Handlers: Global Configs ---
+  const handleSaveStudentTarget = async () => {
+    try {
+      await api.put(`/config/student_target?weight=${studentTarget}`);
+      toast.success("Student Target updated successfully.");
+    } catch {
+      toast.error("Failed to update Student Target.");
+    }
+  };
+
+  // SLIDER HANDLER
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let needVal = Number(e.target.value);
+    
+    // Prevent the thumb from physically moving below 0.55
+    if (needVal < 0.55) {
+      needVal = 0.55; 
+    }
+
+    const interestVal = Number((1.0 - needVal).toFixed(2));
+    
+    setRecWeight({
+      need_weight: needVal,
+      interest_weight: interestVal
+    });
+  };
+
+  const handleSaveRecWeight = async () => {
+    if (Math.abs(recWeight.need_weight + recWeight.interest_weight - 1.0) > 0.01) {
+      toast.error("Recommendation weights must sum to 1.");
+      return;
+    }
+    try {
+      await api.put("/config/recommendation_weight", recWeight);
+      toast.success("Recommendation Weights updated successfully.");
+    } catch {
+      toast.error("Failed to update Recommendation Weights.");
+    }
+  };
+
+  // --- Handlers: Resource Assessments ---
+  const totalAssessmentWeight = useMemo(() => {
+    // Include the new item in the total if we are currently editing one, otherwise use the base list
+    const activeAssessments = editingId 
+      ? assessments.map(a => a.resource_assessment_id === editingId ? { ...a, weight: editData.weight } : a)
+      : assessments;
+
+    return activeAssessments.reduce((sum, item) => sum + Number(item.weight), 0);
+  }, [assessments, editingId, editData.weight]);
+
+  const handleAddAssessment = async () => {
+    if (!newDisplayName.trim()) return toast.error("Display name is required.");
+    if (newWeight <= 0) return toast.error("Weight must be greater than 0.");
+
+    try {
+      await api.post("/config/resource_assessments", {
+        resource_type: selectedType,
+        display_name: newDisplayName,
+        weight: newWeight
+      });
+      toast.success("Assessment created.");
+      setNewDisplayName("");
+      setNewWeight(0);
+      fetchAssessments(selectedType);
+    } catch {
+      toast.error("Failed to create assessment.");
+    }
+  };
+
+  // Triggered when clicking the explicit "Edit" button
+  const startEdit = (assessment: ResourceAssessment) => {
+    setEditingId(assessment.resource_assessment_id);
+    setEditData({
+      display_name: assessment.display_name,
+      weight: assessment.weight
+    });
+  };
+
+  // Triggered when clicking the explicit "Save" button
+  const handleSaveEdit = async (id: string) => {
+    if (!editData.display_name.trim()) return toast.error("Display name cannot be empty.");
+
+    try {
+      // Optimistic UI update
+      setAssessments(prev => prev.map(a => 
+        a.resource_assessment_id === id 
+          ? { ...a, display_name: editData.display_name, weight: editData.weight } 
+          : a
+      ));
+      
+      await api.put(`/config/resource_assessments/${id}`, {
+        resource_type: selectedType,
+        display_name: editData.display_name,
+        weight: editData.weight
+      });
+      toast.success("Assessment updated.");
+      setEditingId(null);
+    } catch {
+      toast.error("Failed to update assessment.");
+      fetchAssessments(selectedType); // Revert on failure
+    }
+  };
+
+  const handleDeleteAssessment = async (id: string) => {
+    try {
+      await api.delete(`/config/resource_assessments/${id}`);
+      toast.success("Assessment deleted.");
+      fetchAssessments(selectedType);
+    } catch {
+      toast.error("Failed to delete assessment.");
+    }
+  };
+
+  return (
+    <div className="p-8 bg-gray-50 min-h-screen font-sans">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-800">System Configuration</h1>
+        <p className="text-gray-500 mt-1">Manage global calculation weights and resource assessments.</p>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+        {/* Student Target Card */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col h-full">
+          <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Student Target Score</h2>
+          <div className="flex-1 flex flex-col justify-center">
+             <div className="flex items-center gap-4">
+              <input
+                type="number"
+                step="0.1"
+                value={studentTarget}
+                onChange={(e) => setStudentTarget(Number(e.target.value))}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-medium"
+              />
+              <button 
+                onClick={handleSaveStudentTarget}
+                className="px-6 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap"
+              >
+                Save Target
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mt-3">The baseline mastery score students are expected to achieve.</p>
+          </div>
+        </div>
+
+        {/* DUAL-SLIDER Recommendation Weights Card */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col h-full">
+          <h2 className="text-lg font-bold text-gray-800 mb-6 border-b pb-2">Recommendation Engine Balance</h2>
+          
+          <div className="flex-1 flex flex-col justify-center px-2">
+            {/* Value Displays */}
+            <div className="flex justify-between items-end mb-3">
+              <div className="text-left">
+                <span className="block text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Need Weight</span>
+                <span className="text-3xl font-bold text-gray-800">{recWeight.need_weight.toFixed(2)}</span>
+              </div>
+              <div className="text-right">
+                <span className="block text-xs font-bold text-purple-600 uppercase tracking-wider mb-1">Interest Weight</span>
+                <span className="text-3xl font-bold text-gray-800">{recWeight.interest_weight.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* The Range Slider */}
+            <div className="relative py-4 mb-4 flex items-center">
+               <div className="absolute left-0 w-full h-3 rounded-full overflow-hidden flex pointer-events-none">
+                  <div className="bg-blue-500 h-full transition-all duration-200" style={{ width: `${recWeight.need_weight * 100}%` }}></div>
+                  <div className="bg-purple-500 h-full transition-all duration-200" style={{ width: `${recWeight.interest_weight * 100}%` }}></div>
+               </div>
+
+               {/* UPDATED: min is set to 0 to align visual scale with absolute background percentages */}
+               <input
+                type="range"
+                min="0" 
+                max="1"
+                step="0.05"
+                value={recWeight.need_weight}
+                onChange={handleSliderChange}
+                className="w-full h-3 appearance-none bg-transparent cursor-pointer z-10 
+                           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-gray-800 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md
+                           [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-gray-800 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:shadow-md"
+              />
+            </div>
+
+            <button 
+              onClick={handleSaveRecWeight}
+              className="w-full mt-auto px-4 py-2.5 bg-gray-800 text-white font-medium rounded-md hover:bg-gray-900 transition-colors shadow-sm"
+            >
+              Save Balance Settings
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Resource Assessments Section */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <div className="flex justify-between items-center mb-6 border-b pb-4">
+          <h2 className="text-xl font-bold text-gray-800">Resource Assessments</h2>
+          
+          <select 
+            value={selectedType} 
+            onChange={(e) => setSelectedType(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 capitalize font-medium"
+          >
+            {RESOURCE_TYPES.map(type => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Validation Warning */}
+        <div className={`mb-6 p-4 rounded-md border flex justify-between items-center transition-colors duration-300 ${Math.abs(totalAssessmentWeight - 1.0) < 0.001 ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+          <div>
+            <span className="font-bold">Current Total Weight: {totalAssessmentWeight.toFixed(2)}</span>
+            {Math.abs(totalAssessmentWeight - 1.0) > 0.001 && <p className="text-sm mt-0.5">The sum of all assessment weights for this resource type must equal exactly 1.0.</p>}
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-8 text-gray-500">Loading assessments...</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-y border-gray-200">
+                  <th className="px-4 py-3 font-semibold text-gray-700 w-1/2">Display Name</th>
+                  <th className="px-4 py-3 font-semibold text-gray-700 w-1/4">Weight</th>
+                  <th className="px-4 py-3 font-semibold text-gray-700 text-right w-1/4">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {assessments.map((item) => {
+                  const isEditing = editingId === item.resource_assessment_id;
+                  
+                  return (
+                    <tr key={item.resource_assessment_id} className="hover:bg-gray-50 group">
+                      <td className="px-4 py-3">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editData.display_name}
+                            onChange={(e) => setEditData({ ...editData, display_name: e.target.value })}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
+                          />
+                        ) : (
+                          <span className="font-medium text-gray-900 px-2 py-1.5">{item.display_name}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            step="0.05"
+                            min="0"
+                            max="1"
+                            value={editData.weight}
+                            onChange={(e) => setEditData({ ...editData, weight: Number(e.target.value) })}
+                            className="w-24 px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
+                          />
+                        ) : (
+                          <span className="font-medium text-gray-900 px-2 py-1.5">{Number(item.weight).toFixed(2)}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {isEditing ? (
+                          <div className="flex justify-end gap-3">
+                            <button 
+                              onClick={() => setEditingId(null)}
+                              className="text-gray-500 hover:text-gray-700 text-sm font-semibold transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button 
+                              onClick={() => handleSaveEdit(item.resource_assessment_id)}
+                              className="text-green-600 hover:text-green-700 text-sm font-semibold transition-colors"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex justify-end gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <button 
+                              onClick={() => startEdit(item)}
+                              className="text-blue-500 hover:text-blue-700 text-sm font-semibold transition-colors"
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteAssessment(item.resource_assessment_id)}
+                              className="text-red-500 hover:text-red-700 text-sm font-semibold transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                
+                {/* Add New Row */}
+                {editingId === null && (
+                  <tr className="bg-blue-50/30">
+                    <td className="px-4 py-3">
+                      <input
+                        type="text"
+                        placeholder="New Display Name..."
+                        value={newDisplayName}
+                        onChange={(e) => setNewDisplayName(e.target.value)}
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="number"
+                        step="0.05"
+                        min="0"
+                        max="1"
+                        placeholder="0.0"
+                        value={newWeight || ''}
+                        onChange={(e) => setNewWeight(Number(e.target.value))}
+                        className="w-24 px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button 
+                        onClick={handleAddAssessment}
+                        className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-blue-700 transition-colors"
+                      >
+                        Add
+                      </button>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

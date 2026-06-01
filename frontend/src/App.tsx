@@ -10,6 +10,7 @@ import Organizers from './Admin/pages/Organizers';
 import Topics from './Admin/pages/Topics';
 import EventRoster from './Admin/pages/EventRoster';
 import Dashboard from './Admin/pages/Dashboard';
+import Configuration from './Admin/pages/Configuration';
 import SupportLackGap from "./Admin/pages/dashboards/SupportLackGap";
 import ResourceCharacteristic from "./Admin/pages/dashboards/ResourceCharacteristic";
 import OrganizerSupport from "./Admin/pages/dashboards/OrganizerSupport";
@@ -76,6 +77,7 @@ function App() {
           <Route path="/manage-admins" element={<ManageAdmins/>}></Route>
           <Route path="/curriculum" element={<Curriculum/>}></Route>
           <Route path="/dashboard" element={<Dashboard/>}></Route>
+          <Route path="/configuration" element={<Configuration/>}></Route>
 
           <Route path="/support_lack_gap" element={<SupportLackGap/>}></Route>
           <Route path="/resource_characteristic" element={<ResourceCharacteristic/>}></Route>

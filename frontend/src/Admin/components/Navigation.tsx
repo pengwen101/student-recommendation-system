@@ -78,6 +78,15 @@ const Navbar = () => {
                         </Button>
                     </Link>
 
+                    <Link to="/configuration" className="w-full">
+                        <Button 
+                            variant={isActive("/configuration") ? "secondary" : "ghost"} 
+                            className={`w-full justify-start ${isActive("/configuration") ? "text-primary-800 font-semibold" : "text-slate-600"}`}
+                        >
+                            Configuration
+                        </Button>
+                    </Link>
+
                     <Link to="/manage-admins" className="w-full">
                         <Button 
                             variant={isActive("/manage-admins") ? "secondary" : "ghost"} 
