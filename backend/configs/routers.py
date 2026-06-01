@@ -22,7 +22,7 @@ async def get_recommendation_weight():
 async def update_recommendation_weight(data: RecommendationWeight):
     await services.update_recommendation_weight(data)
     
-@configs_router.get("/resource_assessments", response_model=List[ResourceAssessment])
+@configs_router.get("/resource_assessments/{type}", response_model=List[ResourceAssessment])
 async def get_resource_assessments(type:ResourceType):
     return await services.get_resource_assessments(type)
 
