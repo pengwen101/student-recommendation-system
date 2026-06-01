@@ -43,6 +43,23 @@ export default function Dashboard() {
                 Student Performance
             </Button>
         </Link>
+
+        <Link to="/student_comparison" className="w-full">
+            <Button 
+                variant={isActive("/student_comparison") ? "secondary" : "ghost"} 
+                className={`w-full justify-start ${isActive("/student_comparison") ? "text-primary-800 font-semibold" : "text-slate-600"}`}
+            >
+                Student Comparison
+            </Button>
+        </Link>
+        <Link to="/student_history" className="w-full">
+            <Button 
+                variant={isActive("/student_history") ? "secondary" : "ghost"} 
+                className={`w-full justify-start ${isActive("/student_history") ? "text-primary-800 font-semibold" : "text-slate-600"}`}
+            >
+                Student History
+            </Button>
+        </Link>
     </>
 
 );

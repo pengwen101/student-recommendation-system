@@ -39,3 +39,17 @@ async def student_mastery(curriculum_type: str,
     target_label = CURRICULUM_TYPE_LABEL_MAP[curriculum_type]
     result = await analytic_cypher.student_mastery(target_label, curriculum_id, nrp, major_ids, batch_ids)
     return result
+
+async def student_comparison(curriculum_type: str,
+                          major_ids: list[str] | None = None,
+                          batch_ids: list[str] | None = None):
+    target_label = CURRICULUM_TYPE_LABEL_MAP[curriculum_type]
+    result = await analytic_cypher.student_comparison(target_label, major_ids, batch_ids)
+    return result
+
+async def student_history(academic_year: str | None = None,
+                          nrp: str | None = None,
+                          major_ids: list | None = None,
+                          study_level_ids: list | None = None):
+    result = await analytic_cypher.student_history(academic_year, nrp, major_ids, study_level_ids)
+    return result

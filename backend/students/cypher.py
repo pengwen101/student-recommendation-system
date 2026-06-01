@@ -233,20 +233,20 @@ async def record_student_attendance(resource_id: str, nrps: list[str]):
     query = """
         MATCH (r:UniResource {resource_id: $resource_id})
         MATCH (st:Config:StudentTarget)
-        MATCH (cf:Config:RecommendationWeight)
+        MATCH (cf:Config:RecommendationWeight)      
         UNWIND $nrps AS nrp
-        MATCH (s:Student {nrp: nrp})
+        MATCH (s:Student {nrp: nrp})       
         CALL (s, st) {
             OPTIONAL MATCH (s)-[rl:HAS]->(:Indicator)
             RETURN sum(CASE 
                 WHEN rl IS NOT NULL AND (st.target_score - rl.weight) > 0 
                 THEN (st.target_score - rl.weight) 
                 ELSE 0.0 END) AS total_lack_weight
-        }
+        }       
         CALL (s) {
             OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(:Topic)
             RETURN count(ri) AS total_interest_count
-        }
+        }       
         CALL (s, r, st) {
             OPTIONAL MATCH (s)-[rl:HAS]->(i:Indicator)<-[rp:SUPPORTS]-(r)
             WITH rl, rp, st,
@@ -259,11 +259,11 @@ async def record_student_attendance(resource_id: str, nrps: list[str]):
                 WHEN rl IS NULL OR rp IS NULL THEN 0.0
                 WHEN specific_lack_weight < rp.weight THEN specific_lack_weight
                 ELSE rp.weight END) AS indicator_intersection
-        }
+        }       
         CALL (s, r) {
             OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(t:Topic)<-[rt:COVERS]-(r)
             RETURN sum(CASE WHEN ri IS NULL OR rt IS NULL THEN 0.0 ELSE 1.0 END) AS topic_intersection
-        }
+        }        
         WITH s, r, 
              ((
                 cf.need_weight * (CASE WHEN total_lack_weight > 0 THEN indicator_intersection / total_lack_weight ELSE 0.0 END) 
@@ -274,6 +274,56 @@ async def record_student_attendance(resource_id: str, nrps: list[str]):
         MERGE (s)-[att:ATTENDED]->(r)
         SET att.recommendation_score = final_score,
             att.recorded_at = datetime({timezone: 'Asia/Jakarta'})
+    """
+    
+    params = {
+        "resource_id": resource_id,
+        "nrps": nrps
+    }
+    
+    await Neo4jConnection.query(query, params)
+    await add_student_score(resource_id, nrps)
+    
+    
+async def add_student_score(resource_id: str, nrps: list[str]):
+    query = """
+        MATCH (r:UniResource {resource_id: $resource_id})
+        MATCH (cf:Config:AddScoreConstant)
+        
+        UNWIND $nrps as nrp
+        MATCH (s:Student {nrp: nrp})
+        
+        CALL (s, r, cf) {
+            MATCH (r)-[rs:SUPPORTS]->(i:Indicator)
+            MATCH (s)-[rh:HAS]->(i)
+            SET rh.weight =
+                CASE WHEN rh.weight + (cf.weight * rs.weight * coalesce(r.internal_weight, 1.0)) <= 1.0
+                THEN rh.weight + (cf.weight * rs.weight * coalesce(r.internal_weight, 1.0))
+                ELSE 1.0 END
+        }
+
+        CALL (s) {
+            MATCH (s)-[rh:HAS]->(:Indicator)<-[:HAS_INDICATOR]-(q:Quality)
+            WITH s, q, avg(rh.weight) AS qual_avg_score
+            MATCH (s)-[rlq:HAS]->(q)
+            SET rlq.weight = qual_avg_score
+        }
+        CALL (s) {
+            MATCH (s)-[rlq:HAS]->(q:Quality)<-[sq:HAS_QUALITY]-(sc:SubCpl)
+            WITH s, sc,
+                 sum(rlq.weight * sq.weight) AS weighted_score_sum,
+                 sum(sq.weight) AS total_weight
+            WITH s, sc, weighted_score_sum / total_weight AS subcpl_avg_score
+            MATCH (s)-[rls:HAS]->(sc)
+            SET rls.weight = subcpl_avg_score
+        }
+
+        CALL (s) {
+            MATCH (s)-[rls:HAS]->(sc:SubCpl)<-[:HAS_SUB_CPL]-(c:Cpl)
+            WITH s, c, avg(rls.weight) AS cpl_avg_score
+            MATCH (s)-[rlc:HAS]->(c)
+            SET rlc.weight = cpl_avg_score
+        }
     """
     
     params = {
@@ -296,3 +346,37 @@ async def check_missing_nrps(nrps: list[str]) -> list[str]:
         return []
         
     return [row["missing_nrp"] for row in result]
+
+
+async def record_all_students_history():
+    query = """
+    MATCH (s:Student)
+    CALL (s) {
+        WITH datetime({timezone: 'Asia/Jakarta'}) AS now, s
+        MERGE (s)-[:LOGGED_SCORE]->(ch:CplHistory {year: now.year, month: now.month})
+        ON CREATE SET 
+            ch.id = randomUUID(), 
+            ch.datetime = now
+        WITH s, ch
+        MATCH (s)-[rh:HAS]->(curriculum_node)
+        WHERE curriculum_node:Cpl 
+           OR curriculum_node:SubCpl 
+           OR curriculum_node:Quality 
+           OR curriculum_node:Indicator
+        MERGE (ch)-[history_rel:HAS]->(curriculum_node)
+        SET history_rel.weight = rh.weight
+        
+    } IN TRANSACTIONS OF 100 ROWS
+    RETURN "Snapshot complete" AS status
+    """
+    await Neo4jConnection.query(query)
+    
+async def get_attended_students(resource_id: str):
+    query = """
+    MATCH (r:UniResource {resource_id: $resource_id})<-[:ATTENDED]-(s:Student)
+    MATCH (s)-[]->(m:Major)
+    RETURN s.nrp as nrp, s.full_name as full_name, m.name as major
+    """
+    
+    result = await Neo4jConnection.query(query, {"resource_id": resource_id})
+    return result

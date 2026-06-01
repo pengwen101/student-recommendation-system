@@ -15,6 +15,8 @@ import SupportLackGap from "./Admin/pages/dashboards/SupportLackGap";
 import ResourceCharacteristic from "./Admin/pages/dashboards/ResourceCharacteristic";
 import OrganizerSupport from "./Admin/pages/dashboards/OrganizerSupport";
 import StudentPerformance from "./Admin/pages/dashboards/StudentPerformance";
+import StudentComparison from "./Admin/pages/dashboards/StudentComparison";
+import StudentHistory from "./Admin/pages/dashboards/StudentHistory";
 import OrganizerForm from './Admin/pages/OrganizerForm';
 import TopicForm from './Admin/pages/TopicForm';
 import Curriculum from './Admin/pages/Curriculum';
@@ -83,6 +85,8 @@ function App() {
           <Route path="/resource_characteristic" element={<ResourceCharacteristic/>}></Route>
           <Route path="/organizer_support" element={<OrganizerSupport/>}></Route>
           <Route path="/student_performance" element={<StudentPerformance/>}></Route>
+          <Route path="/student_comparison" element={<StudentComparison/>}></Route>
+          <Route path="/student_history" element={<StudentHistory/>}></Route>
         </Route>
       </Routes>
     </BrowserRouter>

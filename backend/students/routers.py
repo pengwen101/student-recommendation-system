@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status, UploadFile, File, HTTPException
 from backend.students.schemas import (TopicActionResponse, StudentRecommendationsResponse,\
-                                    IndicatorActionResponse, StudentIndicatorsInputBatch, StudentTopicsInputBatch, SubCplActionResponse, CplActionResponse)
+                                    IndicatorActionResponse, StudentIndicatorsInputBatch, StudentTopicsInputBatch, SubCplActionResponse, CplActionResponse, AttendedStudents)
 from backend.students import services
 from typing import List
 from backend.resources.schemas import ResourceType
@@ -80,3 +80,7 @@ async def record_student_attendance(resource_id: str, file: UploadFile = File(..
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+    
+@attendance_router.get("/{resource_id}", response_model = List[AttendedStudents])
+async def get_attended_students(resource_id: str):
+    return await services.get_attended_students(resource_id)

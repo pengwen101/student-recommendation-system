@@ -69,6 +69,10 @@ async def seed_students(path):
     query = """
         UNWIND $batch as row
         MERGE (s:Student {nrp: row.nrp})
+        SET s.gender = row.gender
+        SET s.major = row.major
+        SET s.religion = row.religion
+        SET s.full_name = row.full_name
         MERGE (m:Major {name: row.major})
         ON CREATE SET m.major_id = randomUUID()
         MERGE (s)-[:MAJORS_IN]->(m)
@@ -80,9 +84,6 @@ async def seed_students(path):
         WITH s, row
         MATCH (sl:StudyLevel {study_level_id: 1})
         MERGE (s)-[:CURRENTLY_IN]->(sl)
-        SET s.gender = row.gender
-        SET s.major = row.major
-        SET s.religion = row.religion
     """
     
     await Neo4jConnection.query(query,{"batch": data})
@@ -200,6 +201,9 @@ async def seed_configs():
     MERGE (:Config:RecommendationWeight {need_weight: 0.7, interest_weight: 0.3})
     
     MERGE (:Config:BookVideoWeight {author_type_weight: 0.5, impact_scale_weight: 0.3, thematic_weight_weight: 0.2})
+    
+    MERGE (cf:Config:AddScoreConstant)
+    set cf.weight=1.0
     """
     
     await Neo4jConnection.query(query)
@@ -688,8 +692,8 @@ async def run_all_seeders():
     # print("Seeding Batch Year and Versions...")
     # await seed_years_and_versions()
     
-    # print("Seeding Students...")
-    # await seed_students("data/demografi.parquet")
+    print("Seeding Students...")
+    await seed_students("data/demografi.parquet")
     
     # print("Seeding Curriculum...")
     # await seed_curriculum("data/curriculum.parquet")
@@ -697,8 +701,8 @@ async def run_all_seeders():
     # print("Seeding Configuration...")
     # await seed_configs()
     
-    # print("Seeding Relations...")
-    # await seed_student_questions_relation("data/hasil_survei.parquet")
+    print("Seeding Relations...")
+    await seed_student_questions_relation("data/hasil_survei.parquet")
     
     # print("Seeding Wikidata from Topic...")
     # await seed_topic_wikidata_id()
@@ -709,7 +713,7 @@ async def run_all_seeders():
     # print("Seeding Resource English Description...")
     # await seed_resource_eng_description()
         
-    await seed_resource_words(additional_stop_words)
+    # await seed_resource_words(additional_stop_words)
     
     print("All seeding complete!")
     

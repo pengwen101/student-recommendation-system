@@ -25,3 +25,6 @@ class ResourceAssessmentUpdate(BaseModel):
 class RecommendationWeight(BaseModel):
     need_weight: float
     interest_weight: float
+
+class AddScoreConstant(BaseModel):
+    weight: float

@@ -6,7 +6,10 @@ from contextlib import asynccontextmanager
 from authlib.integrations.starlette_client import OAuth
 import os
 from dotenv import load_dotenv
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from backend.dependencies import get_current_user, create_access_token
+from backend.students.cypher import record_all_students_history
 
 from backend.database import Neo4jConnection
 from backend.students import routers as student_routers
@@ -24,12 +27,26 @@ from backend.admins import services as admin_services
 from backend.admins import schemas as admin_schemas
 
 load_dotenv()
+scheduler = AsyncIOScheduler()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Neo4jConnection.get_driver()
+    
+    scheduler.add_job(
+        record_all_students_history,
+        CronTrigger(day=1, hour=0, minute=1, timezone='Asia/Jakarta'),
+        id="monthly_history_snapshot",
+        replace_existing=True
+    )
+    scheduler.start()
+    print("Monthly snapshot scheduler started.")
     yield
     await Neo4jConnection.close_driver()
+    
+    scheduler.shutdown()
+    print("Scheduler shut down.")
 
 app = FastAPI(lifespan=lifespan)
 

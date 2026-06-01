@@ -55,3 +55,14 @@ class CurriculumType(str, Enum):
     SUBCPL = "sub_cpl"
     QUALITY = "quality"
     INDICATOR = "indicator"
+    
+class StudentComparison(BaseModel):
+    follow_rec: bool
+    code: str
+    name: str
+    avg_score: float
+    
+class StudentHistory(BaseModel):
+    year: int
+    month: int
+    avg_score: float

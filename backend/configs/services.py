@@ -38,3 +38,9 @@ async def delete_resource_assessments(resource_assessment_id: str):
     if resource_exists:
         raise HTTPException(status_code=404, detail="There are resources connected to this assessment.")
     await cypher.delete_resource_assessments(resource_assessment_id)
+    
+async def get_add_score_constant():
+    return await cypher.get_add_score_constant()
+
+async def update_add_score_constant(weight: float):
+    await cypher.update_add_score_constant(weight)

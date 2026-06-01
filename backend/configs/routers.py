@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from backend.resources.schemas import ResourceType
-from backend.configs.schemas import StudentTarget, ResourceAssessment, ResourceAssessmentInput, RecommendationWeight
+from backend.configs.schemas import StudentTarget, ResourceAssessment, ResourceAssessmentInput, RecommendationWeight, AddScoreConstant
 from backend.configs import services
 from typing import List
 
@@ -37,3 +37,12 @@ async def update_resource_assessments(resource_assessment_id: str, data: Resourc
 @configs_router.delete("/resource_assessments/{resource_assessment_id}")
 async def delete_resource_assessments(resource_assessment_id: str):
     await services.delete_resource_assessments(resource_assessment_id)
+    
+    
+@configs_router.get("/add_score_constant", response_model=AddScoreConstant)
+async def get_add_score_constant():
+    return await services.get_add_score_constant()
+
+@configs_router.put("/add_score_constant")
+async def update_add_score_constant(weight: float):
+    await services.update_add_score_constant(weight)

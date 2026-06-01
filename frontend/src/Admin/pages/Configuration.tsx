@@ -22,6 +22,7 @@ export default function ConfigurationDashboard() {
 
   // Global Config State
   const [studentTarget, setStudentTarget] = useState<number>(0);
+  const [addScoreConstant, setAddScoreConstant] = useState<number>(1.0); // NEW STATE
   const [recWeight, setRecWeight] = useState<RecommendationWeight>({ need_weight: 0.5, interest_weight: 0.5 });
 
   // Resource Assessment State
@@ -47,12 +48,14 @@ export default function ConfigurationDashboard() {
 
   const fetchGlobalConfigs = async () => {
     try {
-      const [targetRes, weightRes] = await Promise.all([
+      const [targetRes, weightRes, constantRes] = await Promise.all([
         api.get("/config/student_target"),
-        api.get("/config/recommendation_weight")
+        api.get("/config/recommendation_weight"),
+        api.get("/config/add_score_constant") // NEW API CALL
       ]);
       setStudentTarget(targetRes.data.target_score || targetRes.data);
       setRecWeight(weightRes.data);
+      setAddScoreConstant(constantRes.data.weight || 1.0);
     } catch {
       toast.error("Failed to load global configurations.");
     }
@@ -78,6 +81,16 @@ export default function ConfigurationDashboard() {
       toast.success("Student Target updated successfully.");
     } catch {
       toast.error("Failed to update Student Target.");
+    }
+  };
+
+  // NEW HANDLER: Add Score Constant
+  const handleSaveAddScoreConstant = async () => {
+    try {
+      await api.put(`/config/add_score_constant?weight=${addScoreConstant}`);
+      toast.success("Score Addition Multiplier updated successfully.");
+    } catch {
+      toast.error("Failed to update Score Addition Multiplier.");
     }
   };
 
@@ -140,7 +153,6 @@ export default function ConfigurationDashboard() {
     }
   };
 
-  // Triggered when clicking the explicit "Edit" button
   const startEdit = (assessment: ResourceAssessment) => {
     setEditingId(assessment.resource_assessment_id);
     setEditData({
@@ -149,12 +161,10 @@ export default function ConfigurationDashboard() {
     });
   };
 
-  // Triggered when clicking the explicit "Save" button
   const handleSaveEdit = async (id: string) => {
     if (!editData.display_name.trim()) return toast.error("Display name cannot be empty.");
 
     try {
-      // Optimistic UI update
       setAssessments(prev => prev.map(a => 
         a.resource_assessment_id === id 
           ? { ...a, display_name: editData.display_name, weight: editData.weight } 
@@ -170,7 +180,7 @@ export default function ConfigurationDashboard() {
       setEditingId(null);
     } catch {
       toast.error("Failed to update assessment.");
-      fetchAssessments(selectedType); // Revert on failure
+      fetchAssessments(selectedType); 
     }
   };
 
@@ -191,7 +201,9 @@ export default function ConfigurationDashboard() {
         <p className="text-gray-500 mt-1">Manage global calculation weights and resource assessments.</p>
       </div>
 
+      {/* TOP ROW: Targets & Constants */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+        
         {/* Student Target Card */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col h-full">
           <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Student Target Score</h2>
@@ -215,11 +227,37 @@ export default function ConfigurationDashboard() {
           </div>
         </div>
 
-        {/* DUAL-SLIDER Recommendation Weights Card */}
+        {/* NEW: Add Score Constant Card */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col h-full">
+          <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Score Addition Multiplier</h2>
+          <div className="flex-1 flex flex-col justify-center">
+             <div className="flex items-center gap-4">
+              <input
+                type="number"
+                step="0.1"
+                value={addScoreConstant}
+                onChange={(e) => setAddScoreConstant(Number(e.target.value))}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-medium"
+              />
+              <button 
+                onClick={handleSaveAddScoreConstant}
+                className="px-6 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap"
+              >
+                Save Constant
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mt-3">The constant multiplier applied when adding resource support scores to student mastery.</p>
+          </div>
+        </div>
+
+      </div>
+
+      {/* MIDDLE ROW: Recommendation Balance Slider */}
+      <div className="mb-8">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col">
           <h2 className="text-lg font-bold text-gray-800 mb-6 border-b pb-2">Recommendation Engine Balance</h2>
           
-          <div className="flex-1 flex flex-col justify-center px-2">
+          <div className="flex flex-col justify-center px-4 md:px-12 max-w-4xl mx-auto w-full">
             {/* Value Displays */}
             <div className="flex justify-between items-end mb-3">
               <div className="text-left">
@@ -233,13 +271,12 @@ export default function ConfigurationDashboard() {
             </div>
 
             {/* The Range Slider */}
-            <div className="relative py-4 mb-4 flex items-center">
-               <div className="absolute left-0 w-full h-3 rounded-full overflow-hidden flex pointer-events-none">
+            <div className="relative py-4 mb-6 flex items-center">
+               <div className="absolute left-0 w-full h-4 rounded-full overflow-hidden flex pointer-events-none">
                   <div className="bg-blue-500 h-full transition-all duration-200" style={{ width: `${recWeight.need_weight * 100}%` }}></div>
                   <div className="bg-purple-500 h-full transition-all duration-200" style={{ width: `${recWeight.interest_weight * 100}%` }}></div>
                </div>
 
-               {/* UPDATED: min is set to 0 to align visual scale with absolute background percentages */}
                <input
                 type="range"
                 min="0" 
@@ -247,15 +284,15 @@ export default function ConfigurationDashboard() {
                 step="0.05"
                 value={recWeight.need_weight}
                 onChange={handleSliderChange}
-                className="w-full h-3 appearance-none bg-transparent cursor-pointer z-10 
-                           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-gray-800 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md
-                           [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-gray-800 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:shadow-md"
+                className="w-full h-4 appearance-none bg-transparent cursor-pointer z-10 
+                           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-8 [&::-webkit-slider-thumb]:h-8 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-4 [&::-webkit-slider-thumb]:border-gray-800 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg
+                           [&::-moz-range-thumb]:w-8 [&::-moz-range-thumb]:h-8 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-4 [&::-moz-range-thumb]:border-gray-800 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:shadow-lg"
               />
             </div>
 
             <button 
               onClick={handleSaveRecWeight}
-              className="w-full mt-auto px-4 py-2.5 bg-gray-800 text-white font-medium rounded-md hover:bg-gray-900 transition-colors shadow-sm"
+              className="w-full px-6 py-3 bg-gray-800 text-white font-medium rounded-md hover:bg-gray-900 transition-colors shadow-sm"
             >
               Save Balance Settings
             </button>
@@ -263,7 +300,7 @@ export default function ConfigurationDashboard() {
         </div>
       </div>
 
-      {/* Resource Assessments Section */}
+      {/* BOTTOM ROW: Resource Assessments Section */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
         <div className="flex justify-between items-center mb-6 border-b pb-4">
           <h2 className="text-xl font-bold text-gray-800">Resource Assessments</h2>

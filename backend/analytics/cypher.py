@@ -253,10 +253,12 @@ async def student_mastery(curriculum_type: str, curriculum_id: str | None = None
     })
     return result
 
-async def student_comparison(curriculum_type: str, curriculum_id: str | None = None, nrp: str | None = None, major_ids: list | None = None, batch_ids: list | None = None):
-    query = """
+async def student_comparison(curriculum_type: str, major_ids: list | None = None, batch_ids: list | None = None):
+    query = f"""
     MATCH (s:Student)
-    CALL (s) {
+    WHERE ($major_ids IS NULL OR EXISTS {{ MATCH (s)-[]->(m:Major) WHERE m.major_id IN $major_ids }})
+      AND ($batch_ids IS NULL OR EXISTS {{ MATCH (s)-[]->(b:Batch) WHERE b.batch_id IN $batch_ids }})
+    CALL (s) {{
         OPTIONAL MATCH (s)-[ra:ATTENDED]->(r:UniResource)
         WITH count(ra) AS total_attended, 
              sum(CASE WHEN ra.recommendation_score > 0 THEN 1.0 ELSE 0.0 END) AS rec_attended
@@ -264,31 +266,53 @@ async def student_comparison(curriculum_type: str, curriculum_id: str | None = N
             WHEN total_attended > 0 AND (rec_attended / total_attended) > 0.5 THEN true 
             ELSE false 
         END AS follow_rec
-    }
-    CALL (s) {
-        OPTIONAL MATCH (s)-[rh:HAS]->(sc:SubCpl)
-        RETURN avg(rh.weight) AS student_avg_score
-    }
+    }}
+    CALL (s) {{
+        OPTIONAL MATCH (s)-[rh:HAS]->(c:{curriculum_type})
+        RETURN c.code as code, c.name as name, avg(rh.weight) AS student_avg_score
+    }}
+    WITH follow_rec, code, name, student_avg_score
     WHERE student_avg_score IS NOT NULL
     RETURN 
         follow_rec, 
-        avg(student_avg_score) AS sub_cpl_avg_score
+        code,
+        name,
+        student_avg_score AS avg_score
     """
     
-    result = await Neo4jConnection.query(query)
+    params = {
+        "major_ids": major_ids,
+        "batch_ids": batch_ids
+    }
+    
+    result = await Neo4jConnection.query(query, params)
     return result
     
 
-async def student_history(academic_year: str, nrp: str | None = None, major_ids: list | None = None, study_level_ids: list | None = None):
+async def student_history(academic_year: str | None = None, nrp: str | None = None, major_ids: list | None = None, study_level_ids: list | None = None):
     query = """
-    
-    MATCH (s:Student)-[]->(m:Major)
-    WHERE ($nrp IS NULL OR s.nrp = $nrp) AND ($major_ids IS NULL OR m.major_id IN $major_ids)
-    MATCH (s)-[]->(sl:StudyLevel)
-    WHERE $study_level_ids IS NULL OR sl.study_level_id IN $study_level_ids
-    MATCH (s)-[rh:HAS]->(c:Cpl)
-    OPTIONAL MATCH (s)-[:LOGGED_SCORE]->(ch:CplHistory)
-    
+    MATCH (s:Student)
+    WHERE ($nrp IS NULL OR s.nrp = $nrp) 
+      AND ($major_ids IS NULL OR EXISTS { MATCH (s)-[]->(m:Major) WHERE m.major_id IN $major_ids })
+      AND ($study_level_ids IS NULL OR EXISTS { MATCH (s)-[]->(sl:StudyLevel) WHERE sl.study_level_id IN $study_level_ids })
+    MATCH (s)-[:LOGGED_SCORE]->(ch:CplHistory)-[rh:HAS]->(c:Cpl)
+    WHERE $academic_year IS NULL OR toString(ch.year) = $academic_year
+    WITH ch.year AS year, ch.month AS month, rh.weight AS cpl_score
+    WITH year, month, avg(cpl_score) AS avg_score
+    ORDER BY year ASC, month ASC
+    RETURN 
+        year, 
+        month, 
+        avg_score
     """
+    params = {
+        "academic_year": academic_year,
+        "nrp": nrp,
+        "major_ids": major_ids,
+        "study_level_ids": study_level_ids
+    }
+    
+    result = await Neo4jConnection.query(query, params)
+    return result
     
     

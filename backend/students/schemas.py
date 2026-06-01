@@ -67,3 +67,8 @@ class StudentIndicatorsInput(BaseModel):
     
 class StudentIndicatorsInputBatch(BaseModel):
     indicators: List[StudentIndicatorsInput]
+    
+class AttendedStudents(BaseModel):
+    nrp: str
+    full_name: str
+    major: str

@@ -108,4 +108,19 @@ async def resource_assessment_resource_exist(resource_assessment_id: str):
     response = await Neo4jConnection.query(query, {"resource_assessment_id": resource_assessment_id})
     return response[0]['exists'] if response else False
     
+async def get_add_score_constant():
+    query = """
+    MATCH (cf:Config:AddScoreConstant)
+    RETURN cf.weight as weight
+    """
     
+    result = await Neo4jConnection.query(query)
+    return result[0] if result else None
+
+async def update_add_score_constant(weight: float):
+    query = """
+    MATCH (cf:Config:AddScoreConstant)
+    SET cf.weight = $weight
+    """
+    
+    await Neo4jConnection.query(query, {"weight": weight})
