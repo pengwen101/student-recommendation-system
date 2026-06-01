@@ -95,30 +95,33 @@ export interface ResourceAssessment {
     resource_weight: number;
 }
 
-export interface Resource {
-    resource_id: string;
-    type: typeof ResourceType[keyof typeof ResourceType];
-    title: string;
-    description?: string;
-    authors?: string[];
-    publisher?: string;
-    published_date?: string;
-    isbn?: string;
-    content_link?: string;
-    article_text?: string;
-    study_levels?: StudyLevel[],
-    sessions?: Session[],
-    organizers?: Organizer[],
-    status?: typeof ResourceStatus[keyof typeof ResourceStatus];
-    scale?: typeof ResourceScale[keyof typeof ResourceScale];
-    speaker_degree?: typeof SpeakerDegree[keyof typeof SpeakerDegree];
-    author_type?: typeof AuthorType[keyof typeof AuthorType];
-    impact_scale?: typeof ImpactScale[keyof typeof ImpactScale];
-    thematic_weight?: typeof ThematicWeight[keyof typeof ThematicWeight];
-    is_active: boolean;
-    topics: Topic[];
-    calculations: ResourceSupportCalculations;
-}
+// export interface Resource {
+//     resource_id: string;
+//     type: typeof ResourceType[keyof typeof ResourceType];
+//     title: string;
+//     description?: string;
+//     authors?: string[];
+//     publisher?: string;
+//     published_date?: string;
+//     isbn?: string;
+//     content_link?: string;
+//     article_text?: string;
+//     study_levels?: StudyLevel[],
+//     sessions?: Session[],
+//     organizers?: Organizer[],
+//     status?: typeof ResourceStatus[keyof typeof ResourceStatus];
+//     // scale?: typeof ResourceScale[keyof typeof ResourceScale];
+//     // speaker_degree?: typeof SpeakerDegree[keyof typeof SpeakerDegree];
+//     // author_type?: typeof AuthorType[keyof typeof AuthorType];
+//     // impact_scale?: typeof ImpactScale[keyof typeof ImpactScale];
+//     // thematic_weight?: typeof ThematicWeight[keyof typeof ThematicWeight];
+//     is_active: boolean;
+//     indicators: Indicator[];
+//     topics: Topic[];
+//     calculations: ResourceSupportCalculations;
+// }
+
+export type Resource = ResourceEvent | ResourceBook | ResourceVideo | ResourceArticle;
 
 // For edit / create
 export interface ResourceInput {
@@ -159,6 +162,7 @@ export interface ResourceBase {
     resource_id: string;
     title: string;
     is_active: boolean;
+    type: typeof ResourceType[keyof typeof ResourceType];
     resource_assessments?: ResourceAssessment[];
     topics: Topic[];
     indicators: ResourceIndicator[];

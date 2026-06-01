@@ -42,14 +42,14 @@ const Navbar = () => {
                     </Link>
 
                     <Link 
-                        to="/profile" 
+                        to="/recommendations" 
                         className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                            isActive('/profile') 
+                            isActive('/recommendations') 
                                 ? 'text-primary-800 bg-primary-50' 
                                 : 'text-slate-600 hover:text-primary-700 hover:bg-slate-50'
                         }`}
                     >
-                        Profile
+                        Recommendations
                     </Link>
 
                     <div className="hidden sm:block h-6 w-px bg-slate-200 mx-2"></div>

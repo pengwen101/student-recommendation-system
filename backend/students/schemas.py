@@ -1,6 +1,6 @@
-from pydantic import BaseModel
-from typing import List, Dict, Set
-from backend.resources.schemas import ResourceDetails
+from pydantic import BaseModel, Field
+from typing import List, Dict, Set, Annotated
+from backend.resources.schemas import ResourceEvent, ResourceBook, ResourceVideo, ResourceArticle
 
 class StudentTopicsResponse(BaseModel):
     topic_id: str
@@ -19,7 +19,10 @@ class StudentTopicsInputBatch(BaseModel):
     topics: List[StudentTopicsInput]
     
 class StudentRecommendation(BaseModel):
-    resource: ResourceDetails
+    resource: Annotated[
+        ResourceEvent | ResourceBook | ResourceVideo | ResourceArticle, 
+        Field(discriminator="type")
+    ]
     score: float
 
 class StudentRecommendationsResponse(BaseModel):

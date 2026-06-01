@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom
 import Navbar from './Student/components/Navbar';
 import Login from './pages/Login';
 import Home from './Student/pages/Home';
+import Recommendations from './Student/pages/Recommendations';
 import SelectTopics from './Student/pages/SelectTopics';
 import ResourceDetails from './Student/pages/ResourceDetails';
 import Profile from './Student/pages/Profile';
@@ -60,6 +61,7 @@ function App() {
            <Route path="/" element={<Navigate to="/home" replace />} />
            
            <Route path="/home" element={<Home />} />
+           <Route path="/recommendations" element={<Recommendations />} />
            <Route path="/resource/:resource_id" element={<ResourceDetails />} />
            <Route path="/profile" element={<Profile />} />
         </Route>

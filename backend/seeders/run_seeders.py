@@ -67,22 +67,23 @@ async def seed_students(path):
     df = pd.read_parquet(path)
     data = df.to_dict(orient="records")
     query = """
+        MATCH (sl:StudyLevel {study_level_id: "1"})
         UNWIND $batch as row
         MERGE (s:Student {nrp: row.nrp})
-        SET s.gender = row.gender
-        SET s.major = row.major
-        SET s.religion = row.religion
-        SET s.full_name = row.full_name
+        SET s.gender = row.gender,
+            s.major = row.major,
+            s.religion = row.religion,
+            s.full_name = row.full_name
         MERGE (m:Major {name: row.major})
         ON CREATE SET m.major_id = randomUUID()
-        MERGE (s)-[:MAJORS_IN]->(m)
         MERGE (f:Faculty {name: row.faculty})
         ON CREATE SET f.faculty_id = randomUUID()
+        MERGE (s)-[:MAJORS_IN]->(m)
         MERGE (m)-[:BELONGS_TO]->(f)
-        MERGE (b:Batch {batch_id: "20" || substring(row.nrp, 3, 2) || "/20" || toString(toInteger(substring(row.nrp, 3, 2)) + 1)})
+        WITH s, sl, row, 
+            "20" + substring(row.nrp, 3, 2) + "/20" + toString(toInteger(substring(row.nrp, 3, 2)) + 1) AS calculated_batch_id
+        MERGE (b:Batch {batch_id: calculated_batch_id})
         MERGE (s)-[:IS_FROM_BATCH]->(b)
-        WITH s, row
-        MATCH (sl:StudyLevel {study_level_id: 1})
         MERGE (s)-[:CURRENTLY_IN]->(sl)
     """
     
@@ -701,8 +702,8 @@ async def run_all_seeders():
     # print("Seeding Configuration...")
     # await seed_configs()
     
-    print("Seeding Relations...")
-    await seed_student_questions_relation("data/hasil_survei.parquet")
+    # print("Seeding Relations...")
+    # await seed_student_questions_relation("data/hasil_survei.parquet")
     
     # print("Seeding Wikidata from Topic...")
     # await seed_topic_wikidata_id()

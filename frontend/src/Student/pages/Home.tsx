@@ -1,267 +1,216 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../../api/axios.tsx';
-import type { ResourceRecommendations, Resource, Topic } from '../../types.ts';
+import api from '../../api/axios';
+import type { Student, ResourceRecommendations, SubCplSupport, CplSupport } from '../../types';
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import ResourceCard from "../components/ResourceCard.tsx";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
+import { faTimesCircle, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 
 const Home = () => {
     const navigate = useNavigate();
+    const [user, setUser] = useState<Student | null>(null);
     
-    // Data States
+    // Competency Data
+    const [cpls, setCpls] = useState<CplSupport[]>([]);
+    const [subCpls, setSubCpls] = useState<SubCplSupport[]>([]);
+    const [selectedCpl, setSelectedCpl] = useState<string | null>(null);
+
+    // Recommendations Data
     const [recommendations, setRecommendations] = useState<ResourceRecommendations | null>(null);
-    const [allResources, setAllResources] = useState<Resource[]>([]);
-    const [topics, setTopics] = useState<Topic[]>([]);
+    const [articleRecommendations, setArticleRecommendations] = useState<ResourceRecommendations | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // Search & Filter States
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filterYear, setFilterYear] = useState('');
-    const [filterMonth, setFilterMonth] = useState('');
-    const [filterTopic, setFilterTopic] = useState('');
-
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchHomeData = async () => {
             try {
                 const userRes = await api.get('/users/me');
                 if (!userRes.data.authenticated) {
                     window.location.href = '/student/login';
                     return;
                 }
-                
-                const nrp = userRes.data.user_id;
-                const hasTopicsRes = await api.get(`/student/topics/has_topics/${nrp}`);
-                if (!hasTopicsRes.data) {
-                    navigate("/student/input_topics", { state: { nrp } });
-                    return;
-                }
+                const userData: Student = userRes.data;
+                setUser(userData);
+                const nrp = "h14250080";
 
-                // 2. Fetch All Necessary Data in Parallel
-                const [recsRes, resourcesRes, topicsRes] = await Promise.all([
-                    api.get(`/student/recommendations/${nrp}`),
-                    api.get('/resource'), // Returns all active resources
-                    api.get('/topic')     // Returns available topics for the filter
+                const [cplsRes, subCplsRes, generalRecs, articleRecs] = await Promise.all([
+                    api.get(`/student/cpls/${nrp}`),
+                    api.get(`/student/subcpls/${nrp}`),
+                    api.get(`/student/recommendations/${nrp}?type=event`),
+                    api.get(`/student/recommendations/${nrp}?type=article`)
                 ]);
 
-                setRecommendations(recsRes.data || null);
-                setAllResources(resourcesRes.data.resources || []);
-                setTopics(topicsRes.data.topics || []);
+                setCpls(cplsRes.data.cpls || []);
+                setSubCpls(subCplsRes.data.subcpls || []);
+                setRecommendations(generalRecs.data || null);
+                setArticleRecommendations(articleRecs.data || null);
 
             } catch (error) {
-                console.error("Failed to load dashboard data:", error);
+                console.error("Error loading home dashboard", error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchData();
-    }, [navigate]);
 
-    // --- HELPER: Get the earliest FUTURE session date for an event ---
-    const getEarliestFutureDate = (resource: Resource, now: number) => {
-        if (!resource.sessions || resource.sessions.length === 0) return null;
-        
-        // Find all sessions that haven't happened yet
-        const futureSessions = resource.sessions.filter(s => 
-            s.start_datetime && new Date(s.start_datetime).getTime() > now
-        );
-        
-        if (futureSessions.length === 0) return null;
-        
-        // Return the closest upcoming date
-        const futureDates = futureSessions.map(s => new Date(s.start_datetime).getTime());
-        return Math.min(...futureDates);
-    };
+        fetchHomeData();
+    }, []);
 
-    // --- DERIVED DATA & FILTERING ---
+    // 1. DYNAMIC RADAR ZOOM (Fixed Math.floor bug for 0-1 scale)
+    const radarDomain = useMemo(() => {
+        if (subCpls.length === 0) return [0, 1];
+        const minScore = Math.min(...subCpls.map(c => c.weight));
+        return [Math.max(0, minScore - 0.15), 1];
+    }, [subCpls]);
 
-    // 1. Top 10 Recommendations
+    // 2. TRUE CPL GROUPING LOGIC
+    const radarGroups = useMemo(() => {
+        if (!cpls || !subCpls) return [];
+
+        // Filter active CPLs if one is explicitly selected
+        const activeCpls = selectedCpl 
+            ? cpls.filter(c => c.code === selectedCpl) 
+            : cpls;
+
+        return activeCpls.map(cpl => {
+            // Extract the CPL number (e.g., "CPL1" -> "1")
+            const cplNumMatch = cpl.code.match(/\d+/);
+            const cplNum = cplNumMatch ? cplNumMatch[0] : null;
+
+            // Find matching Sub-CPLs for this specific CPL
+            const matchingSubCpls = subCpls.filter(sub => {
+                if (!cplNum) return false;
+                // Match sub-codes that start with the parent CPL code (e.g., "CPL1S1" starts with "CPL1")
+                // Added "S" to ensure "CPL1" doesn't accidentally match "CPL10"
+                return sub.code.startsWith(`CPL${cplNum}S`) || sub.code.startsWith(`CPL${cplNum}`);
+            });
+
+            return {
+                cplId: cpl.code,
+                cplScore: cpl.weight,
+                data: matchingSubCpls
+            };
+        }).filter(group => group.data.length > 0); // Hide CPLs that have no recorded subCpls
+    }, [cpls, subCpls, selectedCpl]);
+
     const topRecommendations = useMemo(() => {
-        return recommendations?.recommendations?.slice(0, 10) || [];
+        return recommendations?.recommendations?.slice(0, 5) || [];
     }, [recommendations]);
 
-    // 2. Upcoming Events (Future sessions, sorted closest first)
-    const upcomingEvents = useMemo(() => {
-        const now = new Date().getTime();
-        return allResources
-            .filter(r => r.type === 'event' && getEarliestFutureDate(r, now) !== null)
-            .sort((a, b) => getEarliestFutureDate(a, now)! - getEarliestFutureDate(b, now)!)
-            .slice(0, 10);
-    }, [allResources]);
+    const topArticles = useMemo(() => {
+        return articleRecommendations?.recommendations?.slice(0, 8) || [];
+    }, [articleRecommendations]);
 
-    // 3. Search & Filter Results
-    const isSearching = searchQuery || filterYear || filterMonth || filterTopic;
-    
-    const searchResults = useMemo(() => {
-        if (!isSearching) return [];
-        return allResources.filter(resource => {
-            // Check Search Match
-            const matchesSearch = resource.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                  (resource.description?.toLowerCase().includes(searchQuery.toLowerCase()) || false);
-            
-            // Check Topic Match
-            const matchesTopic = filterTopic ? resource.topics?.some(t => t.topic_id === filterTopic) : true;
 
-            // Check Date Match (Does ANY session fall into the selected year/month?)
-            let matchesDate = true;
-            if (filterYear || filterMonth) {
-                if (!resource.sessions || resource.sessions.length === 0) {
-                    matchesDate = false; // Has date filters, but no dates to check
-                } else {
-                    matchesDate = resource.sessions.some(session => {
-                        if (!session.start_datetime) return false;
-                        const d = new Date(session.start_datetime);
-                        const sessionYear = d.getFullYear().toString();
-                        const sessionMonth = (d.getMonth() + 1).toString();
-
-                        const yearMatch = filterYear ? sessionYear === filterYear : true;
-                        const monthMatch = filterMonth ? sessionMonth === filterMonth : true;
-
-                        return yearMatch && monthMatch;
-                    });
-                }
-            }
-
-            return matchesSearch && matchesTopic && matchesDate;
-        });
-    }, [allResources, searchQuery, filterYear, filterMonth, filterTopic, isSearching]);
-
+    if (loading) return <div className="flex justify-center items-center h-screen"><div className="text-slate-500 animate-pulse font-medium">Loading Dashboard...</div></div>;
+    if (!user) return <div className="p-8 text-center text-slate-500">Error loading user.</div>;
 
     return (
-        <div className="max-w-7xl mx-auto px-6 py-8 md:px-8 flex flex-col gap-10">
+        <div className="max-w-[1400px] mx-auto px-6 py-8 md:px-8 flex flex-col gap-6">
             
-            {/* --- TOP SECTION: SEARCH & FILTERS --- */}
-            <div className="flex flex-col gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <div className="flex flex-col md:flex-row gap-4">
-                    
-                    {/* Search Bar */}
-                    <div className="relative grow">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <FontAwesomeIcon icon={faMagnifyingGlass} className="text-slate-400" />
-                        </div>
-                        <input
-                            type="text"
-                            placeholder="Search resources, events, or books..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                        />
-                    </div>
-
-                    {/* Filters */}
-                    <div className="flex gap-2 overflow-x-auto hide-scrollbar">
-                        <select 
-                            value={filterYear} onChange={(e) => setFilterYear(e.target.value)}
-                            className="py-2.5 px-3 border border-slate-300 rounded-lg text-sm bg-slate-50 text-slate-700 min-w-[100px] focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="">Any Year</option>
-                            <option value="2024">2024</option>
-                            <option value="2025">2025</option>
-                            <option value="2026">2026</option>
-                        </select>
-
-                        <select 
-                            value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}
-                            className="py-2.5 px-3 border border-slate-300 rounded-lg text-sm bg-slate-50 text-slate-700 min-w-[120px] focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="">Any Month</option>
-                            <option value="1">January</option>
-                            <option value="2">February</option>
-                            <option value="3">March</option>
-                            <option value="4">April</option>
-                            <option value="5">May</option>
-                            <option value="6">June</option>
-                            <option value="7">July</option>
-                            <option value="8">August</option>
-                            <option value="9">September</option>
-                            <option value="10">October</option>
-                            <option value="11">November</option>
-                            <option value="12">December</option>
-                        </select>
-
-                        <select 
-                            value={filterTopic} onChange={(e) => setFilterTopic(e.target.value)}
-                            className="py-2.5 px-3 border border-slate-300 rounded-lg text-sm bg-slate-50 text-slate-700 min-w-[140px] focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="">All Topics</option>
-                            {topics.map(t => (
-                                <option key={t.topic_id} value={t.topic_id}>{t.name}</option>
-                            ))}
-                        </select>
-                    </div>
+            {/* HEADER: Student Profile & Name */}
+            <div className="flex justify-between items-end border-b border-slate-200 pb-4 mb-4">
+                <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Student Profile</h1>
+                <div className="text-right">
+                    <h2 className="text-2xl font-bold text-slate-800">{user.name}</h2>
+                    <p className="text-slate-500 text-sm font-medium">{user.nrp}</p>
                 </div>
             </div>
 
-            {/* --- CONTENT AREA --- */}
-            {loading ? (
-                <div className="text-center py-20 text-slate-500 animate-pulse font-medium">
-                    Curating your dashboard...
-                </div>
-            ) : isSearching ? (
+            {/* MAIN GRID LAYOUT */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 
-                /* SEARCH RESULTS GRID */
-                <div className="flex flex-col gap-6">
-                    <h2 className="text-xl font-bold text-slate-900">
-                        Search Results <span className="text-slate-500 font-medium text-base ml-2">({searchResults.length})</span>
-                    </h2>
-                    {searchResults.length === 0 ? (
-                        <div className="text-slate-500 py-10 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                            No resources found matching your filters.
+                {/* LEFT COLUMN (Spans 3 cols): Radar Charts & Recommendations Sneak Peek */}
+                <div className="lg:col-span-3 flex flex-col gap-6">
+                    
+                    {/* Radar Charts Area Grouped by CPL */}
+                    <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">Competency Breakdown</h3>
+                                <p className="text-xs text-slate-500">Click a card to filter and focus on a specific CPL.</p>
+                            </div>
+                            {selectedCpl && (
+                                <button onClick={() => setSelectedCpl(null)} className="text-xs font-bold text-blue-600 hover:underline">
+                                    <FontAwesomeIcon icon={faTimesCircle} className="mr-1" /> Clear Filter ({selectedCpl})
+                                </button>
+                            )}
                         </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {searchResults.map(resource => (
-                                <div key={resource.resource_id} className="h-[360px]">
-                                    <ResourceCard resource={resource} />
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {radarGroups.map((group) => (
+                                <div 
+                                    key={group.cplId} 
+                                    className="flex flex-col items-center justify-between bg-white rounded-xl shadow-sm border border-slate-100 p-4 h-[280px] cursor-pointer hover:shadow-md hover:border-blue-200 transition-all"
+                                    onClick={() => setSelectedCpl(prev => prev === group.cplId ? null : group.cplId)}
+                                >
+                                    <div className="w-full h-[180px]">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <RadarChart cx="50%" cy="50%" outerRadius="65%" data={group.data}>
+                                                <PolarGrid stroke="#e2e8f0" />
+                                                <PolarAngleAxis dataKey="code" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 600 }} />
+                                                <PolarRadiusAxis angle={30} domain={radarDomain} tick={false}/>
+                                                <Tooltip contentStyle={{ borderRadius: '8px' }} />
+                                                <Radar name="Mastery" dataKey="weight" stroke="#0284c7" strokeWidth={2} fill="#38bdf8" fillOpacity={0.3} />
+                                            </RadarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    
+                                    {/* CPL Score Section added here */}
+                                    <div className="text-center mt-2 w-full pt-3 border-t border-slate-100">
+                                        <h4 className="font-bold text-slate-800 leading-none">{group.cplId}</h4>
+                                        <span className="text-xs font-bold text-slate-500 tracking-wide uppercase mt-1 inline-block">
+                                            Score: <span className="text-blue-600">{(group.cplScore * 100).toFixed(1)}%</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                            {radarGroups.length === 0 && (
+                                <div className="col-span-3 text-center text-slate-400 italic text-sm py-10">No Sub-CPL data available.</div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Recommendations Sneak Peek */}
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold text-slate-800">Recommendations (Sneak Peek)</h3>
+                            <button onClick={() => navigate('/recommendations')} className="text-sm font-bold text-blue-600 hover:underline flex items-center gap-2">
+                                View All <FontAwesomeIcon icon={faArrowRight} />
+                            </button>
+                        </div>
+                        
+                        <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-4 hide-scrollbar">
+                            {topRecommendations.map((rec) => (
+                                <div key={rec.resource.resource_id} className="min-w-[280px] max-w-[280px] h-[260px] snap-start shrink-0">
+                                    <ResourceCard resource={rec.resource} />
                                 </div>
                             ))}
                         </div>
-                    )}
+                    </div>
                 </div>
 
-            ) : (
-                
-                /* DEFAULT DASHBOARD (Sliders) */
-                <div className="flex flex-col gap-12">
+                {/* RIGHT COLUMN (Spans 1 col): Recommended Articles List */}
+                <div className="lg:col-span-1 bg-slate-100 rounded-2xl p-6 border border-slate-200 flex flex-col h-full">
+                    <h3 className="text-lg font-bold text-slate-800 mb-6 text-center">Recommended Articles</h3>
                     
-                    {/* SECTION 1: Top Recommendations */}
-                    {topRecommendations.length > 0 && (
-                        <section className="flex flex-col gap-4">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Top Matches for You</h2>
-                            </div>
-                            
-                            <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-6 pt-2 px-6 md:px-8 hide-scrollbar">
-                                {topRecommendations.map((rec) => (
-                                    <div key={rec.resource.resource_id} className="min-w-[300px] md:min-w-[340px] max-w-[340px] h-[360px] snap-start shrink-0">
-                                        <ResourceCard 
-                                            resource={rec.resource} 
-                                            probability_score={rec.probability_score} 
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-                    )}
-
-                    {/* SECTION 2: Upcoming Events */}
-                    {upcomingEvents.length > 0 && (
-                        <section className="flex flex-col gap-4">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Upcoming Events</h2>
-                            </div>
-                            
-                            <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-6 pt-2 -mx-6 px-6 md:-mx-8 md:px-8 hide-scrollbar">
-                                {upcomingEvents.map((event) => (
-                                    <div key={event.resource_id} className="min-w-[300px] md:min-w-[340px] max-w-[340px] h-[360px] snap-start shrink-0">
-                                        <ResourceCard resource={event} />
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-                    )}
+                    <div className="flex flex-col gap-3 overflow-y-auto">
+                        {topArticles.length > 0 ? topArticles.map(rec => (
+                            <button 
+                                key={rec.resource.resource_id}
+                                className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow border border-slate-200 text-left flex flex-col gap-1"
+                                onClick={() => navigate(`/resource/${rec.resource.resource_id}`)}
+                            >
+                                <span className="font-bold text-slate-800 line-clamp-2 text-sm leading-tight">
+                                    {rec.resource.title}
+                                </span>
+                            </button>
+                        )) : (
+                            <div className="text-center text-slate-400 text-sm italic py-10">No articles recommended at this time.</div>
+                        )}
+                    </div>
                 </div>
-            )}
+
+            </div>
         </div>
     );
 };

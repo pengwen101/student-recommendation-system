@@ -54,7 +54,7 @@ async def read_student_indicators(nrp: str):
 async def read_student_subcpls(nrp: str):
     query = """
         MATCH (s:Student {nrp: $nrp})-[r:HAS]->(sc:SubCpl)
-        RETURN sc.sub_cpl_id as sub_cpl_id, sc.code as code, sc.name as name, 1.0 - r.weight as weight
+        RETURN sc.sub_cpl_id as sub_cpl_id, sc.code as code, sc.name as name, r.weight as weight
     """
     params = {"nrp": nrp}
     response = await Neo4jConnection.query(query, params)
@@ -63,7 +63,7 @@ async def read_student_subcpls(nrp: str):
 async def read_student_cpls(nrp: str):
     query = """
         MATCH (s:Student {nrp: $nrp})-[r:HAS]->(c:Cpl)
-        RETURN c.cpl_id as cpl_id, c.code as code, c.name as name, 1.0 - r.weight as weight
+        RETURN c.cpl_id as cpl_id, c.code as code, c.name as name, r.weight as weight
     """
     params = {"nrp": nrp}
     response = await Neo4jConnection.query(query, params)
@@ -117,24 +117,23 @@ async def get_student_recommendations(nrp: str, label: str):
         MATCH (s:Student {{nrp: $nrp}})
         MATCH (st:Config:StudentTarget)
         MATCH (cf:Config:RecommendationWeight)
-        CALL {{
-            WITH s, st
+        CALL (s, st) {{
             OPTIONAL MATCH (s)-[rl:HAS]->(:Indicator)
             RETURN sum(CASE 
                 WHEN rl IS NOT NULL AND (st.target_score - rl.weight) > 0 
                 THEN (st.target_score - rl.weight) 
                 ELSE 0.0 END) AS total_lack_weight
         }}
-        CALL {{
-            WITH s
+        CALL (s) {{
             OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(:Topic)
             RETURN count(ri) AS total_interest_count
         }}
 
-        MATCH (s)-[:CURRENTLY_IN]->(:StudyLevel)<-[:AVAILABLE_FOR]-(r:UniResource:{label})
+        MATCH (s)-[:CURRENTLY_IN]->(sl:StudyLevel)
+        MATCH (r:UniResource:{label})
         WHERE r.is_active = true
-        CALL {{
-            WITH s, r, st
+          AND (NOT 'Event' IN labels(r) OR (r)-[:AVAILABLE_FOR]->(sl))
+        CALL (s, r, st) {{
             OPTIONAL MATCH (s)-[rl:HAS]->(i:Indicator)<-[rp:SUPPORTS]-(r)
             WITH rl, rp, st,
                  CASE 
@@ -148,8 +147,7 @@ async def get_student_recommendations(nrp: str, label: str):
                 ELSE rp.weight END) AS indicator_intersection
         }}
 
-        CALL {{
-            WITH s, r
+        CALL (s, r) {{
             OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(t:Topic)<-[rt:COVERS]-(r)
             RETURN sum(CASE WHEN ri IS NULL OR rt IS NULL THEN 0.0 ELSE 1.0 END) AS topic_intersection
         }}
@@ -162,9 +160,7 @@ async def get_student_recommendations(nrp: str, label: str):
              )) * coalesce(r.internal_weight, 1.0) AS score
              
         ORDER BY score DESC
-        LIMIT 10
-
-        // 7. Return with fast Pattern Comprehensions (No Cartesian Products!)
+        LIMIT 5
         RETURN {{
             resource_id: r.resource_id, 
             type: tolower(head([l IN labels(r) WHERE l <> 'UniResource'])),
@@ -197,6 +193,9 @@ async def get_student_recommendations(nrp: str, label: str):
                 resource_type: ra.resource_type,
                 weight: toFloat(ra.weight),
                 resource_weight: toFloat(rh.weight)
+            }}],
+            indicators: [(r)-[rsi:SUPPORTS]->(i:Indicator) | {{
+                indicator_id: i.indicator_id
             }}],
             topics: [(r)-[rc:COVERS]->(t:Topic) | {{
                 topic_id: t.topic_id, 

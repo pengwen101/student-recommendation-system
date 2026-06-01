@@ -162,7 +162,7 @@ class ResourceArticle(ResourceBase):
 class ResourceDetails(BaseModel):
     resource_id: str
     type: ResourceType
-    name: str
+    title: str
     description: str | None = None
     authors: List[str] | None = None
     publisher: str | None = None

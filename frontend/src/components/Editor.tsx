@@ -2,15 +2,15 @@ import { memo, useEffect, useRef } from 'react';
 import EditorJS, { type OutputData } from '@editorjs/editorjs';
 import EDITOR_JS_TOOLS from './Tool.tsx';
 
-// 1. Define an interface for your props
+// Add readOnly to the interface
 interface EditorProps {
   data: OutputData | undefined;
-  onChange: (data: OutputData) => void;
+  onChange?: (data: OutputData) => void; // Made optional for readOnly mode
   editorBlock: string;
+  readOnly?: boolean; // New prop
 }
 
-const Editor = ({ data, onChange, editorBlock }: EditorProps) => {
-  // 2. Add the EditorJS type to the useRef hook and initialize it with null
+const Editor = ({ data, onChange, editorBlock, readOnly = false }: EditorProps) => {
   const ref = useRef<EditorJS | null>(null);
 
   useEffect(() => {
@@ -19,25 +19,28 @@ const Editor = ({ data, onChange, editorBlock }: EditorProps) => {
         holder: editorBlock,
         data: data,
         tools: EDITOR_JS_TOOLS,
-        // 3. Remove the unused 'event' parameter
+        readOnly: readOnly, // Pass the readOnly flag here
+        
         async onChange(api) {
-          const savedData = await api.saver.save();
-          onChange(savedData);
+          if (!readOnly && onChange) {
+            const savedData = await api.saver.save();
+            onChange(savedData);
+          }
         },
       });
       ref.current = editor;
     }
 
     return () => {
-      // 4. ref.current is now correctly typed, so TypeScript knows 'destroy' exists
       if (ref.current && ref.current.destroy) {
         ref.current.destroy();
-        ref.current = null; // Good practice to clean up the ref
+        ref.current = null;
       }
     };
-  }, []); // Keeping the empty dependency array so the editor only initializes once
+  }, [data, editorBlock, onChange, readOnly]); 
 
-  return <div id={editorBlock} />;
+  // Make the container look like normal text if readOnly, otherwise add styling for editing
+  return <div id={editorBlock} className={readOnly ? "prose max-w-none" : ""} />;
 };
 
 export default memo(Editor);
