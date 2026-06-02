@@ -39,7 +39,14 @@ async def read_curriculum(version_id: str):
     unwrapped_cpls = [record["curriculum"] for record in response]
     return unwrapped_cpls
 
-
+async def read_questions():
+    query = """
+    MATCH (qs:Question)
+    WITH qs.question_id as question_id, qs.code as code, qs.name as name, split(qs.question_scale_label, ",") as splitted
+    RETURN question_id, code, name, splitted[0] as lower_bound, splitted[1] as upper_bound, splitted[2] as lower_text, splitted[3] as upper_text
+    """
+    return await Neo4jConnection.query(query)
+    
 async def study_level_exists(study_level_id: str):
     query = """
     MATCH (sl:StudyLevel {study_level_id: $study_level_id})

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status, UploadFile, File, HTTPException
 from backend.students.schemas import (TopicActionResponse, StudentRecommendationsResponse,\
-                                    IndicatorActionResponse, StudentIndicatorsInputBatch, StudentTopicsInputBatch, SubCplActionResponse, CplActionResponse, AttendedStudents)
+                                    IndicatorActionResponse, StudentIndicatorsInputBatch, StudentTopicsInputBatch, SubCplActionResponse, CplActionResponse, AttendedStudents, StudentQuestionRelation)
 from backend.students import services
 from typing import List
 from backend.resources.schemas import ResourceType
@@ -11,6 +11,7 @@ indicators_router = APIRouter(prefix="/student/indicators", tags=["student_indic
 subcpls_router = APIRouter(prefix="/student/subcpls", tags=["student_subcpls"])
 cpls_router = APIRouter(prefix="/student/cpls", tags=["student_cpls"])
 attendance_router = APIRouter(prefix="/student/attendance", tags=["student_attendance"])
+questions_router = APIRouter(prefix="/student/questions", tags=["student_questions"])
 
 @topics_router.get("/{nrp}", response_model=TopicActionResponse)
 async def read_student_topics(nrp: str):
@@ -21,6 +22,10 @@ async def read_student_topics(nrp: str):
 async def create_student_topics(nrp: str, data: StudentTopicsInputBatch):
     topics = await services.create_student_topics(nrp, data.topics)
     return {"message": "Student topic relations successfully added.", "count": len(topics), "topics": topics}
+
+@questions_router.post("/{nrp}")
+async def create_student_question_relation(nrp: str, data: List[StudentQuestionRelation]):
+    await services.create_student_question_relation(nrp, data)
 
 @topics_router.put("/{nrp}", response_model=TopicActionResponse)
 async def update_student_topics(nrp: str, data: StudentTopicsInputBatch):

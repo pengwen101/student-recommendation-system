@@ -1,19 +1,38 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
-import type { Student, ResourceRecommendations, SubCplSupport, CplSupport } from '../../types';
+import type { Student, ResourceRecommendations, SubCplSupport, CplSupport, Topic } from '../../types';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import ResourceCard from "../components/ResourceCard.tsx";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimesCircle, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 
+// Custom Tooltip to show SubCPL Code, Name, and Score on hover
+const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        return (
+            <div className="bg-white/95 backdrop-blur-sm p-4 border border-slate-200 shadow-xl rounded-xl max-w-[250px]">
+                <p className="font-extrabold text-slate-800 mb-1">{data.code}</p>
+                <p className="text-sm text-slate-600 mb-3 leading-snug">{data.name}</p>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Mastery:</span>
+                    <span className="text-sm font-black text-blue-600">{(data.weight * 100).toFixed(1)}%</span>
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
+
 const Home = () => {
     const navigate = useNavigate();
     const [user, setUser] = useState<Student | null>(null);
     
-    // Competency Data
+    // Competency & Interest Data
     const [cpls, setCpls] = useState<CplSupport[]>([]);
     const [subCpls, setSubCpls] = useState<SubCplSupport[]>([]);
+    const [topics, setTopics] = useState<Topic[]>([]);
     const [selectedCpl, setSelectedCpl] = useState<string | null>(null);
 
     // Recommendations Data
@@ -31,19 +50,22 @@ const Home = () => {
                 }
                 const userData: Student = userRes.data;
                 setUser(userData);
-                const nrp = "h14250080";
+                const nrp = userData.user_id;
 
-                const [cplsRes, subCplsRes, generalRecs, articleRecs] = await Promise.all([
+                // Fetch Profile Data, Topics, & Recommendations concurrently
+                const [cplsRes, subCplsRes, generalRecs, articleRecs, topicsRes] = await Promise.all([
                     api.get(`/student/cpls/${nrp}`),
                     api.get(`/student/subcpls/${nrp}`),
                     api.get(`/student/recommendations/${nrp}?type=event`),
-                    api.get(`/student/recommendations/${nrp}?type=article`)
+                    api.get(`/student/recommendations/${nrp}?type=article`),
+                    api.get(`/student/topics/${nrp}`)
                 ]);
 
                 setCpls(cplsRes.data.cpls || []);
                 setSubCpls(subCplsRes.data.subcpls || []);
                 setRecommendations(generalRecs.data || null);
                 setArticleRecommendations(articleRecs.data || null);
+                setTopics(topicsRes.data.topics || []);
 
             } catch (error) {
                 console.error("Error loading home dashboard", error);
@@ -66,30 +88,26 @@ const Home = () => {
     const radarGroups = useMemo(() => {
         if (!cpls || !subCpls) return [];
 
-        // Filter active CPLs if one is explicitly selected
         const activeCpls = selectedCpl 
             ? cpls.filter(c => c.code === selectedCpl) 
             : cpls;
 
         return activeCpls.map(cpl => {
-            // Extract the CPL number (e.g., "CPL1" -> "1")
             const cplNumMatch = cpl.code.match(/\d+/);
             const cplNum = cplNumMatch ? cplNumMatch[0] : null;
 
-            // Find matching Sub-CPLs for this specific CPL
             const matchingSubCpls = subCpls.filter(sub => {
                 if (!cplNum) return false;
-                // Match sub-codes that start with the parent CPL code (e.g., "CPL1S1" starts with "CPL1")
-                // Added "S" to ensure "CPL1" doesn't accidentally match "CPL10"
                 return sub.code.startsWith(`CPL${cplNum}S`) || sub.code.startsWith(`CPL${cplNum}`);
             });
 
             return {
                 cplId: cpl.code,
+                cplName: cpl.name, // Extracting CPL Name for potential UI use
                 cplScore: cpl.weight,
                 data: matchingSubCpls
             };
-        }).filter(group => group.data.length > 0); // Hide CPLs that have no recorded subCpls
+        }).filter(group => group.data.length > 0); 
     }, [cpls, subCpls, selectedCpl]);
 
     const topRecommendations = useMemo(() => {
@@ -108,9 +126,25 @@ const Home = () => {
         <div className="max-w-[1400px] mx-auto px-6 py-8 md:px-8 flex flex-col gap-6">
             
             {/* HEADER: Student Profile & Name */}
-            <div className="flex justify-between items-end border-b border-slate-200 pb-4 mb-4">
-                <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Student Profile</h1>
-                <div className="text-right">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-slate-200 pb-4 mb-2 gap-4">
+                <div>
+                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Student Profile</h1>
+                    
+                    {/* TOPICS / INTERESTS LISTING */}
+                    <div className="flex flex-wrap gap-2 mt-4">
+                        {topics.length > 0 ? (
+                            topics.map(topic => (
+                                <span key={topic.topic_id} className="bg-indigo-50 border border-indigo-100 text-indigo-700 font-semibold text-xs px-3 py-1.5 rounded-full shadow-sm">
+                                    {topic.name}
+                                </span>
+                            ))
+                        ) : (
+                            <span className="text-xs text-slate-400 italic">No interests selected.</span>
+                        )}
+                    </div>
+                </div>
+                
+                <div className="text-left md:text-right">
                     <h2 className="text-2xl font-bold text-slate-800">{user.name}</h2>
                     <p className="text-slate-500 text-sm font-medium">{user.nrp}</p>
                 </div>
@@ -127,7 +161,7 @@ const Home = () => {
                         <div className="flex justify-between items-center mb-4">
                             <div>
                                 <h3 className="text-lg font-bold text-slate-800">Competency Breakdown</h3>
-                                <p className="text-xs text-slate-500">Click a card to filter and focus on a specific CPL.</p>
+                                <p className="text-xs text-slate-500">Click a card to filter and focus on a specific CPL. Hover to see details.</p>
                             </div>
                             {selectedCpl && (
                                 <button onClick={() => setSelectedCpl(null)} className="text-xs font-bold text-blue-600 hover:underline">
@@ -140,8 +174,9 @@ const Home = () => {
                             {radarGroups.map((group) => (
                                 <div 
                                     key={group.cplId} 
-                                    className="flex flex-col items-center justify-between bg-white rounded-xl shadow-sm border border-slate-100 p-4 h-[280px] cursor-pointer hover:shadow-md hover:border-blue-200 transition-all"
+                                    className="flex flex-col items-center justify-between bg-white rounded-xl shadow-sm border border-slate-100 p-4 h-[280px] cursor-pointer hover:shadow-md hover:border-blue-200 transition-all group"
                                     onClick={() => setSelectedCpl(prev => prev === group.cplId ? null : group.cplId)}
+                                    title={group.cplName} // Native HTML tooltip as a fallback for the entire card
                                 >
                                     <div className="w-full h-[180px]">
                                         <ResponsiveContainer width="100%" height="100%">
@@ -149,14 +184,14 @@ const Home = () => {
                                                 <PolarGrid stroke="#e2e8f0" />
                                                 <PolarAngleAxis dataKey="code" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 600 }} />
                                                 <PolarRadiusAxis angle={30} domain={radarDomain} tick={false}/>
-                                                <Tooltip contentStyle={{ borderRadius: '8px' }} />
-                                                <Radar name="Mastery" dataKey="weight" stroke="#0284c7" strokeWidth={2} fill="#38bdf8" fillOpacity={0.3} />
+                                                {/* Replaced default Tooltip with the custom component */}
+                                                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }}/>
+                                                <Radar name="Mastery" dataKey="weight" stroke="#0284c7" strokeWidth={2} fill="#38bdf8" fillOpacity={0.3} activeDot={{ r: 5, fill: '#0369a1' }} />
                                             </RadarChart>
                                         </ResponsiveContainer>
                                     </div>
                                     
-                                    {/* CPL Score Section added here */}
-                                    <div className="text-center mt-2 w-full pt-3 border-t border-slate-100">
+                                    <div className="text-center mt-2 w-full pt-3 border-t border-slate-100 group-hover:border-blue-100 transition-colors">
                                         <h4 className="font-bold text-slate-800 leading-none">{group.cplId}</h4>
                                         <span className="text-xs font-bold text-slate-500 tracking-wide uppercase mt-1 inline-block">
                                             Score: <span className="text-blue-600">{(group.cplScore * 100).toFixed(1)}%</span>

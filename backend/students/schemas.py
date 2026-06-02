@@ -7,6 +7,10 @@ class StudentTopicsResponse(BaseModel):
     code: str
     name: str
     
+class StudentQuestionRelation(BaseModel):
+    question_id: str
+    answer: int
+    
 class TopicActionResponse(BaseModel):
     message: str
     count: int

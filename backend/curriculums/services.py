@@ -11,3 +11,7 @@ async def study_level_exists(study_level_id: str):
 
 async def read_curriculum_versions():
     return await curriculum_cypher.read_curriculum_versions()
+
+async def read_questions():
+    questions = await curriculum_cypher.read_questions()
+    return questions

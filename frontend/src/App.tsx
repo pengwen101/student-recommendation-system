@@ -4,8 +4,10 @@ import Login from './pages/Login';
 import Home from './Student/pages/Home';
 import Recommendations from './Student/pages/Recommendations';
 import SelectTopics from './Student/pages/SelectTopics';
+import SurveyAssessment from './Student/pages/SurveyAssessment';
+import StudentGuard from './Student/pages/StudentGuard';
 import ResourceDetails from './Student/pages/ResourceDetails';
-import Profile from './Student/pages/Profile';
+//import Profile from './Student/pages/Profile';
 import Resources from './Admin/pages/Resources';
 import Organizers from './Admin/pages/Organizers';
 import Topics from './Admin/pages/Topics';
@@ -53,17 +55,20 @@ function App() {
       <Routes>
         {/* Public Route */}
         <Route path="/login" element={<Login />} />
-        <Route path="/student/input_topics" element={<SelectTopics />} />
+        <Route element={<StudentGuard />}>
+          <Route path="/student/input_topics" element={<SelectTopics />} />
+          <Route path="/student/survey_assessment" element={<SurveyAssessment />} />
 
-        {/* Protected Routes (Wrapped in Layout) */}
-        <Route element={<MainLayout />}>
-           {/* Redirect root "/" to "/home" */}
-           <Route path="/" element={<Navigate to="/home" replace />} />
-           
-           <Route path="/home" element={<Home />} />
-           <Route path="/recommendations" element={<Recommendations />} />
-           <Route path="/resource/:resource_id" element={<ResourceDetails />} />
-           <Route path="/profile" element={<Profile />} />
+          {/* Protected Routes (Wrapped in Layout) */}
+          <Route element={<MainLayout />}>
+            {/* Redirect root "/" to "/home" */}
+            <Route path="/" element={<Navigate to="/home" replace />} />
+            
+            <Route path="/home" element={<Home />} />
+            <Route path="/recommendations" element={<Recommendations />} />
+            <Route path="/resource/:resource_id" element={<ResourceDetails />} />
+            {/* <Route path="/profile" element={<Profile />} /> */}
+          </Route>
         </Route>
 
         <Route element={<AdminMainLayout />}>

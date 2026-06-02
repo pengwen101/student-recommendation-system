@@ -53,6 +53,7 @@ async def seed_curriculum(path):
         SET i.name = row.indicator_name
         SET qs.name = row.question_name
         SET qs.question_scale_label = row.question_scale_label
+        SET qs.flipped = row.flipped
         MERGE (b)-[:USES]->(cv)
         MERGE (cv)-[:HAS_CPL]->(c)
         MERGE (c)-[:HAS_SUB_CPL]->(sc)
@@ -693,11 +694,11 @@ async def run_all_seeders():
     # print("Seeding Batch Year and Versions...")
     # await seed_years_and_versions()
     
-    print("Seeding Students...")
-    await seed_students("data/demografi.parquet")
+    # print("Seeding Students...")
+    # await seed_students("data/demografi.parquet")
     
-    # print("Seeding Curriculum...")
-    # await seed_curriculum("data/curriculum.parquet")
+    print("Seeding Curriculum...")
+    await seed_curriculum("data/curriculum.parquet")
     
     # print("Seeding Configuration...")
     # await seed_configs()

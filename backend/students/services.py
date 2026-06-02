@@ -2,7 +2,7 @@ from backend.students import cypher as student_cypher
 from backend.indicators import cypher as indicator_cypher
 from backend.topics import cypher as topic_cypher
 from fastapi import HTTPException
-from backend.students.schemas import StudentTopicsResponse, TopicActionResponse, StudentTopicsInput, StudentIndicatorsInput
+from backend.students.schemas import StudentTopicsResponse, TopicActionResponse, StudentTopicsInput, StudentIndicatorsInput, StudentQuestionRelation
 from typing import List
 import pandas as pd
 import io
@@ -13,6 +13,13 @@ type_label_dict = {
     "video": "Video",
     "article": "Article"
 }
+
+async def create_student_question_relation(nrp: str, data: List[StudentQuestionRelation]):
+    student_exists = await student_cypher.student_exists(nrp)
+    if not student_exists:
+        raise HTTPException(status_code=404, detail="Student not found")
+    data_dict = [item.model_dump() for item in data]
+    return await student_cypher.create_student_question_relation(nrp, data_dict)
 
 async def read_student_topics(nrp: str):
     student_exists = await student_cypher.student_exists(nrp)

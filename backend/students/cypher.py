@@ -17,6 +17,45 @@ async def student_exists(nrp: str):
     params = {"nrp": nrp}
     response = await Neo4jConnection.query(query, params)
     return response[0]['exists'] if response else False
+
+async def create_student_question_relation(nrp: str, data: list[dict]):
+    query = """
+    MATCH (s:Student {nrp: $nrp})
+    UNWIND $relations as relation
+    MATCH (qs:Question {question_id: relation.question_id})
+    MERGE (s)-[ra:ANSWERED]->(qs)
+    SET ra.score = relation.answer
+    SET ra.valid_score = CASE WHEN qs.flipped = false THEN relation.answer ELSE 11 - relation.answer END
+    
+    WITH DISTINCT s
+    MATCH (s)-[ra:ANSWERED]->(:Question)<-[:HAS_QUESTION]-(i:Indicator)
+    WITH s, i, (avg(ra.valid_score)-1.0)/9.0 AS ind_avg_score
+    MERGE (s)-[rli:HAS]->(i)
+    SET rli.weight = ind_avg_score
+
+    WITH s
+    MATCH (s)-[rli:HAS]->(i:Indicator)<-[:HAS_INDICATOR]-(q:Quality)
+    WITH s, q, avg(rli.weight) AS qual_avg_score
+    MERGE (s)-[rlq:HAS]->(q)
+    SET rlq.weight = qual_avg_score
+
+    WITH s
+    MATCH (s)-[rlq:HAS]->(q:Quality)<-[sq:HAS_QUALITY]-(sc:SubCpl)
+    WITH s, sc, 
+        sum(rlq.weight * sq.weight) AS weighted_score_sum,
+        sum(sq.weight) AS total_weight
+    WITH s, sc, weighted_score_sum / total_weight as subcpl_avg_score
+    MERGE (s)-[rls:HAS]->(sc)
+    SET rls.weight = subcpl_avg_score
+    
+    WITH s
+    MATCH (s)-[rls:HAS]->(sc:SubCpl)<-[:HAS_SUB_CPL]-(c:Cpl)
+    WITH s, c, avg(rls.weight) as cpl_avg_score
+    MERGE (s)-[rlc:HAS]->(c)
+    SET rlc.weight = cpl_avg_score
+    """
+    await Neo4jConnection.query(query, {"nrp": nrp, "relations": data})
+    
     
 async def create_student_topics(nrp: str, topic_list: list):
     query = """
@@ -105,7 +144,7 @@ async def has_topics(nrp: str):
 
 async def has_indicators(nrp: str):
     query = """
-        MATCH (s:Student {nrp: $nrp})-[rl:HAS]->(i:Indicators)
+        MATCH (s:Student {nrp: $nrp})-[rl:HAS]->(i:Indicator)
         RETURN count(rl) > 0 as has_indicators
     """
     params = {"nrp": nrp}

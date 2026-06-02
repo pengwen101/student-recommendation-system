@@ -30,10 +30,10 @@ function ResourceDetails() {
                     return;
                 }
                 
-                const nrp = "h14250080";
+                const nrp = userRes.data.user_id;
                 const [resourceRes, studentSubCplRes, studentTopicRes] = await Promise.all([
                     api.get(`/resource/${resource_id}`),
-                    api.get(`/student/subcpls/h14250080`),
+                    api.get(`/student/subcpls/${nrp}`),
                     api.get(`/student/topics/${nrp}`)
                 ]);
                 
