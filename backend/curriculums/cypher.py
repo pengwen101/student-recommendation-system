@@ -2,38 +2,53 @@ from backend.database import Neo4jConnection
 
 async def read_curriculum(version_id: str):
     query = """
-    MATCH (v:Version {version_id: $version_id})-[:HAS_CPL]->(c:Cpl)
-    RETURN {
-    cpl_id: c.cpl_id,
-    name: c.name,
-    code: c.code,
-    
-    subcpls: [ (c)-[:HAS_SUB_CPL]->(s:SubCpl) | {
-        sub_cpl_id: s.sub_cpl_id,
-        name: s.name,
-        code: s.code,
+        MATCH (v:CurriculumVersion {curriculum_version_id: toInteger($version_id)})-[:HAS_CPL]->(c:Cpl)
+        MATCH (c)-[:HAS_SUB_CPL]->(s:SubCpl)
+        MATCH (s)-[rel_sq:HAS_QUALITY]->(q:Quality)
+        MATCH (q)-[:HAS_INDICATOR]->(i:Indicator)
+        MATCH (i)-[:HAS_QUESTION]->(qs:Question)
 
-        qualities: [ (s)-[rel_sq:HAS_QUALITY]->(q:Quality) | {
+        ORDER BY c.code ASC, s.code ASC, q.code ASC, i.code ASC, qs.code ASC
+
+        WITH c, s, rel_sq, q, i, collect({
+        question_id: qs.question_id,
+        code: qs.code,
+        name: qs.name,
+        lower_bound: split(qs.question_scale_label, ",")[0],
+        upper_bound: split(qs.question_scale_label, ",")[1],
+        lower_text: split(qs.question_scale_label, ",")[2],
+        upper_text: split(qs.question_scale_label, ",")[3]
+        }) AS ordered_questions
+
+        WITH c, s, rel_sq, q, collect({
+        indicator_id: i.indicator_id,
+        name: i.name,
+        code: i.code,
+        questions: ordered_questions
+        }) AS ordered_indicators
+
+        WITH c, s, collect({
         quality_id: q.quality_id,
         name: q.name,
         code: q.code,
         weight: rel_sq.weight,
-        
-        indicators: [ (q)-[:HAS_INDICATOR]->(i:Indicator) | {
-            indicator_id: i.indicator_id,
-            name: i.name,
-            code: i.code,
-          
-            questions: [ (i)-[:HAS_QUESTION]->(qs:Question) | {
-            question_id: qs.question_id,
-            code: qs.code,
-            name: qs.name
-            } ]
-            
-        } ]
-        } ]
-    } ]
-    } AS curriculum
+        indicators: ordered_indicators
+        }) AS ordered_qualities
+
+        WITH c, collect({
+        sub_cpl_id: s.sub_cpl_id,
+        name: s.name,
+        code: s.code,
+        qualities: ordered_qualities
+        }) AS ordered_subcpls
+
+        ORDER BY c.code ASC
+        RETURN {
+        cpl_id: c.cpl_id,
+        name: c.name,
+        code: c.code,
+        subcpls: ordered_subcpls
+        } AS curriculum
     """
     response = await Neo4jConnection.query(query, {"version_id": version_id})
     unwrapped_cpls = [record["curriculum"] for record in response]

@@ -59,6 +59,18 @@ async def read_student_indicators(nrp: str):
         raise HTTPException(status_code=404, detail="Student not found")
     return await student_cypher.read_student_indicators(nrp)
 
+async def read_student_lack_indicators(nrp: str):
+    student_exists = await student_cypher.student_exists(nrp)
+    if not student_exists:
+        raise HTTPException(status_code=404, detail="Student not found")
+    return await student_cypher.read_student_lack_indicators(nrp)
+
+async def read_student_lack_subcpls(nrp: str):
+    student_exists = await student_cypher.student_exists(nrp)
+    if not student_exists:
+        raise HTTPException(status_code=404, detail="Student not found")
+    return await student_cypher.read_student_lack_subcpls(nrp)
+
 async def read_student_subcpls(nrp: str):
     student_exists = await student_cypher.student_exists(nrp)
     if not student_exists:
@@ -137,3 +149,9 @@ async def record_student_attendance(resource_id: str, file_contents: bytes, file
     
 async def get_attended_students(resource_id: str):
     return await student_cypher.get_attended_students(resource_id)
+
+async def delete_student_attendance(resource_id: str, nrp: str | None = None):
+    await student_cypher.delete_student_attendance(resource_id, nrp)
+    
+async def delete_all_student_attendance(resource_id: str, nrp: str | None = None):
+    await student_cypher.delete_student_attendance(resource_id, nrp)

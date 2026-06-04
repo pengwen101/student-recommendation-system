@@ -32,10 +32,20 @@ async def update_student_topics(nrp: str, data: StudentTopicsInputBatch):
     topics = await services.update_student_topics(nrp, data.topics)
     return {"message": "Student topic relations successfully updated.", "count": len(topics), "topics": topics}
 
+@indicators_router.get("/lack/{nrp}", response_model=IndicatorActionResponse)
+async def read_student_lack_indicators(nrp: str):
+    indicators = await services.read_student_lack_indicators(nrp)
+    return {"message": "Student indicators relations successfully retrieved.", "count": len(indicators), "indicators": indicators}
+
 @indicators_router.get("/{nrp}", response_model=IndicatorActionResponse)
 async def read_student_indicators(nrp: str):
     indicators = await services.read_student_indicators(nrp)
     return {"message": "Student indicators relations successfully retrieved.", "count": len(indicators), "indicators": indicators}
+
+@subcpls_router.get("/lack/{nrp}", response_model=SubCplActionResponse)
+async def read_student_lack_subcpls(nrp: str):
+    subcpls = await services.read_student_lack_subcpls(nrp)
+    return {"message": "Student subcpls relations successfully retrieved.", "count": len(subcpls), "subcpls": subcpls}
 
 @subcpls_router.get("/{nrp}", response_model=SubCplActionResponse)
 async def read_student_subcpls(nrp: str):
@@ -85,6 +95,12 @@ async def record_student_attendance(resource_id: str, file: UploadFile = File(..
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+    
+    
+@attendance_router.delete("/{resource_id}")
+async def delete_student_attendance(resource_id: str, nrp: str | None = None):
+    await services.delete_student_attendance(resource_id, nrp)
+    
     
 @attendance_router.get("/{resource_id}", response_model = List[AttendedStudents])
 async def get_attended_students(resource_id: str):

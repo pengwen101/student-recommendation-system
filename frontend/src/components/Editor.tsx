@@ -2,29 +2,37 @@ import { memo, useEffect, useRef } from 'react';
 import EditorJS, { type OutputData } from '@editorjs/editorjs';
 import EDITOR_JS_TOOLS from './Tool.tsx';
 
-// Add readOnly to the interface
 interface EditorProps {
   data: OutputData | undefined;
-  onChange?: (data: OutputData) => void; // Made optional for readOnly mode
+  onChange?: (data: OutputData) => void;
   editorBlock: string;
-  readOnly?: boolean; // New prop
+  readOnly?: boolean;
 }
 
 const Editor = ({ data, onChange, editorBlock, readOnly = false }: EditorProps) => {
   const ref = useRef<EditorJS | null>(null);
+  
+  // 1. Keep a mutable ref of the latest onChange function
+  // This prevents the "stale closure" problem without triggering re-renders
+  const onChangeRef = useRef(onChange);
+
+  // 2. Update the ref whenever the parent passes a new onChange function
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   useEffect(() => {
     if (!ref.current) {
       const editor = new EditorJS({
         holder: editorBlock,
-        data: data,
+        data: data, // This is only read ONCE when the component mounts
         tools: EDITOR_JS_TOOLS,
-        readOnly: readOnly, // Pass the readOnly flag here
+        readOnly: readOnly,
         
         async onChange(api) {
-          if (!readOnly && onChange) {
+          if (!readOnly && onChangeRef.current) {
             const savedData = await api.saver.save();
-            onChange(savedData);
+            onChangeRef.current(savedData); // Use the ref here
           }
         },
       });
@@ -37,10 +45,12 @@ const Editor = ({ data, onChange, editorBlock, readOnly = false }: EditorProps) 
         ref.current = null;
       }
     };
-  }, [data, editorBlock, onChange, readOnly]); 
+    // 3. IMPORTANT: Empty dependency array so this ONLY runs on mount and unmount.
+    // It will no longer destroy the editor when you type.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); 
 
-  // Make the container look like normal text if readOnly, otherwise add styling for editing
-  return <div id={editorBlock} className={readOnly ? "prose max-w-none" : ""} />;
+  return <div id={editorBlock} className="prose max-w-none" />;
 };
 
 export default memo(Editor);

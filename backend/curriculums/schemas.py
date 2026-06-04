@@ -27,6 +27,7 @@ class QualityResponse(BaseModel):
     code: str
     name: str
     weight: float
+    indicators: List[IndicatorResponse]
     
 class SubCPLResponse(BaseModel):
     sub_cpl_id: str

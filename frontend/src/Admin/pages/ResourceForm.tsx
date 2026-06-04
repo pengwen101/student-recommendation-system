@@ -50,12 +50,15 @@ function ResourceForm() {
           window.location.href = "/admin/login";
           return;
         }
-        const subcplsRes = await api.get(`/subcpl/indicators/${versionId}`);
-        const topicsRes = await api.get("/topic");
-        const organizersRes = await api.get("/organizer");
-        const versionsRes = await api.get("/curriculum_version");
-        const resourceAssessmentsRes = await api.get(`/config/resource_assessments/${resourceType}`);
-   
+
+        const [subcplsRes, topicsRes, organizersRes, versionsRes, resourceAssessmentsRes] = await Promise.all([
+            api.get(`/subcpl/indicators/${versionId}`),
+            api.get("/topic"),
+            api.get("/organizer"),
+            api.get("/curriculum_version"),
+            api.get(`/config/resource_assessments/${resourceType}`)
+        ]);
+
         const fetchedSubCpls = subcplsRes.data.subcpls;
         setSubCpls(subcplsRes.data.subcpls);
         setTopics(topicsRes.data.topics);
@@ -111,26 +114,43 @@ function ResourceForm() {
   }, [resource_id, isEdit, versionId, resourceType]);
 
 
-  const fetchBookInfo = async (isbn: string | null | undefined) => {
-    if (!isbn) return;
+const GOOGLE_BOOKS_API_KEY = import.meta.env.VITE_GOOGLE_BOOKS_API_KEY;
+console.log(GOOGLE_BOOKS_API_KEY);
+
+const fetchBookInfo = async (title: string | null | undefined) => {
+    if (!title) return; 
     setSearching(true);
-    axios.get(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`)
-    .then(res => {
-      const book = res.data.items[0].volumeInfo;
-      setResource(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          name: book.title,
-          publisher: book.publisher,
-          authors: book.authors,
-          published_date: book.publishedDate,
-          description: book.description
-        };
-      });
-    }).catch(err => console.log(err));
-    setSearching(false);
-  }
+    try {
+      const query = encodeURIComponent(title);
+      const res = await axios.get(
+        `https://www.googleapis.com/books/v1/volumes?q=intitle:${query}&key=${GOOGLE_BOOKS_API_KEY}`
+      );
+      if (res.data.items && res.data.items.length > 0) {
+        const book = res.data.items[0].volumeInfo;
+        const isbnObj = book.industryIdentifiers?.find((id: any) => id.type === "ISBN_13") 
+                     || book.industryIdentifiers?.find((id: any) => id.type === "ISBN_10");
+        const extractedIsbn = isbnObj ? isbnObj.identifier : "";
+        setResource(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            name: book.title,
+            publisher: book.publisher || "",
+            authors: book.authors || [],
+            published_date: book.publishedDate || "",
+            description: book.description || "",
+            isbn: extractedIsbn
+          };
+        });
+      } else {
+        console.log("No books found matching that title.");
+      }
+    } catch (err) {
+      console.error("Error fetching book details:", err);
+    } finally {
+      setSearching(false); 
+    }
+  };
 
   const getDateOnly = (isoString?: string) => {
     if (!isoString) return "";
@@ -805,526 +825,526 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
       
       {/* SECTION 1: Basic Details */}
       <Pane variant="shadow" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 mb-6 border-b border-slate-100 pb-2">Basic Details</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="flex flex-col gap-2 md:col-span-2">
-            <label className="text-sm font-semibold text-slate-700">Name</label>
-            <Input
-              type="text"
-              name="title"
-              placeholder="e.g. Intro to Advanced Robotics"
-              value={resource?.title || ""}
-              onChange={onChange}
-            />
-            {errors.title && (
-              <span className="text-xs font-medium text-red-600 mt-1">
-                {errors.title}
-              </span>
-            )}
-          </div>
+  {/* Header Section */}
+  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-slate-100 pb-4 gap-4">
+    <h3 className="text-lg font-bold text-slate-900 m-0">Basic Details</h3>
+    <div className="flex items-center gap-3">
+      <label className="text-sm font-semibold text-slate-700 whitespace-nowrap">Type</label>
+      <div className="flex flex-col min-w-[150px]">
+        <Select 
+          name="type" 
+          onChange={(e) => setResourceType(e.target.value)} 
+          value={resourceType || ""}
+        >
+          <option value="event">Event</option>
+          <option value="book">Book</option>
+          <option value="video">Video</option>
+          <option value="article">Article</option>
+        </Select>
+        {errors.type && (
+          <span className="text-xs font-medium text-red-600 mt-1">
+            {errors.type}
+          </span>
+        )}
+      </div>
+    </div>
+  </div>
 
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-slate-700">Type</label>
-            <Select name="type" onChange={(e)=>{setResourceType(e.target.value)}} value={resourceType || ""}>
-              <option value="event">Event</option>
-              <option value="book">Book</option>
-              <option value="video">Video</option>
-              <option value="article">Article</option>
-            </Select>
-            {errors.type && (
-              <span className="text-xs font-medium text-red-600 mt-1">
-                {errors.type}
-              </span>
-            )}
-          </div>
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    {/* Title Input */}
+    <div className={`flex flex-col gap-2 ${resourceType === 'book' ? 'md:col-span-2' : 'md:col-span-3'}`}>
+      <label className="text-sm font-semibold text-slate-700">Name</label>
+      <Input
+        type="text"
+        name="title"
+        placeholder="e.g. Intro to Advanced Robotics"
+        value={resource?.title || ""}
+        onChange={onChange}
+      />
+      {errors.title && (
+        <span className="text-xs font-medium text-red-600 mt-1">
+          {errors.title}
+        </span>
+      )}
+    </div>
 
-          { resourceType === "video" && (
-              <div className="flex flex-col gap-2 col-span-3">
-              <label className="text-sm font-semibold text-slate-700">Content Link</label>
-              <Input
-                type="text"
-                name="content_link"
-                placeholder=""
-                value={resource?.content_link || ""}
-                onChange={onChange}
-              />
-              {errors.content_link && (
-                <span className="text-xs font-medium text-red-600 mt-1">
-                  {errors.content_link}
-                </span>
-              )}
+    {/* Search Book Button aligned to bottom of input */}
+    {resourceType === 'book' && (
+      <div className="flex items-end col-span-1">
+        <Button
+          type="button"
+          isLoading={searching}
+          onClick={() => fetchBookInfo(resource?.title)}
+          size="default"
+          variant="solid"
+          className="text-base w-full h-[42px]"
+        >
+          {searching ? "Searching..." : "Search Book"}
+        </Button>
+      </div>
+    )}
+
+    {/* Video Link */}
+    {resourceType === "video" && (
+      <div className="flex flex-col gap-2 md:col-span-3">
+        <label className="text-sm font-semibold text-slate-700">Content Link</label>
+        <Input
+          type="text"
+          name="content_link"
+          placeholder="https://youtube.com/..."
+          value={resource?.content_link || ""}
+          onChange={onChange}
+        />
+        {errors.content_link && (
+          <span className="text-xs font-medium text-red-600 mt-1">
+            {errors.content_link}
+          </span>
+        )}
+      </div>
+    )}
+
+    {/* Book Specifics (Neatly aligned in one row) */}
+    {resourceType === "book" && (
+      <>
+        <div className="flex flex-col gap-2 md:col-span-1">
+          <label className="text-sm font-semibold text-slate-700">ISBN</label>
+          <Input
+            type="text"
+            name="isbn"
+            placeholder="e.g. 978-3-16-148410-0"
+            value={resource?.isbn || ""}
+            onChange={onChange}
+          />
+          {errors.isbn && (
+            <span className="text-xs font-medium text-red-600 mt-1">
+              {errors.isbn}
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 md:col-span-1">
+          <label className="text-sm font-semibold text-slate-700">Publisher</label>
+          <Input
+            type="text"
+            name="publisher"
+            placeholder="e.g. O'Reilly Media"
+            value={resource?.publisher || ""}
+            onChange={onChange}
+          />
+          {errors.publisher && (
+            <span className="text-xs font-medium text-red-600 mt-1">
+              {errors.publisher}
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 md:col-span-1">
+          <label className="text-sm font-semibold text-slate-700">Published Date</label>
+          <Input
+            type="date"
+            name="published_date"
+            className="bg-white"
+            value={getDateOnly(resource?.published_date) || ""}
+            onChange={(e) => onChange(e)}
+            required
+          />
+          {errors.published_date && (
+            <span className="text-xs font-medium text-red-600 mt-1">
+              {errors.published_date}
+            </span>
+          )}
+        </div>
+
+        {/* Authors Section */}
+        <div className="flex flex-col md:col-span-3 gap-4 mt-2 pt-6 border-t border-slate-100">
+          <div className="flex justify-between items-center mb-2">
+            <div>
+              <h4 className="text-base font-bold text-slate-900">Authors</h4>
+              <p className="text-sm text-slate-500">Input author(s) of this book.</p>
             </div>
-          )
-          }
-
-          { resourceType === "book" && (
-
-            <>
-            <div className="flex flex-col col-span-3 gap-2">
-            <label className="text-sm font-semibold text-slate-700">ISBN</label>
-            <div className="grid grid-cols-4 gap-x-6">
-            <Input
-              type="text"
-              name="isbn"
-              placeholder=""
-              className="col-span-3"
-              value={resource?.isbn || ""}
-              onChange={onChange}
-            />
             <Button
               type="button"
-              isLoading={searching}
-              onClick={() => fetchBookInfo(resource?.isbn)}
-              size="default"
-              variant="solid" 
-              className="text-base col-span-1"
+              onClick={handleAddAuthor}
+              variant="outline"
+              size="sm"
+              className="text-primary-700 border-primary-200 hover:bg-primary-50"
             >
-              {searching ? "Searching..." : "Search Book"}
+              + Add Author
             </Button>
-            </div>
-            {errors.isbn && (
-              <span className="text-xs font-medium text-red-600 mt-1">
-                {errors.isbn}
-              </span>
-            )}
-            </div>
-
-          <div className="flex flex-col col-span-1 gap-2">
-            <label className="text-sm font-semibold text-slate-700">Publisher</label>
-            <Input
-              type="text"
-              name="publisher"
-              placeholder=""
-              value={resource?.publisher || ""}
-              onChange={onChange}
-            />
-            {errors.publisher && (
-              <span className="text-xs font-medium text-red-600 mt-1">
-                {errors.publisher}
-              </span>
-            )}
           </div>
-
-          <div className="flex flex-col col-span-2 gap-2">
-            <label className="text-xs font-semibold text-slate-600">Published Date</label>
-              <Input
-                type="date"
-                name="published_date"
-                className="flex-1 bg-white"
-                value={getDateOnly(resource?.published_date) || ""}
-                onChange={(e) => onChange(e)}
-                required
-              />
-              {errors.published_date && (
-                <span className="text-xs font-medium text-red-600">{errors.published_date}</span>
-              )}
-            </div>
-
-            <div className="flex flex-col col-span-3 gap-4 mt-6 pt-6 border-t border-slate-100">
-              <div className="flex justify-between items-center mb-2">
-                <div>
-                  <h4 className="text-base font-bold text-slate-900">Authors</h4>
-                  <p className="text-sm text-slate-500">Input author(s) of this book.</p>
-                </div>
-                <Button 
-                  type="button" 
-                  onClick={handleAddAuthor} 
-                  variant="outline" 
-                  size="sm"
-                  className="text-primary-700 border-primary-200 hover:bg-primary-50"
-                >
-                  + Add Author
-                </Button>
-              </div>
-              {errors.authors && (
-                <span className="text-xs font-medium text-red-600 mt-1">{errors.authors}</span>
-              )}
-              {resource?.authors?.map((author, index) => (
-                <div 
-                  key={index} 
-                  className="flex flex-col gap-4 p-4 border border-slate-200 rounded-xl bg-slate-50 relative group transition-all hover:border-slate-300"
-                >
-                  <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                    <span className="text-sm font-bold text-slate-700 uppercase tracking-wider">
-                      Author {index + 1}
-                    </span>
-                    
-                    {/* Only show delete button if there is more than 1 session */}
-                    {resource.authors && resource.authors.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveAuthor(index)}
-                        className="text-slate-400 hover:text-danger-600 transition-colors p-1"
-                        title="Remove author"
-                      >
-                        <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-2 md:col-span-1">
-                    <label className="text-sm font-semibold text-slate-700">Author</label>
-                    <Input
-                      type="text"
-                      name="author"
-                      className="flex-1 bg-white"
-                      value={author || ""}
-                      onChange={(e) => handleAuthorChange(index, e.target.value)}
-                      required
-                    />
-                  </div>
-                  
-                </div>
-              ))}
-            </div>
-          </>
+          {errors.authors && (
+            <span className="text-xs font-medium text-red-600 mt-1">{errors.authors}</span>
           )}
+          
+          {resource?.authors?.map((author, index) => (
+            <div
+              key={index}
+              className="flex flex-col gap-4 p-4 border border-slate-200 rounded-xl bg-slate-50 relative group transition-all hover:border-slate-300"
+            >
+              <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                <span className="text-sm font-bold text-slate-700 uppercase tracking-wider">
+                  Author {index + 1}
+                </span>
 
-          {/* {(resource?.type === "book" || resource?.type === "video") && (
-            <>
-              <div className="flex flex-col gap-2 md:col-span-1">
-                <label className="text-sm font-semibold text-slate-700">Author Type</label>
-                <Select name="author_type" value={resource?.author_type || "personal_blog"} onChange={onChange}>
-                  <option value="personal_blog">Personal Blog</option>
-                  <option value="practitioner">Practitioner</option>
-                  <option value="academic">Academic</option>
-                </Select>
+                {resource.authors && resource.authors.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAuthor(index)}
+                    className="text-slate-400 hover:text-danger-600 transition-colors p-1"
+                    title="Remove author"
+                  >
+                    <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
+                  </button>
+                )}
               </div>
-
-              <div className="flex flex-col gap-2 md:col-span-1">
-                <label className="text-sm font-semibold text-slate-700">Impact Scale</label>
-                <Select name="impact_scale" value={resource?.impact_scale || "local"} onChange={onChange}>
-                  <option value="local">Local</option>
-                  <option value="international">International</option>
-                  <option value="worldwide">Worldwide</option>
-                </Select>
-              </div>
-
-              <div className="flex flex-col gap-2 md:col-span-1">
-                <label className="text-sm font-semibold text-slate-700">Thematic Weight</label>
-                <Select name="thematic_weight" value={resource?.thematic_weight || "personal_opinion"} onChange={onChange}>
-                  <option value="personal_opinion">Personal Opinion</option>
-                  <option value="academic_journal">Academic Journal</option>
-                  <option value="critique">Critique</option>
-                  <option value="philosophy">Philosophy</option>
-                </Select>
-              </div>
-
-            </>
-
-          )} */}
-
-          {/* SECTION: Article Specific Details */}
-          {resourceType === 'article' && (
-            <Pane variant="shadow" className="p-6 mt-6 col-span-3">
-              <h3 className="text-lg font-bold text-slate-900 mb-6 border-b border-slate-100 pb-2">
-                Article Content
-              </h3>
               <div className="flex flex-col gap-2">
-                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 min-h-[300px]">
-                  <Editor
-                    editorBlock="editorjs-container"
-                    data={resource?.article_text}
-                    onChange={(data) => {
-                      setResource(prev => prev ? { ...prev, article_text: data } : prev);
-                      
-                      // Clear error if user starts typing
-                      if (data?.blocks?.length > 0) {
-                        setErrors(prev => {
-                          const newErrors = { ...prev };
-                          delete newErrors.article_text;
-                          return newErrors;
-                        });
-                      }
-                    }}
+                <label className="text-sm font-semibold text-slate-700">Author Name</label>
+                <Input
+                  type="text"
+                  name="author"
+                  className="bg-white"
+                  value={author || ""}
+                  onChange={(e) => handleAuthorChange(index, e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </>
+    )}
+
+    {/* Commented out dropdowns */}
+    {/* {(resource?.type === "book" || resource?.type === "video") && (
+      <>
+        <div className="flex flex-col gap-2 md:col-span-1">
+          <label className="text-sm font-semibold text-slate-700">Author Type</label>
+          <Select name="author_type" value={resource?.author_type || "personal_blog"} onChange={onChange}>
+            <option value="personal_blog">Personal Blog</option>
+            <option value="practitioner">Practitioner</option>
+            <option value="academic">Academic</option>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-2 md:col-span-1">
+          <label className="text-sm font-semibold text-slate-700">Impact Scale</label>
+          <Select name="impact_scale" value={resource?.impact_scale || "local"} onChange={onChange}>
+            <option value="local">Local</option>
+            <option value="international">International</option>
+            <option value="worldwide">Worldwide</option>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-2 md:col-span-1">
+          <label className="text-sm font-semibold text-slate-700">Thematic Weight</label>
+          <Select name="thematic_weight" value={resource?.thematic_weight || "personal_opinion"} onChange={onChange}>
+            <option value="personal_opinion">Personal Opinion</option>
+            <option value="academic_journal">Academic Journal</option>
+            <option value="critique">Critique</option>
+            <option value="philosophy">Philosophy</option>
+          </Select>
+        </div>
+      </>
+    )} */}
+
+    {/* Description (For non-articles) */}
+    {resourceType !== 'article' && (
+      <div className="flex flex-col gap-2 md:col-span-3 mt-2">
+        <label className="text-sm font-semibold text-slate-700">Description</label>
+        <Textarea
+          name="description"
+          placeholder="Provide a brief overview of this resource..."
+          value={resource?.description || ""}
+          onChange={onChange}
+        />
+        {errors.description && (
+          <span className="text-xs font-medium text-red-600 mt-1">
+            {errors.description}
+          </span>
+        )}
+      </div>
+    )}
+
+    {/* Article Specific Details */}
+    {resourceType === 'article' && (
+      <div className="md:col-span-3 mt-4 border border-slate-200 rounded-xl overflow-hidden">
+        <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+          <h3 className="text-base font-bold text-slate-900">Article Content</h3>
+        </div>
+        <div className="p-6 bg-white flex flex-col gap-2">
+          <div className="min-h-[300px]">
+            <Editor
+              editorBlock="editorjs-container"
+              data={resource?.article_text}
+              onChange={(data) => {
+                setResource((prev) => (prev ? { ...prev, article_text: data } : prev));
+                if (data?.blocks?.length > 0) {
+                  setErrors((prev) => {
+                    const newErrors = { ...prev };
+                    delete newErrors.article_text;
+                    return newErrors;
+                  });
+                }
+              }}
+            />
+          </div>
+          {errors.article_text && (
+            <span className="text-xs font-medium text-red-600 mt-1">
+              {errors.article_text}
+            </span>
+          )}
+        </div>
+      </div>
+    )}
+  </div>
+
+  {/* Event Specifics */}
+  {resourceType === 'event' && (
+    <>
+      <div className="grid grid-cols-1 gap-6 mt-6 pt-6 border-t border-slate-100">
+        
+        {/* Study Level Toggle */}
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-semibold text-slate-700">Available for Study Level</label>
+          <div className="flex flex-wrap items-center gap-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isAllLevelsChecked}
+                onChange={() => handleStudyLevelToggle('all')}
+                className="w-4 h-4 text-primary-600 border-slate-300 rounded cursor-pointer focus:ring-primary-500"
+              />
+              <span className={`text-sm font-medium ${isAllLevelsChecked ? 'text-primary-800' : 'text-slate-700'}`}>
+                All Levels
+              </span>
+            </label>
+
+            <div className="h-4 w-px bg-slate-300 hidden sm:block"></div>
+
+            {availableStudyLevels.map((level) => {
+              const isChecked = currentStudyLevelIds.includes(level);
+              return (
+                <label key={level} className="flex items-center gap-2 cursor-pointer hover:opacity-80">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => handleStudyLevelToggle(level)}
+                    className="w-4 h-4 text-primary-600 border-slate-300 rounded cursor-pointer focus:ring-primary-500"
+                  />
+                  <span className={`text-sm ${isChecked ? 'text-slate-900 font-medium' : 'text-slate-600'}`}>
+                    Level {level}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          {errors.studyLevels && (
+            <span className="text-xs font-medium text-red-600 mt-1">
+              {errors.studyLevels}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Event Organizers */}
+      <div className="flex flex-col gap-4 mt-8">
+        <div className="flex justify-between items-center mb-2">
+          <div>
+            <h4 className="text-base font-bold text-slate-900">Event Organizers</h4>
+            <p className="text-sm text-slate-500">Select organizer(s) of this event.</p>
+          </div>
+          <Button
+            type="button"
+            onClick={handleAddOrganizer}
+            variant="outline"
+            size="sm"
+            className="text-primary-700 border-primary-200 hover:bg-primary-50"
+          >
+            + Add Organizer
+          </Button>
+        </div>
+        {errors.organizers && (
+          <span className="text-xs font-medium text-red-600 mt-1">{errors.organizers}</span>
+        )}
+        
+        {resource?.organizers?.map((organizer, index) => (
+          <div
+            key={index}
+            className="flex flex-col gap-4 p-4 border border-slate-200 rounded-xl bg-slate-50 relative group transition-all hover:border-slate-300"
+          >
+            <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+              <span className="text-sm font-bold text-slate-700 uppercase tracking-wider">
+                Organizer {index + 1}
+              </span>
+
+              {resource.organizers && resource.organizers.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveOrganizer(index)}
+                  className="text-slate-400 hover:text-danger-600 transition-colors p-1"
+                  title="Remove Organizer"
+                >
+                  <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-semibold text-slate-700">Organizer Name</label>
+              <Select 
+                name="organizer" 
+                value={organizer.organizer_id || ""} 
+                onChange={(e) => handleOrganizerChange(index, e.target.value)}
+                className="bg-white"
+              >
+                <option value="" disabled>Select an organizer...</option>
+                {organizers?.map((org) => (
+                  <option key={org.organizer_id} value={org.organizer_id}>
+                    {org.name.charAt(0).toUpperCase() + org.name.slice(1)}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Event Sessions */}
+      <div className="flex flex-col gap-4 mt-8 pt-6 border-t border-slate-100">
+        <div className="flex justify-between items-center mb-2">
+          <div>
+            <h4 className="text-base font-bold text-slate-900">Event Sessions</h4>
+            <p className="text-sm text-slate-500">Add multiple days or time blocks for this event.</p>
+          </div>
+          <Button
+            type="button"
+            onClick={handleAddSession}
+            variant="outline"
+            size="sm"
+            className="text-primary-700 border-primary-200 hover:bg-primary-50"
+          >
+            + Add Session
+          </Button>
+        </div>
+        {errors.sessions && (
+          <span className="text-xs font-medium text-red-600 mt-1">{errors.sessions}</span>
+        )}
+        
+        {resource?.sessions?.map((session, index) => (
+          <div
+            key={index}
+            className="flex flex-col gap-4 p-4 border border-slate-200 rounded-xl bg-slate-50 relative group transition-all hover:border-slate-300"
+          >
+            <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+              <span className="text-sm font-bold text-slate-700 uppercase tracking-wider">
+                Session {index + 1}
+              </span>
+
+              {resource.sessions && resource.sessions.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveSession(index)}
+                  className="text-slate-400 hover:text-danger-600 transition-colors p-1"
+                  title="Remove Session"
+                >
+                  <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-slate-600">Starts At</label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    type="date"
+                    className="flex-1 bg-white"
+                    value={getDateOnly(session.start_datetime) || ""}
+                    onChange={(e) => handleSessionChange(index, 'start', 'date', e.target.value)}
+                    required
+                  />
+                  <Input
+                    type="time"
+                    className="w-full sm:w-32 bg-white"
+                    value={getTimeOnly(session.start_datetime) || ""}
+                    onChange={(e) => handleSessionChange(index, 'start', 'time', e.target.value)}
+                    required
                   />
                 </div>
-                {errors.article_text && (
-                  <span className="text-xs font-medium text-red-600 mt-1">
-                    {errors.article_text}
-                  </span>
-                )}
-              </div>
-            </Pane>
-          )}
-
-          { resourceType != 'article' && (
-            <div className="flex flex-col gap-2 md:col-span-3">
-            <label className="text-sm font-semibold text-slate-700">Description</label>
-            <Textarea
-              name="description"
-              placeholder="Provide a brief overview of this resource..."
-              value={resource?.description || ""}
-              onChange={onChange}
-            />
-            {errors.description && (
-              <span className="text-xs font-medium text-red-600 mt-1">
-                {errors.description}
-              </span>
-            )}
-          </div>
-
-          )}
-        </div>
-        { resourceType == 'event' && (
-        <>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-          {/* <div className="flex flex-col gap-2 md:col-span-1">
-            <label className="text-sm font-semibold text-slate-700">Scale</label>
-            <Select name="scale" value={resource?.scale || ""} onChange={onChange}>
-              <option value="university">University</option>
-              <option value="regional">Regional</option>
-              <option value="national">National</option>
-              <option value="international">International</option>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-2 md:col-span-1">
-            <label className="text-sm font-semibold text-slate-700">Speaker's Degree</label>
-            <Select name="speaker_degree" value={resource?.speaker_degree || ""} onChange={onChange}>
-              <option value="no_speaker">No Speaker</option>
-              <option value="university_student">University Student</option>
-              <option value="bachelor">Bachelor</option>
-              <option value="master">Master</option>
-              <option value="phd">Phd</option>
-            </Select>
-          </div> */}
-
-          <div className="flex flex-col gap-2 md:col-span-2 mt-2">
-            <label className="text-sm font-semibold text-slate-700">Available for Study Level</label>
-            <div className="flex flex-wrap items-center gap-6 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isAllLevelsChecked}
-                  onChange={() => handleStudyLevelToggle('all')}
-                  className="w-4 h-4 text-primary-600 border-slate-300 rounded cursor-pointer focus:ring-primary-500"
-                />
-                <span className={`text-sm font-medium ${isAllLevelsChecked ? 'text-primary-800' : 'text-slate-700'}`}>
-                  All Levels
-                </span>
-              </label>
-
-              <div className="h-4 w-px bg-slate-300 hidden sm:block"></div>
-
-              {availableStudyLevels.map((level) => {
-                const isChecked = currentStudyLevelIds.includes(level); 
-                
-                return (
-                  <label key={level} className="flex items-center gap-2 cursor-pointer hover:opacity-80">
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => handleStudyLevelToggle(level)}
-                      className="w-4 h-4 text-primary-600 border-slate-300 rounded cursor-pointer focus:ring-primary-500"
-                    />
-                    <span className={`text-sm ${isChecked ? 'text-slate-900 font-medium' : 'text-slate-600'}`}>
-                      Level {level}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-            {errors.studyLevels && (
-              <span className="text-xs font-medium text-red-600 mt-1">
-                {errors.studyLevels}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-4 mt-6 pt-6 border-t border-slate-100">
-          <div className="flex justify-between items-center mb-2">
-            <div>
-              <h4 className="text-base font-bold text-slate-900">Event Organizers</h4>
-              <p className="text-sm text-slate-500">Select organizer(s) of this event.</p>
-            </div>
-            <Button 
-              type="button" 
-              onClick={handleAddOrganizer} 
-              variant="outline" 
-              size="sm"
-              className="text-primary-700 border-primary-200 hover:bg-primary-50"
-            >
-              + Add Organizer
-            </Button>
-          </div>
-          {errors.organizers && (
-            <span className="text-xs font-medium text-red-600 mt-1">{errors.organizers}</span>
-          )}
-          {resource?.organizers?.map((organizer, index) => (
-            <div 
-              key={index} 
-              className="flex flex-col gap-4 p-4 border border-slate-200 rounded-xl bg-slate-50 relative group transition-all hover:border-slate-300"
-            >
-              <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                <span className="text-sm font-bold text-slate-700 uppercase tracking-wider">
-                  Organizer {index + 1}
-                </span>
-                
-                {/* Only show delete button if there is more than 1 session */}
-                {resource.organizers && resource.organizers.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveOrganizer(index)}
-                    className="text-slate-400 hover:text-danger-600 transition-colors p-1"
-                    title="Remove Organizer"
-                  >
-                    <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-col gap-2 md:col-span-1">
-                <label className="text-sm font-semibold text-slate-700">Organizer</label>
-                <Select name="organizer" value={organizer.organizer_id || ""} onChange={ (e) => {handleOrganizerChange(index, e.target.value)}}>
-                  <option value="" disabled>Select an organizer...</option>
-                  { organizers?.map((organizer) => (
-                    <option key={organizer.organizer_id} value={organizer.organizer_id}>{organizer.name.charAt(0).toUpperCase() + organizer.name.slice(1)}</option>
-                  ))
-                  }
-                </Select>
-              </div>
-              
-            </div>
-          ))}
-        </div>
-
-        <div className="flex flex-col gap-4 mt-6 pt-6 border-t border-slate-100">
-          <div className="flex justify-between items-center mb-2">
-            <div>
-              <h4 className="text-base font-bold text-slate-900">Event Sessions</h4>
-              <p className="text-sm text-slate-500">Add multiple days or time blocks for this event.</p>
-            </div>
-            <Button 
-              type="button" 
-              onClick={handleAddSession} 
-              variant="outline" 
-              size="sm"
-              className="text-primary-700 border-primary-200 hover:bg-primary-50"
-            >
-              + Add Session
-            </Button>
-          </div>
-          {errors.sessions && (
-            <span className="text-xs font-medium text-red-600 mt-1">{errors.sessions}</span>
-          )}
-          {resource?.sessions?.map((session, index) => (
-            <div 
-              key={index} 
-              className="flex flex-col gap-4 p-4 border border-slate-200 rounded-xl bg-slate-50 relative group transition-all hover:border-slate-300"
-            >
-              <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                <span className="text-sm font-bold text-slate-700 uppercase tracking-wider">
-                  Session {index + 1}
-                </span>
-                
-                {/* Only show delete button if there is more than 1 session */}
-                {resource.sessions && resource.sessions.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveSession(index)}
-                    className="text-slate-400 hover:text-danger-600 transition-colors p-1"
-                    title="Remove Session"
-                  >
-                    <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
-                  </button>
+                {errors[`session_${index}_start`] && (
+                  <span className="text-xs font-medium text-red-600">{errors[`session_${index}_start`]}</span>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-slate-600">Starts At</label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="date"
-                      className="flex-1 bg-white"
-                      value={getDateOnly(session.start_datetime) || ""}
-                      onChange={(e) => handleSessionChange(index, 'start', 'date', e.target.value)}
-                      required
-                    />
-                    <Input
-                      type="time"
-                      className="w-32 bg-white"
-                      value={getTimeOnly(session.start_datetime) || ""}
-                      onChange={(e) => handleSessionChange(index, 'start', 'time', e.target.value)}
-                      required
-                    />
-                  </div>
-                   {errors[`session_${index}_start`] && (
-                      <span className="text-xs font-medium text-red-600">{errors[`session_${index}_start`]}</span>
-                    )}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-slate-600">Ends At</label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="date"
-                      className="flex-1 bg-white"
-                      value={getDateOnly(session.end_datetime) || ""}
-                      onChange={(e) => handleSessionChange(index, 'end', 'date', e.target.value)}
-                      required
-                    />
-                    <Input
-                      type="time"
-                      className="w-32 bg-white"
-                      value={getTimeOnly(session.end_datetime) || ""}
-                      onChange={(e) => handleSessionChange(index, 'end', 'time', e.target.value)}
-                      required
-                    />
-                  </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-slate-600">Ends At</label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    type="date"
+                    className="flex-1 bg-white"
+                    value={getDateOnly(session.end_datetime) || ""}
+                    onChange={(e) => handleSessionChange(index, 'end', 'date', e.target.value)}
+                    required
+                  />
+                  <Input
+                    type="time"
+                    className="w-full sm:w-32 bg-white"
+                    value={getTimeOnly(session.end_datetime) || ""}
+                    onChange={(e) => handleSessionChange(index, 'end', 'time', e.target.value)}
+                    required
+                  />
                 </div>
                 {errors[`session_${index}_end`] && (
-                      <span className="text-xs font-medium text-red-600">{errors[`session_${index}_end`]}</span>
-                    )}
-              </div>
-            </div>
-          ))}
-        </div>
-        </>
-        )}
-      </Pane>
-
-      <Pane variant="shadow" className="p-6">
-        <div className="grid grid-cols-1 gap-6">
-
-          {resourceAssessments?.map((resourceAssessment, index) => {
-            const currentVal = resource?.resource_assessments?.find(
-              (a) => a.resource_assessment_id === resourceAssessment.resource_assessment_id
-            )?.resource_weight || 0;
-
-            return (
-              <div key={resourceAssessment.resource_assessment_id || index} className="flex flex-col mb-4">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-sm font-semibold text-slate-700">
-                    {resourceAssessment.display_name}
-                  </label>
-                  <span className="text-sm font-bold text-blue-600">
-                    {currentVal.toFixed(2)}
-                  </span>
-                </div>
-
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={currentVal}
-                  onChange={(e) => handleAssessmentChange(resourceAssessment.resource_assessment_id, parseFloat(e.target.value))}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                />
-                {errors[`resource_assessments_${index}`] && (
-                  <span className="text-xs font-medium text-red-600 mt-1">
-                    {errors[`resource_assessments_${index}`]}
-                  </span>
+                  <span className="text-xs font-medium text-red-600">{errors[`session_${index}_end`]}</span>
                 )}
               </div>
-            );
-          })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  )}
+</Pane>
 
+{/* Resource Assessments Section */}
+<Pane variant="shadow" className="p-6 mt-6">
+  <h3 className="text-lg font-bold text-slate-900 mb-6 border-b border-slate-100 pb-2">Assessments</h3>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+    {resourceAssessments?.map((resourceAssessment, index) => {
+      const currentVal = resource?.resource_assessments?.find(
+        (a) => a.resource_assessment_id === resourceAssessment.resource_assessment_id
+      )?.resource_weight || 0;
+
+      return (
+        <div key={resourceAssessment.resource_assessment_id || index} className="flex flex-col">
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-sm font-semibold text-slate-700">
+              {resourceAssessment.display_name}
+            </label>
+            <span className="text-sm font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+              {currentVal.toFixed(2)}
+            </span>
+          </div>
+
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={currentVal}
+            onChange={(e) => handleAssessmentChange(resourceAssessment.resource_assessment_id, parseFloat(e.target.value))}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+          />
+          {errors[`resource_assessments_${index}`] && (
+            <span className="text-xs font-medium text-red-600 mt-1">
+              {errors[`resource_assessments_${index}`]}
+            </span>
+          )}
         </div>
-      </Pane>
+      );
+    })}
+  </div>
+</Pane>
 
 
       {/* SECTION 2: Sub-CPLs & Indicators */}

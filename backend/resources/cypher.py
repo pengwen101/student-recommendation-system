@@ -30,26 +30,31 @@ create_update_base_query = """
         MATCH (t:Topic {topic_id: topic.topic_id})
         MERGE (r)-[rc:COVERS]->(t)
     }
-    CALL (r) {
-        SET r.internal_weight = CASE 
-            WHEN $resource_assessments IS NULL OR size($resource_assessments) = 0 THEN 1.0
-            ELSE REDUCE(
-                total = 0.0, 
-                item IN $resource_assessments | 
-                total + (
-                    toFloat(item.resource_weight) * COALESCE(
-                        HEAD([(ra:ResourceAssessment {resource_assessment_id: item.resource_assessment_id}) | toFloat(ra.weight)]), 
-                        0.0
-                    )
-                )
-            )
-        END
-        WITH r
-        UNWIND COALESCE($resource_assessments, []) AS ra_input 
-        MATCH (ra:ResourceAssessment {resource_assessment_id: ra_input.resource_assessment_id}) 
-        MERGE (r)-[rh:HAS]->(ra) 
-        SET rh.weight = toFloat(ra_input.resource_weight) 
+    WITH r, coalesce($resource_assessments, []) AS assessments
+    CALL (r, assessments) {
+        // We UNWIND a list that is guaranteed to have at least one element (even if it's null).
+        // This prevents the subquery from returning zero rows and accidentally filtering out 'r' entirely.
+        UNWIND (CASE WHEN size(assessments) = 0 THEN [null] ELSE assessments END) AS item
+        
+        // Match the assessment node if the item exists
+        OPTIONAL MATCH (ra:ResourceAssessment {resource_assessment_id: item.resource_assessment_id})
+        
+        // Use FOREACH as a safe conditional block to create the relationship
+        FOREACH (_ IN CASE WHEN item IS NOT NULL AND ra IS NOT NULL THEN [1] ELSE [] END |
+            MERGE (r)-[rh:HAS]->(ra)
+            SET rh.weight = toFloat(item.resource_weight)
+        )
+        
+        // Calculate and return the sum. If the list was empty, this sums to 0.0
+        RETURN sum(
+            CASE WHEN item IS NOT NULL AND ra IS NOT NULL 
+            THEN toFloat(item.resource_weight) * toFloat(ra.weight) 
+            ELSE 0.0 END
+        ) AS calculated_weight
     }
+
+    // Finally, apply the weight to the resource (defaulting to 1.0 if the math yielded 0.0)
+    SET r.internal_weight = CASE WHEN calculated_weight = 0.0 THEN 1.0 ELSE calculated_weight END
 """
 
 
@@ -178,7 +183,7 @@ async def create_resource(resource_id: str, label: str, data: dict, current_user
     WITH r
     {create_update_base_query}
     """
-    resource_properties = {k: v for k, v in data.items() if k not in {"study_levels", "organizers", "sessions", "topics", "resource_assessments", "indicators", "published_date", "target_words"}}
+    resource_properties = {k: v for k, v in data.items() if k not in {"study_levels", "organizers", "sessions", "topics", "resource_assessments", "indicators", "published_date"}}
     
     
     params = {"resource_id": resource_id, 
@@ -213,7 +218,7 @@ async def update_resource(resource_id: str, data: dict, current_user: dict):
     WITH r
     {create_update_base_query}
     """
-    resource_properties = {k: v for k, v in data.items() if k not in {"study_levels", "organizers", "sessions", "topics", "resource_assessments", "indicators", "published_date", "target_words"}}
+    resource_properties = {k: v for k, v in data.items() if k not in {"study_levels", "organizers", "sessions", "topics", "resource_assessments", "indicators", "published_date"}}
     params = {"resource_id": resource_id, 
               "resource_properties": resource_properties,
               "published_date": data.get("published_date"),
@@ -349,10 +354,10 @@ async def get_indicator_recommendation(target_words: list[str], method: str):
     WITH $target_words AS target_words
     WITH target_words, size(target_words) AS target_word_count
     UNWIND target_words AS word
-    MATCH (w:ns2__LexicalEntry) WHERE lower(w.lemma) = lower(word) AND w.partOfSpeech = "Noun"
+    MATCH (w:ns2__LexicalEntry) WHERE w.lower_lemma = lower(word) AND w.partOfSpeech = "Noun"
     CALL (w) {
         MATCH (other:UniResource)-[r:LINKED_TO]->(w)
-        WHERE r.method = "noun_wordnet"
+        WHERE r.method = "entity_wordnet"
         RETURN other
         UNION
         WITH w

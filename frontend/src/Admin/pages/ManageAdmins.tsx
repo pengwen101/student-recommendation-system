@@ -1,13 +1,13 @@
-import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCircleCheck } from '@fortawesome/free-regular-svg-icons';
+import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 import type { Admin } from "../../types";
 import api from "../../api/axios";
 
-function ManageAdmins(){
+function ManageAdmins() {
     const [admins, setAdmins] = useState<Admin[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -17,7 +17,7 @@ function ManageAdmins(){
                 const response = await api.get("/admin");
                 setAdmins(response.data.admins);
             }
-            catch (error){
+            catch (error) {
                 let errorMessage = "An unknown error occurred";
                 if (error instanceof Error) {
                     errorMessage = error.message;
@@ -32,7 +32,7 @@ function ManageAdmins(){
             }
         }
         fetchAdmins();
-    }, [])
+    }, []);
 
     const onApprove = async (admin_id: string) => {
         try {
@@ -46,7 +46,7 @@ function ManageAdmins(){
             );
             toast.success("Admin approved successfully.");
         }
-        catch (error){
+        catch (error) {
             let errorMessage = "An unknown error occurred";
             if (error instanceof Error) {
                 errorMessage = error.message;
@@ -58,36 +58,94 @@ function ManageAdmins(){
         }
     }
 
-
     return (
-        <>
-            <div className="text-2xl mb-4">Admins</div>
-            <Link to="/admin/create"><button className="bg-blue-500 text-white">Add Admin</button></Link>
-            {loading ? (<div className="text-sm text-gray-500 mt-4 animate-pulse">Loading admins...</div>) : (
-            <div className="overflow-x-auto bg-white rounded-lg shadow-md border border-gray-200 m-8">
-                <table className="table-auto w-full text-left border-collapse">
-                    <thead className="bg-gray-50 border-b border-gray-200 text-gray-700 uppercase text-xs font-bold tracking-wider">
-                        <tr>
-                            <th className="px-6 py-4">Email</th>
-                            <th className="px-6 py-4">Name</th>
-                        </tr>
-                    </thead>
-                    <tbody className="text-sm text-gray-800">
-                        {admins.map((admin) => (
-                            <tr key={admin.admin_id} className="border-b border-gray-100 hover:bg-gray-200 transition-colors">
-                                <td className="px-6 py-4 font-medium">{admin.email}</td>
-                                <td className="px-6 py-4 text-gray-500">{admin.name}</td>
-                                {admin.approved ? (<td className="px-6 py-4"></td>) : (
-                                <td className="px-6 py-4"><FontAwesomeIcon className="cursor-pointer" onClick={() => onApprove(admin.admin_id)} icon={faCircleCheck} /></td>)
-                                }
+        <div className="max-w-6xl mx-auto px-6 py-12 md:px-8 min-h-screen bg-slate-50">
+            {/* Header */}
+            <div className="mb-8 flex justify-between items-end">
+                <div>
+                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Manage Admins</h1>
+                    <p className="text-slate-500 mt-2">View and approve system administrators.</p>
+                </div>
+                {!loading && (
+                    <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg font-bold shadow-sm border border-blue-100">
+                        {admins.length} Total Admins
+                    </div>
+                )}
+            </div>
+
+            {/* Content Pane */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[400px]">
+                <div className="p-4 border-b border-slate-100 bg-slate-50">
+                    <h3 className="text-lg font-bold text-slate-900">Administrator Roster</h3>
+                </div>
+
+                <div className="overflow-x-auto flex-1 relative">
+                    {loading ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/60 z-10">
+                            <div className="text-slate-500 font-medium flex items-center gap-2">
+                                <FontAwesomeIcon icon={faSpinner} spin /> Loading admins...
+                            </div>
+                        </div>
+                    ) : null}
+
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
+                                <th className="p-4 font-semibold">Admin Details</th>
+                                <th className="p-4 font-semibold">Status</th>
+                                <th className="p-4 font-semibold text-right">Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>)
-            }
-        </>
-    )
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-sm bg-white">
+                            {admins.length > 0 ? (
+                                admins.map((admin) => (
+                                    <tr key={admin.admin_id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="p-4">
+                                            <div className="font-bold text-slate-900">{admin.name}</div>
+                                            <div className="text-slate-500 text-xs mt-0.5">{admin.email}</div>
+                                        </td>
+                                        <td className="p-4">
+                                            {admin.approved ? (
+                                                <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-xs font-bold border border-green-200 inline-block">
+                                                    Approved
+                                                </span>
+                                            ) : (
+                                                <span className="bg-amber-100 text-amber-700 px-2.5 py-1 rounded-md text-xs font-bold border border-amber-200 inline-block">
+                                                    Pending
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="p-4 text-right">
+                                            {!admin.approved ? (
+                                                <button 
+                                                    onClick={() => onApprove(admin.admin_id)} 
+                                                    className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-blue-200"
+                                                    title="Approve Admin"
+                                                >
+                                                    <FontAwesomeIcon icon={faCircleCheck} className="text-sm" /> 
+                                                    Approve
+                                                </button>
+                                            ) : (
+                                                <span className="text-slate-300 text-xs italic pr-2">No actions available</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                !loading && (
+                                    <tr>
+                                        <td colSpan={3} className="p-10 text-center text-slate-400 italic">
+                                            No administrators found.
+                                        </td>
+                                    </tr>
+                                )
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 export default ManageAdmins;

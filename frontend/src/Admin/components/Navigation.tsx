@@ -24,15 +24,6 @@ const Navbar = () => {
                 </div>
                 
                 <nav className="flex flex-col gap-y-1">
-                    <Link to="/home" className="w-full">
-                        <Button 
-                            variant={isActive("/home") ? "secondary" : "ghost"} 
-                            className={`w-full justify-start ${isActive("/home") ? "text-primary-800 font-semibold" : "text-slate-600"}`}
-                        >
-                            Home
-                        </Button>
-                    </Link>
-
                     <Link to="/topic" className="w-full">
                         <Button 
                             variant={isActive("/topic") ? "secondary" : "ghost"} 

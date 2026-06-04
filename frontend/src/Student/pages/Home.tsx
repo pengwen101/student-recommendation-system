@@ -48,7 +48,7 @@ const Home = () => {
                     window.location.href = '/student/login';
                     return;
                 }
-                const userData: Student = userRes.data;
+                const userData = userRes.data;
                 setUser(userData);
                 const nrp = userData.user_id;
 

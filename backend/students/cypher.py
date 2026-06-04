@@ -90,6 +90,37 @@ async def read_student_indicators(nrp: str):
     response = await Neo4jConnection.query(query, params)
     return response
 
+
+async def read_student_lack_indicators(nrp: str):
+    query = """
+    MATCH (cf:Config:StudentTarget)
+    MATCH (s:Student {nrp: $nrp})-[r:HAS]->(i:Indicator)
+    WITH i, cf.target_score - r.weight AS calculated_weight
+    WHERE calculated_weight > 0
+    RETURN i.indicator_id as indicator_id, 
+           i.code as code, 
+           i.name as name, 
+           calculated_weight as weight
+    """
+    params = {"nrp": nrp}
+    response = await Neo4jConnection.query(query, params)
+    return response
+
+async def read_student_lack_subcpls(nrp: str):
+    query = """
+    MATCH (cf:Config:StudentTarget)
+    MATCH (s:Student {nrp: $nrp})-[r:HAS]->(sc:SubCpl)
+    WITH sc, cf.target_score - r.weight AS calculated_weight
+    WHERE calculated_weight > 0
+    RETURN sc.sub_cpl_id as sub_cpl_id, 
+           sc.code as code, 
+           sc.name as name, 
+           calculated_weight as weight
+    """
+    params = {"nrp": nrp}
+    response = await Neo4jConnection.query(query, params)
+    return response
+
 async def read_student_subcpls(nrp: str):
     query = """
         MATCH (s:Student {nrp: $nrp})-[r:HAS]->(sc:SubCpl)
@@ -199,7 +230,7 @@ async def get_student_recommendations(nrp: str, label: str):
              )) * coalesce(r.internal_weight, 1.0) AS score
              
         ORDER BY score DESC
-        LIMIT 5
+        LIMIT 4
         RETURN {{
             resource_id: r.resource_id, 
             type: tolower(head([l IN labels(r) WHERE l <> 'UniResource'])),
@@ -323,6 +354,20 @@ async def record_student_attendance(resource_id: str, nrps: list[str]):
     await add_student_score(resource_id, nrps)
     
     
+async def delete_student_attendance(resource_id: str, nrp: str | None = None):
+    query = """
+        MATCH (r:UniResource {resource_id: $resource_id})<-[ra:ATTENDED]-(s:Student)
+        WHERE $nrp IS NULL OR s.nrp = $nrp
+        DELETE ra
+    """
+    params = {
+        "resource_id": resource_id,
+        "nrp": nrp
+    }
+    
+    await Neo4jConnection.query(query, params)
+    await delete_student_score(resource_id, nrp)
+    
 async def add_student_score(resource_id: str, nrps: list[str]):
     query = """
         MATCH (r:UniResource {resource_id: $resource_id})
@@ -332,12 +377,26 @@ async def add_student_score(resource_id: str, nrps: list[str]):
         MATCH (s:Student {nrp: nrp})
         
         CALL (s, r, cf) {
-            MATCH (r)-[rs:SUPPORTS]->(i:Indicator)
+            MATCH (r)-[rs:SUPPORTS]->(i:Indicator)       
             MATCH (s)-[rh:HAS]->(i)
-            SET rh.weight =
-                CASE WHEN rh.weight + (cf.weight * rs.weight * coalesce(r.internal_weight, 1.0)) <= 1.0
-                THEN rh.weight + (cf.weight * rs.weight * coalesce(r.internal_weight, 1.0))
-                ELSE 1.0 END
+            
+            WITH s, r, i, rh, cf, rs,
+                 rh.weight + (cf.weight * rs.weight * coalesce(r.internal_weight, 1.0)) AS calc_score
+    
+            CREATE (st:ScoreTransaction {
+                score_transaction_id: randomUUID(),
+                timestamp: datetime({timezone: 'Asia/Jakarta'})
+            })
+            
+            SET st.previous_score = rh.weight,
+                st.new_score = CASE WHEN calc_score <= 1.0 THEN calc_score ELSE 1.0 END,
+                st.delta_score = CASE WHEN calc_score <= 1.0 THEN calc_score - rh.weight ELSE 1.0 - rh.weight END
+
+            MERGE (s)-[:EARNED]->(st)
+            MERGE (st)-[:AFFECTS]->(i)
+            MERGE (st)-[:FROM_SOURCE]->(r)
+
+            SET rh.weight = st.new_score
         }
 
         CALL (s) {
@@ -367,6 +426,57 @@ async def add_student_score(resource_id: str, nrps: list[str]):
     params = {
         "resource_id": resource_id,
         "nrps": nrps
+    }
+    
+    await Neo4jConnection.query(query, params)
+    
+    
+async def delete_student_score(resource_id: str, nrp: str | None = None):
+    query = """
+        MATCH (r:UniResource {resource_id: $resource_id})
+        MATCH (s:Student)
+        WHERE ($nrp IS NOT NULL AND s.nrp = $nrp) 
+        OR ($nrp IS NULL AND EXISTS { (s)-[:EARNED]->(:ScoreTransaction)-[:FROM_SOURCE]->(r) })
+        
+        CALL (s, r) {
+            MATCH (r)-[:SUPPORTS]->(i:Indicator)
+            MATCH (s)-[re:EARNED]->(st:ScoreTransaction)-[:AFFECTS]->(i)
+            MATCH (st)-[:FROM_SOURCE]->(r)
+            MATCH (s)-[rh:HAS]->(i)
+            SET rh.weight = CASE 
+                WHEN rh.weight - st.delta_score < 0.0 THEN 0.0 
+                ELSE rh.weight - st.delta_score 
+            END
+            DETACH DELETE st
+        }
+
+        CALL (s) {
+            MATCH (s)-[rh:HAS]->(:Indicator)<-[:HAS_INDICATOR]-(q:Quality)
+            WITH s, q, avg(rh.weight) AS qual_avg_score
+            MATCH (s)-[rlq:HAS]->(q)
+            SET rlq.weight = qual_avg_score
+        }
+        CALL (s) {
+            MATCH (s)-[rlq:HAS]->(q:Quality)<-[sq:HAS_QUALITY]-(sc:SubCpl)
+            WITH s, sc,
+                 sum(rlq.weight * sq.weight) AS weighted_score_sum,
+                 sum(sq.weight) AS total_weight
+            WITH s, sc, weighted_score_sum / total_weight AS subcpl_avg_score
+            MATCH (s)-[rls:HAS]->(sc)
+            SET rls.weight = subcpl_avg_score
+        }
+
+        CALL (s) {
+            MATCH (s)-[rls:HAS]->(sc:SubCpl)<-[:HAS_SUB_CPL]-(c:Cpl)
+            WITH s, c, avg(rls.weight) AS cpl_avg_score
+            MATCH (s)-[rlc:HAS]->(c)
+            SET rlc.weight = cpl_avg_score
+        }
+    """
+    
+    params = {
+        "resource_id": resource_id,
+        "nrp": nrp
     }
     
     await Neo4jConnection.query(query, params)

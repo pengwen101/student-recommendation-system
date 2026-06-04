@@ -30,12 +30,14 @@ type BottomChartView = 'quality' | 'indicator';
 // --- RADAR CHART COMPONENT ---
 function RadarChart({ 
   title, 
+  cplName, 
   data, 
   parentCplId, 
-  cplScore, // <-- New Prop for the real database score
+  cplScore, 
   onSelect 
 }: { 
   title: string; 
+  cplName: string;
   data: StudentMastery[];
   parentCplId: string;
   cplScore: number;
@@ -51,6 +53,38 @@ function RadarChart({
     return {
       tooltip: {
         trigger: 'item',
+        extraCssText: 'white-space: normal; max-width: 450px; width: max-content;', 
+        
+        // --- NEW: Tooltip Positioning Logic ---
+        position: (point: number[], params: any, dom: HTMLElement, rect: any, size: any) => {
+          // point[0] is X, point[1] is Y
+          // size.contentSize is [width, height] of the tooltip popup
+          // size.viewSize is [width, height] of the chart container
+
+          // 1. Move it to the left of the cursor (15px gap)
+          let xPos = point[0] - size.contentSize[0] - 15;
+  
+          // 2. Center it vertically (Math is exact: cursor Y minus half the tooltip's height)
+          let yPos = point[1] - (size.contentSize[1] / 2);
+
+          // 3. Boundary Fallbacks: Prevent clipping off the screen
+          if (xPos < 0) {
+            // If it hits the left wall, flip it to the right side of the cursor so it doesn't get cut off
+            xPos = point[0] + 15; 
+          }
+          
+          if (yPos < 0) {
+            // If it hits the top ceiling, stick it to the top
+            yPos = 0; 
+          } else if (yPos + size.contentSize[1] > size.viewSize[1]) {
+            // If it hits the bottom floor, stick it to the bottom
+            yPos = size.viewSize[1] - size.contentSize[1];
+          }
+
+          return [xPos, yPos];
+        },
+        // --------------------------------------
+
         formatter: (params: any) => {
           const isTarget = params.name === 'Target Score';
           let html = `<div class="text-sm font-semibold border-b border-gray-300 pb-1 mb-1">${title} - ${params.name}</div>`;
@@ -66,8 +100,8 @@ function RadarChart({
             html += `
               <div class="mt-2 text-xs">
                 <div class="font-bold text-gray-700">${item.curriculum_code}</div>
-                <div class="text-gray-500 truncate max-w-[200px]" title="${item.curriculum_name}">${item.curriculum_name}</div>
-                <div class="flex justify-between gap-4 mt-0.5">
+                <div class="text-gray-500 whitespace-normal break-words mt-0.5 leading-snug">${item.curriculum_name}</div>
+                <div class="flex justify-between gap-4 mt-1">
                   <span>Score:</span>
                   <span class="font-bold" style="color: ${scoreColor}">${displayValue}</span>
                 </div>
@@ -120,16 +154,19 @@ function RadarChart({
         if (clickedItem) onSelect(clickedItem.curriculum_id, clickedItem.curriculum_code);
       } 
       else if (params.componentType === 'series' && parentCplId) {
-        onSelect(parentCplId, title); // Uses the REAL UUID now!
+        onSelect(parentCplId, title); 
       }
     }
   }), [data, parentCplId, onSelect, title]);
 
   return (
     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-between min-h-[350px]">
-      <div className="w-full flex justify-between items-center px-2">
-        <h3 className="font-bold text-gray-800">{title}</h3>
-        <span className="text-xs text-gray-400 italic">Click chart or labels to filter</span>
+      <div className="w-full px-2 mb-2">
+        <div className="flex justify-between items-center mb-1.5">
+          <h3 className="font-bold text-gray-800 text-lg leading-tight">{title}</h3>
+          <span className="text-xs text-gray-400 italic shrink-0">Click chart or labels to filter</span>
+        </div>
+        <p className="text-xs text-gray-500 leading-relaxed w-full">{cplName}</p>
       </div>
       
       {data.length > 0 ? (
@@ -138,7 +175,6 @@ function RadarChart({
         <div className="flex-1 flex items-center justify-center text-gray-400 italic text-sm">No data available</div>
       )}
 
-      {/* Replaced calculated average with the real DB CPL Score */}
       <div className="mt-2 px-4 py-2 bg-blue-50 text-blue-800 rounded-lg text-sm w-full text-center font-medium border border-blue-100">
         Overall CPL Mastery: <span className="font-bold">{cplScore.toFixed(2)}</span>
       </div>
@@ -424,6 +460,7 @@ export default function StudentPerformanceDashboard() {
               <RadarChart 
                 key={cpl.curriculum_id}
                 title={cpl.curriculum_code} 
+                cplName={cpl.curriculum_name}
                 data={relatedSubCpls} 
                 parentCplId={cpl.curriculum_id} // <--- Real UUID from the API!
                 cplScore={cpl.mastery_score}    // <--- Real Mastery Score from the API!

@@ -87,7 +87,7 @@ async def create_resource(type: str, data: ResourceEventInput | ResourceBookInpu
         data_dict['eng_text'] = eng_text
         data_dict['target_words'] = target_words
     
-    await resource_cypher.update_resource(data_dict, current_user)
+    await resource_cypher.create_resource(new_resource_id, label, data_dict, current_user)
     return await read_resource_details(new_resource_id)
 
 async def update_resource(resource_id: str, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict):
@@ -196,8 +196,9 @@ async def get_text_hash_eng_text_target_words(text: str):
     
 async def get_indicator_recommendation(text: str):
     target_words, eng_text, text_hash = await get_text_hash_eng_text_target_words(text)
-    result = await resource_cypher.get_indicator_recommendation(target_words, "entity_wordnet")
-    result["eng_text"] = eng_text
-    result["text_hash"] = text_hash
-    result["target_words"] = target_words
+    result = await resource_cypher.get_indicator_recommendation(target_words, "entity_wordnet")   
+    if result:
+        result["eng_text"] = eng_text
+        result["text_hash"] = text_hash
+        result["target_words"] = target_words
     return result

@@ -3,6 +3,8 @@ import Navbar from './Student/components/Navbar';
 import Login from './pages/Login';
 import Home from './Student/pages/Home';
 import Recommendations from './Student/pages/Recommendations';
+import RecommendationPage from './Student/pages/RecommendationPage';
+import RecommendationPageStudent from './Student/pages/RecommendationPageStudent';
 import SelectTopics from './Student/pages/SelectTopics';
 import SurveyAssessment from './Student/pages/SurveyAssessment';
 import StudentGuard from './Student/pages/StudentGuard';
@@ -55,6 +57,8 @@ function App() {
       <Routes>
         {/* Public Route */}
         <Route path="/login" element={<Login />} />
+        <Route path="/recommendation_result" element={<RecommendationPage />} />
+        <Route path="/recommendation_result_student" element={<RecommendationPageStudent />} />
         <Route element={<StudentGuard />}>
           <Route path="/student/input_topics" element={<SelectTopics />} />
           <Route path="/student/survey_assessment" element={<SurveyAssessment />} />

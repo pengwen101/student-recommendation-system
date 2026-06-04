@@ -22,7 +22,7 @@ export default function ConfigurationDashboard() {
 
   // Global Config State
   const [studentTarget, setStudentTarget] = useState<number>(0);
-  const [addScoreConstant, setAddScoreConstant] = useState<number>(1.0); // NEW STATE
+  const [addScoreConstant, setAddScoreConstant] = useState<number>(1.0); // Constant for student score addition
   const [recWeight, setRecWeight] = useState<RecommendationWeight>({ need_weight: 0.5, interest_weight: 0.5 });
 
   // Resource Assessment State
@@ -51,11 +51,13 @@ export default function ConfigurationDashboard() {
       const [targetRes, weightRes, constantRes] = await Promise.all([
         api.get("/config/student_target"),
         api.get("/config/recommendation_weight"),
-        api.get("/config/add_score_constant") // NEW API CALL
+        api.get("/config/add_score_constant")
       ]);
       setStudentTarget(targetRes.data.target_score || targetRes.data);
       setRecWeight(weightRes.data);
-      setAddScoreConstant(constantRes.data.weight || 1.0);
+      
+      // Assumes your AddScoreConstant model returns a 'weight' or similar numeric field
+      setAddScoreConstant(constantRes.data.weight ?? constantRes.data ?? 1.0);
     } catch {
       toast.error("Failed to load global configurations.");
     }
@@ -64,7 +66,7 @@ export default function ConfigurationDashboard() {
   const fetchAssessments = async (type: string) => {
     try {
       setLoading(true);
-      const res = await api.get(`/config/resource_assessments?type=${type}`);
+      const res = await api.get(`/config/resource_assessments/${type}`);
       setAssessments(res.data);
       setEditingId(null); // Clear any active edits when switching tabs
     } catch {
@@ -84,9 +86,9 @@ export default function ConfigurationDashboard() {
     }
   };
 
-  // NEW HANDLER: Add Score Constant
   const handleSaveAddScoreConstant = async () => {
     try {
+      // Matches: update_add_score_constant(weight: float)
       await api.put(`/config/add_score_constant?weight=${addScoreConstant}`);
       toast.success("Score Addition Multiplier updated successfully.");
     } catch {
@@ -227,7 +229,7 @@ export default function ConfigurationDashboard() {
           </div>
         </div>
 
-        {/* NEW: Add Score Constant Card */}
+        {/* Add Score Constant Card */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col h-full">
           <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Score Addition Multiplier</h2>
           <div className="flex-1 flex flex-col justify-center">
@@ -285,8 +287,8 @@ export default function ConfigurationDashboard() {
                 value={recWeight.need_weight}
                 onChange={handleSliderChange}
                 className="w-full h-4 appearance-none bg-transparent cursor-pointer z-10 
-                           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-8 [&::-webkit-slider-thumb]:h-8 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-4 [&::-webkit-slider-thumb]:border-gray-800 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg
-                           [&::-moz-range-thumb]:w-8 [&::-moz-range-thumb]:h-8 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-4 [&::-moz-range-thumb]:border-gray-800 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:shadow-lg"
+                            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-8 [&::-webkit-slider-thumb]:h-8 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-4 [&::-webkit-slider-thumb]:border-gray-800 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg
+                            [&::-moz-range-thumb]:w-8 [&::-moz-range-thumb]:h-8 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-4 [&::-moz-range-thumb]:border-gray-800 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:shadow-lg"
               />
             </div>
 

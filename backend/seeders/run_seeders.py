@@ -20,12 +20,12 @@ additional_stop_words = ["students", "student", "people"]
 
 async def seed_years_and_versions():
     query = """
-        MERGE (:StudyLevel {study_level_id: 1})
-        MERGE (:StudyLevel {study_level_id: 2})
-        MERGE (:StudyLevel {study_level_id: 3})
-        MERGE (:StudyLevel {study_level_id: 4})
+        MERGE (:StudyLevel {study_level_id: "1"})
+        MERGE (:StudyLevel {study_level_id: "2"})
+        MERGE (:StudyLevel {study_level_id: "3"})
+        MERGE (:StudyLevel {study_level_id: "4"})
         
-        MERGE (:CurriculumVersion {curriculum_version_id: 1})
+        MERGE (:CurriculumVersion {curriculum_version_id: "1"})
     """
     await Neo4jConnection.query(query)
     
@@ -35,7 +35,7 @@ async def seed_curriculum(path):
     
     query = """
         UNWIND $batch as row
-        MATCH (cv:CurriculumVersion {curriculum_version_id: 1})
+        MATCH (cv:CurriculumVersion {curriculum_version_id: "1"})
         MATCH (b: Batch {batch_id: "2025/2026"})
         MERGE (c:Cpl {code: row.cpl_code})
         ON CREATE SET c.cpl_id = randomUUID()
@@ -133,6 +133,19 @@ async def seed_student_questions_relation(path):
     """
     
     await Neo4jConnection.query(query)
+    
+async def seed_student_topics_relation(path):
+    df = pd.read_parquet(path)
+    data = df.to_dict(orient="records")
+    
+    query = """
+    UNWIND $batch as row
+    MATCH (t:Topic {name: row.topic})
+    MATCH (s:Student {nrp: row.nrp})
+    MERGE (s)-[ri:INTERESTED_IN]-(t)
+    """
+    await Neo4jConnection.query(query, {"batch": data})
+    
     
 async def seed_configs():
     query = """
@@ -694,17 +707,20 @@ async def run_all_seeders():
     # print("Seeding Batch Year and Versions...")
     # await seed_years_and_versions()
     
-    # print("Seeding Students...")
-    # await seed_students("data/demografi.parquet")
+    print("Seeding Students...")
+    await seed_students("data/demografi.parquet")
     
-    print("Seeding Curriculum...")
-    await seed_curriculum("data/curriculum.parquet")
+    # print("Seeding Curriculum...")
+    # await seed_curriculum("data/curriculum.parquet")
     
     # print("Seeding Configuration...")
     # await seed_configs()
     
-    # print("Seeding Relations...")
-    # await seed_student_questions_relation("data/hasil_survei.parquet")
+    print("Seeding Student Questions Relations...")
+    await seed_student_questions_relation("data/hasil_survei.parquet")
+    
+    print("Seeding Student Topics Relations...")
+    await seed_student_topics_relation("data/hasil_topik.parquet")
     
     # print("Seeding Wikidata from Topic...")
     # await seed_topic_wikidata_id()

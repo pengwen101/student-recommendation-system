@@ -262,18 +262,24 @@ export interface Quality {
     code: string;
     name: string;
     weight: number;
-}
-
-export interface Question {
-    question_id: string;
-    code: string;
-    name: string;
+    indicators?: Indicator[]
 }
 
 export interface Indicator {
     indicator_id: string;
     code: string;
     name: string;
+    questions?: Question[];
+}
+
+export interface Question {
+    question_id: string;
+    code: string;
+    name: string;
+    lower_bound: string;
+    upper_bound: string;
+    lower_text?: string;
+    upper_text?: string;
 }
 
 export interface IndicatorSupport {
@@ -302,6 +308,7 @@ export interface SubCpl {
     code: string;
     name: string;
     indicators: Indicator[];
+    qualities?: Quality[];
 }
 
 export interface CPL {
