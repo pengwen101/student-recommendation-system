@@ -43,12 +43,15 @@ REQUIRE a.admin_id IS UNIQUE;
 CREATE CONSTRAINT topic_id IF NOT EXISTS
 FOR (t:Topic)
 REQUIRE t.topic_id IS UNIQUE;
-CREATE CONSTRAINT author_type IF NOT EXISTS
-FOR (cf:AuthorTypeRule)
-REQUIRE cf.author_type IS UNIQUE;
-CREATE CONSTRAINT impact_scale IF NOT EXISTS
-FOR (cf:ImpactScaleRule)
-REQUIRE cf.impact_scale IS UNIQUE;
-CREATE CONSTRAINT thematic_weight IF NOT EXISTS
-FOR (cf:ThematicWeightRule)
-REQUIRE cf.thematic_weight IS UNIQUE;
+CREATE CONSTRAINT resource_assessment_id IF NOT EXISTS
+FOR (ra:ResourceAssessment)
+REQUIRE ra.resource_assessment_id IS UNIQUE;
+CREATE CONSTRAINT session_id IF NOT EXISTS
+FOR (ss:Session)
+REQUIRE ss.session_id IS UNIQUE;
+CREATE score_transaction_id IF NOT EXISTS
+FOR (st:ScoreTransaction)
+REQUIRE st.score_transaction_id IS UNIQUE;
+CREATE cpl_history_id IF NOT EXISTS
+FOR (ch:CplHistory)
+REQUIRE cpl_history_id IS UNIQUE;
