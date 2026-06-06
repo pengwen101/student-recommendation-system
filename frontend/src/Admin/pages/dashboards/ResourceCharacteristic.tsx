@@ -222,8 +222,8 @@ export default function ResourceCharacteristic() {
         <div className="p-8 bg-gray-50 min-h-screen font-sans">
             <div className="mb-6 flex justify-between items-end">
               <div>
-                  <h1 className="text-3xl font-bold text-gray-800">Resource Characteristics</h1>
-                  <p className="text-gray-500 mt-1">Select a point on the scatter plot to drill down into resource details.</p>
+                  <h1 className="text-3xl font-bold text-gray-800">Karakteristik Resource</h1>
+                  <p className="text-gray-500 mt-1">Klik titik pada plot untuk melihat detail resource.</p>
               </div>
             </div>
 
@@ -272,6 +272,9 @@ export default function ResourceCharacteristic() {
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative h-full min-h-[350px]">
                   {loading && <div className="absolute inset-0 bg-white/40 z-10 flex items-center justify-center rounded-xl backdrop-blur-[1px] text-gray-500 font-medium">Loading map...</div>}
                   {data && <ResourceCharacteristicChart data={data} onSelect={handleResourceIdSelect} selectedId={selectedResourceId}/>}
+                  <div className="mt-4 p-3 bg-blue-50/50 border border-blue-100 rounded-lg text-sm text-gray-700 leading-relaxed">
+                    Grafik ini bertujuan untuk melihat apakah sebuah resource cenderung memiliki banyak Sub-CPL namun tidak mendalam (kanan bawah), mendalam namun tidak meluas ke banyak Sub-CPL (kanan atas), keduanya (kiri atas), atau bukan keduanya sama sekali (kanan bawah).
+                  </div>
                 </div>
 
                 {/* Details Panel Card */}

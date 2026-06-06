@@ -413,8 +413,8 @@ export default function StudentPerformanceDashboard() {
     <div className="p-8 bg-gray-50 min-h-screen font-sans">
       <div className="mb-6 flex justify-between items-end">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Student Performance</h1>
-          <p className="text-gray-500 mt-1">Track mastery scores against target targets.</p>
+          <h1 className="text-3xl font-bold text-gray-800">Skor CPL Mahasiswa</h1>
+          <p className="text-gray-500 mt-1">Klik sebuah Sub-CPL untuk filter grafik kualitas/indikator di bawah.</p>
         </div>
       </div>
 

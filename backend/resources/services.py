@@ -190,13 +190,13 @@ async def get_text_hash_eng_text_target_words(text: str):
             noun_phrases.append(span_text.lower())
     print(f"[TIME] Find entities: {time.perf_counter() - start_time:.4f} seconds")
     start_time = time.perf_counter()
-    target_words = await topics_cypher.get_valid_noun_lemmas(noun_phrases)
-    print(f"[TIME] Find valid entities in WordNet: {time.perf_counter() - start_time:.4f} seconds")
-    return target_words, eng_text, text_hash
+    # target_words = await topics_cypher.get_valid_noun_lemmas(noun_phrases)
+    # print(f"[TIME] Find valid entities in WordNet: {time.perf_counter() - start_time:.4f} seconds")
+    return noun_phrases, eng_text, text_hash
     
 async def get_indicator_recommendation(text: str):
     target_words, eng_text, text_hash = await get_text_hash_eng_text_target_words(text)
-    result = await resource_cypher.get_indicator_recommendation(target_words, "entity_wordnet")   
+    result = await resource_cypher.get_indicator_recommendation(target_words)   
     if result:
         result["eng_text"] = eng_text
         result["text_hash"] = text_hash

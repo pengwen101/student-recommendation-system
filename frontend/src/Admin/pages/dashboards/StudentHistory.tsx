@@ -88,12 +88,6 @@ function HistoryLineChart({ data }: { data: StudentHistory[] }) {
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[400px] flex flex-col">
-      <div className="mb-4 flex justify-between items-end">
-        <div>
-          <h3 className="font-bold text-gray-800">Historical CPL Cohort Progression</h3>
-          <p className="text-sm text-gray-500">Average CPL mastery score for the selected cohort over time.</p>
-        </div>
-      </div>
       {data.length > 0 ? (
         <ReactECharts option={option} style={{ height: '400px', width: '100%' }} />
       ) : (
@@ -193,8 +187,8 @@ export default function StudentHistoryDashboard() {
     <div className="p-8 bg-gray-50 min-h-screen font-sans">
       <div className="mb-6 flex justify-between items-end">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Historical Progression</h1>
-          <p className="text-gray-500 mt-1">Track average CPL mastery growth over time.</p>
+          <h1 className="text-3xl font-bold text-gray-800">Data Historis Kompetensi Mahasiswa</h1>
+          <p className="text-gray-500 mt-1">Rata-rata skor CPL mahasiswa setiap bulan.</p>
         </div>
       </div>
 

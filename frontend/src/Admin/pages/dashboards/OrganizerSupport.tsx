@@ -351,8 +351,8 @@ export default function OrganizerSupportDashboard() {
     <div className="p-8 bg-gray-50 min-h-screen font-sans">
       <div className="mb-6 flex justify-between items-end">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Organizer Support Map</h1>
-          <p className="text-gray-500 mt-1">Click a cell to filter the table by intersection, or click the labels to filter by row/column.</p>
+          <h1 className="text-3xl font-bold text-gray-800">Dukungan Penyelenggara Kegiatan Terhadap Resource</h1>
+          <p className="text-gray-500 mt-1">Klik sel untuk filter tabel resource secara interseksi antara penyelenggara kegiatan dengan {selectedCurriculumType[0].replace('_', '-').replace(/\b\w/g, s => s.toUpperCase())}, atau klik label untuk filter baris ({selectedCurriculumType[0].replace('_', '-').replace(/\b\w/g, s => s.toUpperCase())}) / kolom (penyelenggara kegiatan).</p>
         </div>
       </div>
 
@@ -390,7 +390,9 @@ export default function OrganizerSupportDashboard() {
           {loadingMap && <div className="absolute inset-0 bg-white/40 z-10 flex items-center justify-center rounded-xl backdrop-blur-[1px] font-medium text-gray-500">Loading Map...</div>}
           
           <div className="flex justify-between items-center mb-2 px-4 sticky left-0">
-            <h3 className="font-bold text-gray-700">Support Intensity</h3>
+            <div className="mt-4 p-3 bg-blue-50/50 border border-blue-100 rounded-lg text-sm text-gray-700 leading-relaxed">
+              Grafik ini bertujuan untuk melihat intensitas dukungan masing-masing penyelenggara kegiatan terhadap masing-masing {selectedCurriculumType[0].replace('_', '-').replace(/\b\w/g, s => s.toUpperCase())}.
+          </div>
             {(activeOrganizerId || activeCurriculumId) && (
               <button 
                 onClick={clearSelection}

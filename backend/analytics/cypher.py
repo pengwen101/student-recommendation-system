@@ -258,6 +258,7 @@ async def student_comparison(curriculum_type: str, major_ids: list | None = None
     MATCH (s:Student)
     WHERE ($major_ids IS NULL OR EXISTS {{ MATCH (s)-[]->(m:Major) WHERE m.major_id IN $major_ids }})
       AND ($batch_ids IS NULL OR EXISTS {{ MATCH (s)-[]->(b:Batch) WHERE b.batch_id IN $batch_ids }})
+   
     CALL (s) {{
         OPTIONAL MATCH (s)-[ra:ATTENDED]->(r:UniResource)
         WITH count(ra) AS total_attended, 
@@ -265,19 +266,34 @@ async def student_comparison(curriculum_type: str, major_ids: list | None = None
         RETURN CASE 
             WHEN total_attended > 0 AND (rec_attended / total_attended) > 0.5 THEN true 
             ELSE false 
-        END AS follow_rec
+        END AS follow_rec,
+        CASE WHEN total_attended > 0 THEN 1.0 ELSE 0.0 END AS joined_event
     }}
+    
+    WITH collect({{student: s, follow_rec: follow_rec}}) AS student_records,
+         sum(CASE WHEN follow_rec THEN 1.0 ELSE 0.0 END) AS total_followed,
+         sum(joined_event) AS total_joined
+         
+    WITH student_records,
+         CASE WHEN total_joined > 0 THEN (total_followed / total_joined) ELSE 0.0 END AS pct_followed_rec
+         
+    UNWIND student_records AS record
+    WITH record.student AS s, record.follow_rec AS follow_rec, pct_followed_rec
+  
     CALL (s) {{
         OPTIONAL MATCH (s)-[rh:HAS]->(c:{curriculum_type})
         RETURN c.code as code, c.name as name, avg(rh.weight) AS student_avg_score
     }}
-    WITH follow_rec, code, name, student_avg_score
+    
+    WITH follow_rec, code, name, student_avg_score, pct_followed_rec
     WHERE student_avg_score IS NOT NULL
+    
     RETURN 
         follow_rec, 
         code,
         name,
-        student_avg_score AS avg_score
+        avg(student_avg_score) AS avg_score,
+        pct_followed_rec
     """
     
     params = {

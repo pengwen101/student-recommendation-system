@@ -61,6 +61,7 @@ class StudentComparison(BaseModel):
     code: str
     name: str
     avg_score: float
+    pct_followed_rec: float
     
 class StudentHistory(BaseModel):
     year: int

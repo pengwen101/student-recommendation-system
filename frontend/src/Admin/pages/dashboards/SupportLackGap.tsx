@@ -207,7 +207,7 @@ export function CountAverageChart({ data, selectedId, onSelect }: { data: Suppor
   return <ReactECharts option={option} onEvents={onEvents} style={{ height: '300px' }} />;
 }
 
-const ITEMS_PER_PAGE = 2;
+const ITEMS_PER_PAGE = 3;
 
 export function SupportLackGapList({ data, selectedId, onSelect }: { data: SupportLackGap[], selectedId: string | null, onSelect: (id: string) => void }) {
   const [currentPage, setCurrentPage] = useState(1);
@@ -354,7 +354,7 @@ export function ResourceSupportingXList({ data }: { data: ResourceSupportingX[] 
                 return (
                   <tr key={`${item.resource_title}-${idx}`} className="hover:bg-blue-50 transition-colors duration-150 ease-in-out">
                     {/* Replaced truncate with break-words whitespace-normal */}
-                    <td className="px-4 py-2.5 font-medium text-gray-900 break-words whitespace-normal align-top">
+                    <td className="px-4 py-2.5 text-gray-900 break-words whitespace-normal align-top">
                       {item.resource_title}
                     </td>
                     <td className="px-4 py-2.5 text-gray-700 capitalize break-words whitespace-normal align-top">
@@ -527,31 +527,6 @@ export default function SupportLackGap() {
     }
   };
 
-  // const handleBreadcrumbClick = (index: number) => {
-  //   // If clicking "Home" (index -1)
-  //   if (index === -1) {
-  //       setDrillPath([]);
-  //       setSelectedCurriculumType(['indicator']); // Or whatever your default root is
-  //       setSelectedCurriculumId(null);
-  //       return;
-  //   }
-
-  //   // Navigate to a specific point in the path
-  //   const newPath = drillPath.slice(0, index + 1);
-  //   const targetNode = newPath[newPath.length - 1];
-    
-  //   setDrillPath(newPath.slice(0, -1)); // Remove the target node from the path as it becomes the active view parent
-  //   setSelectedCurriculumType([CURRICULUM_HIERARCHY[newPath.length > 1 ? newPath[newPath.length - 2].type : 'cpl']]); // Re-calculate type based on parent
-    
-  //   // Simpler fallback if the above type calculation gets messy: Just store the active type in the breadcrumb too.
-  //   // Let's refine how we handle the breadcrumb click for safety:
-    
-  //   const targetType = CURRICULUM_HIERARCHY[targetNode.type]; 
-  //   setDrillPath(newPath);
-  //   setSelectedCurriculumType([targetType]);
-  //   setSelectedCurriculumId(null);
-  // };
-  
   // Safe Breadcrumb navigation
   const navigateToLevel = (levelIndex: number) => {
       if (levelIndex === -1) {
@@ -616,8 +591,8 @@ export default function SupportLackGap() {
     <div className="p-8 bg-gray-50 min-h-screen font-sans">
       <div className="mb-6 flex justify-between items-end">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Student Analytics</h1>
-          <p className="text-gray-500 mt-1">Click a department point to filter the trends and support charts.</p>
+          <h1 className="text-3xl font-bold text-gray-800">Gap Antara Dukungan Resource dan Kebutuhan Mahasiswa</h1>
+          <p className="text-gray-500 mt-1">Klik titik pada salah satu grafik untuk highlight dan filter grafik lainnya.</p>
         </div>
       </div>
 
@@ -732,6 +707,9 @@ export default function SupportLackGap() {
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative">
             {loading && <div className="absolute inset-0 bg-white/40 z-10 flex items-center justify-center rounded-xl backdrop-blur-[1px]" />}
             <SupportLackGapChart data={data.support_lack_gap} onSelect={handleCurriculumIdSelect} selectedId={selectedCurriculumId}/>
+            <div className="mt-4 p-3 bg-blue-50/50 border border-blue-100 rounded-lg text-sm text-gray-700 leading-relaxed">
+              Grafik ini bertujuan untuk melihat {selectedCurriculumType[0].replace('_', '-').replace(/\b\w/g, s => s.toUpperCase())} mana yang kurang didukung oleh resource, namun banyak dibutuhkan mahasiswa (kiri atas). Atau sebaliknya, {selectedCurriculumType[0].replace('_', '-').replace(/\b\w/g, s => s.toUpperCase())} mana yang memiliki dukungan resource yang besar, namun sedikit dibutuhkan oleh mahasiswa (kanan bawah).
+            </div>
           </div>
 
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative">
@@ -742,6 +720,9 @@ export default function SupportLackGap() {
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative">
             {loading && <div className="absolute inset-0 bg-white/40 z-10 flex items-center justify-center rounded-xl backdrop-blur-[1px]" />}
             <CountAverageChart data={data.support_lack_gap} onSelect={handleCurriculumIdSelect} selectedId={selectedCurriculumId}/>
+            <div className="mt-4 p-3 bg-blue-50/50 border border-blue-100 rounded-lg text-sm text-gray-700 leading-relaxed">
+              Grafik ini bertujuan untuk melihat jumlah resource dan rata-rata dukungan resource pada {selectedCurriculumType[0].replace('_', '-').replace(/\b\w/g, s => s.toUpperCase())}. Titik di kiri atas berarti jumlah resource sedikit namun intensitas dukungannya besar (kuantitas {"<"} kualitas), sedangkan titik di kanan bawah berarti jumlah resource banyak namun intensitas dukungannya sedikit (kuantitas {">"} kualitas)
+            </div>
           </div>
 
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative">

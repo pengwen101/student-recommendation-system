@@ -12,6 +12,7 @@ export interface StudentComparisonRaw {
   code: string;
   name: string;
   avg_score: number;
+  pct_followed_rec: number; // Added from backend
 }
 
 export interface ProcessedComparison {
@@ -35,7 +36,8 @@ export interface Batch {
 type BottomChartView = 'quality' | 'indicator';
 
 // --- DATA PROCESSING HELPER ---
-// Merges the flat true/false rows into a single object per curriculum code
+// Transforms the flat true/false rows into a combined object per module code
+// No math is calculated here, just routing backend values into a shape for ECharts.
 function processComparisonData(rawData: StudentComparisonRaw[]): ProcessedComparison[] {
   const map = new Map<string, ProcessedComparison>();
   
@@ -254,10 +256,14 @@ export default function StudentComparisonDashboard() {
   const [allMajors, setAllMajors] = useState<Major[]>([]);
   const [allBatches, setAllBatches] = useState<Batch[]>([]);
 
+  // Graph Data States
   const [cplData, setCplData] = useState<ProcessedComparison[]>([]);
   const [subCplData, setSubCplData] = useState<ProcessedComparison[]>([]);
   const [bottomChartData, setBottomChartData] = useState<ProcessedComparison[]>([]);
   
+  // Score Card State
+  const [cohortComplianceRate, setCohortComplianceRate] = useState<number | null>(null);
+
   const [loadingTop, setLoadingTop] = useState(false);
   const [loadingBottom, setLoadingBottom] = useState(false);
   
@@ -287,7 +293,7 @@ export default function StudentComparisonDashboard() {
     fetchDropdowns();
   }, []);
 
-  // Fetch Radars (Top Section)
+  // Fetch Radars & Global Percentages (Top Section)
   useEffect(() => {
     const fetchRadars = async () => {
       try {
@@ -301,7 +307,16 @@ export default function StudentComparisonDashboard() {
           api.get('/analytic/student_comparison/sub_cpl', { params })
         ]);
 
-        setCplData(processComparisonData(cplRes.data));
+        const rawCplData = cplRes.data as StudentComparisonRaw[];
+        
+        // Extract the global percentage from the first row of the CPL response
+        if (rawCplData.length > 0 && typeof rawCplData[0].pct_followed_rec !== 'undefined') {
+            setCohortComplianceRate(rawCplData[0].pct_followed_rec);
+        } else {
+            setCohortComplianceRate(null);
+        }
+
+        setCplData(processComparisonData(rawCplData));
         setSubCplData(processComparisonData(subCplRes.data));
       } catch {
         toast.error("Failed to load CPL/Sub-CPL comparison data");
@@ -361,11 +376,37 @@ export default function StudentComparisonDashboard() {
     <div className="p-8 bg-gray-50 min-h-screen font-sans">
       <div className="mb-6 flex justify-between items-end">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Recommendation Impact Analysis</h1>
-          <p className="text-gray-500 mt-1">Detailed comparison between students who follow system recommendations and those who do not.</p>
+          <h1 className="text-3xl font-bold text-gray-800">Analisis Dampak Rekomendasi</h1>
+          <p className="text-gray-500 mt-1">Membandingkan skor mahasiswa yang mengikuti kegiatan sesuai rekomendasi dan mahasiswa yang mengikuti kegiatan tidak sesuai rekomendasi.</p>
         </div>
       </div>
 
+      {/* COMPLIANCE SCORE CARD */}
+      {cohortComplianceRate !== null && !loadingTop && (
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl p-6 text-white shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-emerald-100 text-sm font-semibold mb-1 uppercase tracking-wider">Followed Recommendations</p>
+              <h2 className="text-4xl font-bold">{(cohortComplianceRate * 100).toFixed(1)}%</h2>
+            </div>
+            <div className="p-3 bg-white/20 rounded-lg">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+          </div>
+          
+          <div className="bg-gradient-to-r from-rose-500 to-rose-600 rounded-xl p-6 text-white shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-rose-100 text-sm font-semibold mb-1 uppercase tracking-wider">Ignored Recommendations</p>
+              <h2 className="text-4xl font-bold">{((1 - cohortComplianceRate) * 100).toFixed(1)}%</h2>
+            </div>
+             <div className="p-3 bg-white/20 rounded-lg">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FILTERS */}
       <div className="flex flex-wrap items-end gap-4 mb-8 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
         <DropdownFilter 
           title="Batch"
