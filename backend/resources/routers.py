@@ -7,6 +7,10 @@ from typing import List
 resources_router = APIRouter(prefix="/resource", tags=["resource"])
 recommendation_configs_router = APIRouter(prefix="/recommendation-config", tags=["config"])
 
+@resources_router.get("/search/{type}/{model_name:path}")
+async def search_similar_resources(type: ResourceType, model_name: str, query: str):
+    result = await services.search_similar_resources(type, model_name, query)
+    return result
 
 @resources_router.get("/indicator_recommendation", response_model=IndicatorRecommendation)
 async def get_indicator_recommendation(text: str):

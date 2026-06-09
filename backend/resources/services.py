@@ -15,10 +15,14 @@ from deep_translator import GoogleTranslator
 import asyncio
 import hashlib
 import time
+from sentence_transformers import SentenceTransformer
+import re
 
 nlp = spacy.load("en_core_web_sm")
 if "entityLinker" not in nlp.pipe_names:
     nlp.add_pipe("entityLinker", last=True)
+    
+MODEL_CACHE = {}
 
 additional_stop_words = ["student", "students", "people"]
 
@@ -146,6 +150,9 @@ async def update_resource(resource_id: str, data: ResourceEventInput | ResourceB
         data_dict['eng_text'] = eng_text
         data_dict['target_words'] = target_words
     await resource_cypher.update_resource(resource_id, data_dict, current_user)
+    if generate_new_hash:
+        await resource_cypher.create_vector_embedding(resource_id, "BAAI/bge-m3")
+        await resource_cypher.create_vector_embedding(resource_id, "all-MiniLM-L6-v2")
     return await read_resource_details(resource_id)
 
 async def archive_resource(resource_id: str):
@@ -202,3 +209,17 @@ async def get_indicator_recommendation(text: str):
         result["text_hash"] = text_hash
         result["target_words"] = target_words
     return result
+
+async def get_embedding_model(model_name: str) -> SentenceTransformer:
+    if model_name not in MODEL_CACHE:
+        MODEL_CACHE[model_name] = SentenceTransformer(model_name)
+    return MODEL_CACHE[model_name]
+
+async def search_similar_resources(type: str, model_name: str, user_query: str):
+    if model_name=="LazarusNLP/all-indo-e5-small-v4":
+        user_query = "query: " + user_query
+    label = type_label_dict[type]
+    model=await get_embedding_model(model_name)
+    property_name = f"embedding_{re.sub(r'[^a-zA-Z0-9_]', '_', model_name)}"
+    query_vector = model.encode(user_query).tolist()
+    return await resource_cypher.search_similar_resources(label, property_name, query_vector)

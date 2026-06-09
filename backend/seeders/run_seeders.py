@@ -7,7 +7,9 @@ import httpx
 from deep_translator import GoogleTranslator
 import asyncio
 import re
+from sentence_transformers import SentenceTransformer
 from keybert import KeyBERT
+import textwrap
 
 nlp = spacy.load("en_core_web_sm")
 if "entityLinker" not in nlp.pipe_names:
@@ -222,6 +224,57 @@ async def seed_configs():
     """
     
     await Neo4jConnection.query(query)
+    
+async def create_vector_embedding(model_name):
+    prefix=""
+    if "e5" in model_name.lower():
+        prefix = "passage: "
+    clean_property_name = f"embedding_{re.sub(r'[^a-zA-Z0-9_]', '_', model_name)}"
+    model = SentenceTransformer(model_name)
+    query = """
+    MATCH (r:UniResource)-[]->(t:Topic)
+    RETURN r.resource_id AS resource_id, 
+           r.title AS title, 
+           r.description AS description, 
+           apoc.text.join(collect(t.name), ", ") AS topics
+    """
+    resources = await Neo4jConnection.query(query)
+    text_batch = []
+    for resource in resources:
+        body_text = textwrap.dedent(f"""\
+            Title: {resource['title']}
+            Description: {resource['description']}
+            Topics: {resource['topics']}""").strip()
+        structured_text = f"{prefix}{body_text}"
+        text_batch.append(structured_text)
+
+    print(f"Generating embeddings for {len(text_batch)} resources...")
+    embeddings = model.encode(text_batch).tolist()
+    payload = []
+    for idx, resource in enumerate(resources):
+        payload.append({
+            "resource_id": resource['resource_id'],
+            "embedding": embeddings[idx]
+        })
+        
+    write_query = f"""
+    UNWIND $resources as resource
+    MATCH (r:UniResource {{resource_id: resource.resource_id}})
+    CALL db.create.setNodeVectorProperty(r, '{clean_property_name}', resource.embedding)
+    """
+    await Neo4jConnection.query(write_query, {"resources": payload})
+    print(f"Successfully updated embeddings using property key: {clean_property_name}")
+    embedding_dim = model.get_sentence_embedding_dimension()
+    index_query = f"""
+    CREATE VECTOR INDEX resource_{clean_property_name} IF NOT EXISTS
+        FOR (r:UniResource) ON (r.{clean_property_name})
+        OPTIONS {{
+        indexConfig: {{
+            `vector.dimensions`: {embedding_dim}
+        }}
+        }};
+    """
+    await Neo4jConnection.query(index_query)
     
 async def translate_to_english(id_text):
     try:
@@ -707,8 +760,8 @@ async def run_all_seeders():
     # print("Seeding Batch Year and Versions...")
     # await seed_years_and_versions()
     
-    print("Seeding Students...")
-    await seed_students("data/demografi.parquet")
+    # print("Seeding Students...")
+    # await seed_students("data/demografi.parquet")
     
     # print("Seeding Curriculum...")
     # await seed_curriculum("data/curriculum.parquet")
@@ -716,11 +769,20 @@ async def run_all_seeders():
     # print("Seeding Configuration...")
     # await seed_configs()
     
-    print("Seeding Student Questions Relations...")
-    await seed_student_questions_relation("data/hasil_survei.parquet")
+    # print("Seeding Student Questions Relations...")
+    # await seed_student_questions_relation("data/hasil_survei.parquet")
     
-    print("Seeding Student Topics Relations...")
-    await seed_student_topics_relation("data/hasil_topik.parquet")
+    # print("Seeding Student Topics Relations...")
+    # await seed_student_topics_relation("data/hasil_topik.parquet")
+    
+    # print("Seeding Resource Embedding (all-MiniLM-L6-v2)...")
+    # await create_vector_embedding("all-MiniLM-L6-v2")
+    
+    # print("Seeding Resource Embedding (BAAI/bge-m3)...")
+    # await create_vector_embedding("BAAI/bge-m3")
+    
+    print("Seeding Resource Embedding (LazarusNLP/all-indo-e5-small-v4)...")
+    await create_vector_embedding("LazarusNLP/all-indo-e5-small-v4")
     
     # print("Seeding Wikidata from Topic...")
     # await seed_topic_wikidata_id()

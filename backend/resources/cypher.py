@@ -1,5 +1,7 @@
 from backend.database import Neo4jConnection
 import time
+import re
+from sentence_transformers import SentenceTransformer
 
 update_cleanup_query = """
     OPTIONAL MATCH (r)-[old_rel:ORGANIZES|COVERS|SUPPORTS|HAS_SESSION|AVAILABLE_FOR|HAS|LINKED_TO]-()
@@ -198,6 +200,8 @@ async def create_resource(resource_id: str, label: str, data: dict, current_user
     await Neo4jConnection.query(query, params)
     await calculate_support_weights(resource_id, data['indicators'])
     await link_resource_keywords(resource_id, data["target_words"])
+    await create_vector_embedding(resource_id, "BAAI/bge_m3")
+    await create_vector_embedding(resource_id, "all-MiniLM-L6-v2")
     
 async def update_resource(resource_id: str, data: dict, current_user: dict):
     query = f"""
@@ -419,3 +423,65 @@ async def set_resource_weight(resource_id: str | None = None):
     """
     
     await Neo4jConnection.query(query, {"resource_id": resource_id})
+    
+async def search_similar_resources(label, property_name, query_vector):
+    query = f"""
+    MATCH (r:UniResource:{label})
+    WHERE r['{property_name}'] IS NOT NULL
+    WITH r, vector.similarity.cosine(r['{property_name}'], $queryEmbedding) AS similarityScore
+    RETURN r.title AS title,
+        r.description AS description,
+        similarityScore,
+        apoc.text.join([(r)-[]->(t:Topic) | t.name], ", ") AS topics
+    ORDER BY similarityScore DESC
+    LIMIT 5
+    """
+    return await Neo4jConnection.query(query, {"queryEmbedding": query_vector})
+
+async def create_vector_embedding(resource_id, model_name):
+    clean_property_name = f"embedding_{re.sub(r'[^a-zA-Z0-9_]', '_', model_name)}"
+    model = SentenceTransformer(model_name)
+    query = """
+    MATCH (r:UniResource {resource_id: $resource_id})-[]->(t:Topic)
+    RETURN r.resource_id AS resource_id, 
+           r.title AS title, 
+           r.description AS description, 
+           apoc.text.join(collect(t.name), ", ") AS topics
+    """
+    resources = await Neo4jConnection.query(query, {"resource_id": resource_id})
+    text_batch = []
+    for resource in resources:
+        structured_text = f"""
+        Title: {resource['title']}
+        Description: {resource['description']}
+        Topics: {resource['topics']}
+        """
+        text_batch.append(structured_text)
+
+    print(f"Generating embeddings for {len(text_batch)} resources...")
+    embeddings = model.encode(text_batch).tolist()
+    payload = []
+    for idx, resource in enumerate(resources):
+        payload.append({
+            "resource_id": resource['resource_id'],
+            "embedding": embeddings[idx]
+        })
+        
+    write_query = f"""
+    UNWIND $resources as resource
+    MATCH (r:UniResource {{resource_id: resource.resource_id}})
+    CALL db.create.setNodeVectorProperty(r, '{clean_property_name}', resource.embedding)
+    """
+    await Neo4jConnection.query(write_query, {"resources": payload})
+    print(f"Successfully updated embeddings using property key: {clean_property_name}")
+    embedding_dim = model.get_sentence_embedding_dimension()
+    index_query = f"""
+    CREATE VECTOR INDEX resource_{clean_property_name} IF NOT EXISTS
+        FOR (r:UniResource) ON (r.{clean_property_name})
+        OPTIONS {{
+        indexConfig: {{
+            `vector.dimensions`: {embedding_dim}
+        }}
+        }};
+    """
+    await Neo4jConnection.query(index_query)
