@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCircleCheck } from '@fortawesome/free-regular-svg-icons';
-import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faTrash } from '@fortawesome/free-solid-svg-icons';
 
 import type { Admin } from "../../types";
 import api from "../../api/axios";
@@ -15,7 +15,7 @@ function ManageAdmins() {
         const fetchAdmins = async () => {
             try {
                 const response = await api.get("/admin");
-                setAdmins(response.data.admins);
+                setAdmins(response.data);
             }
             catch (error) {
                 let errorMessage = "An unknown error occurred";
@@ -40,11 +40,29 @@ function ManageAdmins() {
             setAdmins(prevAdmins =>
                 prevAdmins.map(admin =>
                     admin.admin_id === admin_id
-                        ? response.data.admin_details
+                        ? response.data
                         : admin
                 )
             );
             toast.success("Admin approved successfully.");
+        }
+        catch (error) {
+            let errorMessage = "An unknown error occurred";
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            }
+            else if (typeof error === 'string') {
+                errorMessage = error;
+            }
+            toast.error(errorMessage);
+        }
+    }
+
+    const onDelete = async (admin_id: string) => {
+        try {
+            await api.delete(`/admin/${admin_id}`);
+            setAdmins(prevAdmins => prevAdmins.filter(admin => admin.admin_id !== admin_id));
+            toast.success("Admin deleted successfully.");
         }
         catch (error) {
             let errorMessage = "An unknown error occurred";
@@ -126,7 +144,14 @@ function ManageAdmins() {
                                                     Approve
                                                 </button>
                                             ) : (
-                                                <span className="text-slate-300 text-xs italic pr-2">No actions available</span>
+                                                <button
+                                                    onClick={() => onDelete(admin.admin_id)}
+                                                    className="inline-flex items-center gap-1.5 text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-red-200"
+                                                    title="Delete Admin"
+                                                >
+                                                    <FontAwesomeIcon icon={faTrash} className="text-sm" />
+                                                    Delete
+                                                </button>
                                             )}
                                         </td>
                                     </tr>

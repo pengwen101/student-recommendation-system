@@ -61,17 +61,6 @@ async def approve_admin(admin_id: str):
     params = {"admin_id": admin_id}
     await Neo4jConnection.query(query, params)
 
-async def update_admin(admin_id: str, data: dict):
-    
-    query = """
-    MATCH (a:Admin {admin_id: $admin_id})
-    SET a.name = $name
-    """
-    
-    params = {"admin_id": admin_id, "name": data['name']}
-    await Neo4jConnection.query(query, params)
-
-
 async def delete_admin(admin_id: str):
     
     query = """

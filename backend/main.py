@@ -133,7 +133,7 @@ async def auth(request: Request):
             if role == 'admin':
                 redirect_url = f'http://localhost:5173/admin?token={token}'
             else:
-                redirect_url = f'http://localhost:5173/admin/login?error=pending_approval'
+                redirect_url = f'http://localhost:5173/login?token={token}'
 
         return RedirectResponse(url=redirect_url)
 
