@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import jwt
 import os
 from dotenv import load_dotenv
+from backend import states
 
 load_dotenv()
 
@@ -31,3 +32,10 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
         raise HTTPException(status_code=401, detail="Token has expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+    
+def get_resources_similarity():
+    return states.embedding_model
+
+
+def get_embedding_model():
+    return states.embedding_model

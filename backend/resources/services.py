@@ -4,7 +4,7 @@ from backend.organizers import cypher as organizer_cypher
 from backend.curriculums import cypher as curriculum_cypher
 from backend.topics import cypher as topic_cypher
 from backend.admins import cypher as admin_cypher
-from fastapi import HTTPException
+from fastapi import HTTPException, Depends
 from backend.resources.schemas import ResourceDetailsResponse, AllResourcesResponse, ResourceEventInput, ResourceBookInput, ResourceVideoInput, ResourceArticleInput, ActorType
 from typing import List
 import uuid
@@ -17,6 +17,7 @@ import hashlib
 import time
 from sentence_transformers import SentenceTransformer
 import re
+from backend.dependencies import get_embedding_model
 
 nlp = spacy.load("en_core_web_sm")
 if "entityLinker" not in nlp.pipe_names:
@@ -210,16 +211,22 @@ async def get_indicator_recommendation(text: str):
         result["target_words"] = target_words
     return result
 
-async def get_embedding_model(model_name: str) -> SentenceTransformer:
-    if model_name not in MODEL_CACHE:
-        MODEL_CACHE[model_name] = SentenceTransformer(model_name)
-    return MODEL_CACHE[model_name]
+# async def get_embedding_model(model_name: str) -> SentenceTransformer:
+#     if model_name not in MODEL_CACHE:
+#         MODEL_CACHE[model_name] = SentenceTransformer(model_name)
+#     return MODEL_CACHE[model_name]
 
-async def search_similar_resources(type: str, model_name: str, user_query: str):
-    if model_name=="LazarusNLP/all-indo-e5-small-v4":
-        user_query = "query: " + user_query
+# async def search_similar_resources(type: str, model_name: str, user_query: str):
+#     if model_name=="LazarusNLP/all-indo-e5-small-v4":
+#         user_query = "query: " + user_query
+#     label = type_label_dict[type]
+#     model=await get_embedding_model(model_name)
+#     property_name = f"embedding_{re.sub(r'[^a-zA-Z0-9_]', '_', model_name)}"
+#     query_vector = model.encode(user_query).tolist()
+#     return await resource_cypher.search_similar_resources(label, property_name, query_vector)
+
+async def get_resources_similarity(type: str, user_query: str, model=Depends(get_embedding_model)):
+    user_query = "query: " + user_query
     label = type_label_dict[type]
-    model=await get_embedding_model(model_name)
-    property_name = f"embedding_{re.sub(r'[^a-zA-Z0-9_]', '_', model_name)}"
     query_vector = model.encode(user_query).tolist()
-    return await resource_cypher.search_similar_resources(label, property_name, query_vector)
+    return await resource_cypher.get_resources_similarity(label, query_vector)

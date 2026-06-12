@@ -5,7 +5,7 @@ import Home from './Student/pages/Home';
 import Recommendations from './Student/pages/Recommendations';
 import RecommendationPage from './Student/pages/RecommendationPage';
 import RecommendationPageStudent from './Student/pages/RecommendationPageStudent';
-import SelectTopics from './Student/pages/SelectTopics';
+import StudentTopics from './Student/pages/StudentTopics';
 import SurveyAssessment from './Student/pages/SurveyAssessment';
 import StudentGuard from './Student/pages/StudentGuard';
 import ResourceDetails from './Student/pages/ResourceDetails';
@@ -60,7 +60,8 @@ function App() {
         <Route path="/recommendation_result" element={<RecommendationPage />} />
         <Route path="/recommendation_result_student" element={<RecommendationPageStudent />} />
         <Route element={<StudentGuard />}>
-          <Route path="/student/input_topics" element={<SelectTopics />} />
+          <Route path="/student/topics" element={<StudentTopics />} />
+          <Route path="/student/input_topics" element={<Navigate to="/student/topics" replace />} />
           <Route path="/student/survey_assessment" element={<SurveyAssessment />} />
 
           {/* Protected Routes (Wrapped in Layout) */}

@@ -6,6 +6,8 @@ from backend.students.schemas import StudentTopicsResponse, TopicActionResponse,
 from typing import List
 import pandas as pd
 import io
+import re
+import uuid
 
 type_label_dict = {
     "book": "Book",
@@ -13,6 +15,10 @@ type_label_dict = {
     "video": "Video",
     "article": "Article"
 }
+
+
+async def create_student(nrp: str, email: str, name: str):
+    return await student_cypher.create_student(nrp, email, name)
 
 async def create_student_question_relation(nrp: str, data: List[StudentQuestionRelation]):
     student_exists = await student_cypher.student_exists(nrp)
@@ -27,30 +33,77 @@ async def read_student_topics(nrp: str):
         raise HTTPException(status_code=404, detail="Student not found")
     return await student_cypher.read_student_topics(nrp)
 
-async def create_student_topics(nrp: str, topics: List[StudentTopicsInput]):
+
+def _normalize_topic_code(name: str) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9]+", "_", name.strip())
+    return cleaned.strip("_").upper() or "CUSTOM_TOPIC"
+
+
+async def _prepare_student_topics(topics: List[StudentTopicsInput]) -> list[dict]:
+    prepared_topics: list[dict] = []
+
+    for topic in topics:
+        topic_dict = topic.model_dump()
+        topic_id = topic_dict.get("topic_id")
+        topic_name = topic_dict.get("name")
+
+        if topic_id:
+            topic_exists = await topic_cypher.topic_exists(topic_id)
+            if not topic_exists:
+                raise HTTPException(status_code=404, detail=f"Topic ID {topic_id} not found")
+            prepared_topics.append({"topic_id": topic_id})
+            continue
+
+        if not topic_name or not topic_name.strip():
+            raise HTTPException(status_code=400, detail="Topic name is required when topic_id is not provided")
+
+        new_topic_id = str(uuid.uuid4())
+        topic_code = topic_dict.get("code") or _normalize_topic_code(topic_name)
+        await topic_cypher.create_topic(new_topic_id, {"name": topic_name.strip(), "code": topic_code})
+        prepared_topics.append({"topic_id": new_topic_id})
+
+    return prepared_topics
+
+
+def _compose_topic_text(topic_rows: list[dict]) -> str:
+    return ", ".join(
+        (
+            f"{topic['name']}, {topic['eng_text']}"
+            if topic.get("eng_text")
+            else topic["name"]
+        )
+        for topic in topic_rows
+        if topic.get("name") or topic.get("eng_text")
+    )
+
+
+async def _sync_student_topic_embedding(nrp: str, embedding_model):
+    topic_rows = await student_cypher.read_student_topics(nrp)
+    topic_text = _compose_topic_text(topic_rows)
+
+    if not topic_text:
+        await student_cypher.clear_student_topic_embedding(nrp)
+        return
+
+    topic_embedding = embedding_model.encode("query: " + topic_text).tolist()
+    await student_cypher.set_student_topic_embedding(nrp, topic_embedding)
+
+async def create_student_topics(nrp: str, topics: List[StudentTopicsInput], embedding_model):
     student_exists = await student_cypher.student_exists(nrp)
     if not student_exists:
         raise HTTPException(status_code=404, detail="Student not found")
-    topics_list = [topic.model_dump() for topic in topics]
-    for topic in topics_list:
-        topic_id = topic['topic_id']
-        topic_exists = await topic_cypher.topic_exists(topic_id)
-        if not topic_exists:
-            raise HTTPException(status_code=404, detail=f"Topic ID {topic_id} not found")
+    topics_list = await _prepare_student_topics(topics)
     await student_cypher.create_student_topics(nrp, topics_list)
+    await _sync_student_topic_embedding(nrp, embedding_model)
     return await student_cypher.read_student_topics(nrp)
 
-async def update_student_topics(nrp: str, topics: List[StudentTopicsInput]):
+async def update_student_topics(nrp: str, topics: List[StudentTopicsInput], embedding_model):
     student_exists = await student_cypher.student_exists(nrp)
     if not student_exists:
         raise HTTPException(status_code=404, detail="Student not found")
-    topics_list = [topic.model_dump() for topic in topics]
-    for topic in topics_list:
-        topic_id = topic['topic_id']
-        topic_exists = await topic_cypher.topic_exists(topic_id)
-        if not topic_exists:
-            raise HTTPException(status_code=404, detail=f"Topic ID {topic_id} not found")
+    topics_list = await _prepare_student_topics(topics)
     await student_cypher.update_student_topics(nrp, topics_list)
+    await _sync_student_topic_embedding(nrp, embedding_model)
     return await student_cypher.read_student_topics(nrp)
 
 async def read_student_indicators(nrp: str):
@@ -121,14 +174,15 @@ async def has_indicators(nrp: str):
         raise HTTPException(status_code=404, detail="Student not found")
     return await student_cypher.has_indicators(nrp)
 
-async def get_student_recommendations(nrp: str, type: str):
+async def get_student_recommendations(nrp: str, type: str, top_k: int = 4):
     label = type_label_dict[type]
     if not label:
         raise HTTPException(status_code=404, detail="Type not exist")
     student_exists = await student_cypher.student_exists(nrp)
     if not student_exists:
         raise HTTPException(status_code=404, detail="Student not found")
-    return await student_cypher.get_student_recommendations(nrp, label)
+
+    return await student_cypher.get_student_recommendations(nrp, label, top_k)
 
 async def record_student_attendance(resource_id: str, file_contents: bytes, filename: str) -> dict:
     try:

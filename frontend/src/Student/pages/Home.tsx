@@ -51,13 +51,14 @@ const Home = () => {
                 const userData = userRes.data;
                 setUser(userData);
                 const nrp = userData.user_id;
+                const top_k = 5;
 
                 // Fetch Profile Data, Topics, & Recommendations concurrently
                 const [cplsRes, subCplsRes, generalRecs, articleRecs, topicsRes] = await Promise.all([
                     api.get(`/student/cpls/${nrp}`),
                     api.get(`/student/subcpls/${nrp}`),
-                    api.get(`/student/recommendations/${nrp}?type=event`),
-                    api.get(`/student/recommendations/${nrp}?type=article`),
+                    api.get(`/student/recommendations/${nrp}?type=event&top_k=${top_k}`),
+                    api.get(`/student/recommendations/${nrp}?type=article&top_k=${top_k}`),
                     api.get(`/student/topics/${nrp}`)
                 ]);
 

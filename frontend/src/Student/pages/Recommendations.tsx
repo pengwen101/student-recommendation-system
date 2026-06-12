@@ -17,7 +17,7 @@ const Recommendation = () => {
             try {
                 const userRes = await api.get('/users/me');
                 if (!userRes.data.authenticated) return;
-                const nrp = "h14250080";
+                const nrp = userRes.data.user_id;
 
                 // Fetch recommendations distinctly based on type
                 const [events, books, videos] = await Promise.all([

@@ -1,9 +1,11 @@
 from backend.database import Neo4jConnection
 
+TOPIC_EMBEDDING_PROPERTY = "embedding_LazarusNLP_all_indo_e5_small_v4"
+
 async def read_student_topics(nrp: str):
     query = """
         MATCH (s:Student {nrp: $nrp})-[r:INTERESTED_IN]->(t:Topic)
-        RETURN t.topic_id as topic_id, t.code as code, t.name as name
+        RETURN t.topic_id as topic_id, t.code as code, t.name as name, t.eng_text as eng_text
     """
     params = {"nrp": nrp}
     response = await Neo4jConnection.query(query, params)
@@ -79,6 +81,22 @@ async def update_student_topics(nrp: str, topic_list: list):
     """
     params = {"nrp": nrp, "topics": topic_list}
     await Neo4jConnection.query(query, params)
+
+
+async def set_student_topic_embedding(nrp: str, embedding: list[float]):
+    query = f"""
+        MATCH (s:Student {{nrp: $nrp}})
+        CALL db.create.setNodeVectorProperty(s, '{TOPIC_EMBEDDING_PROPERTY}', $embedding)
+    """
+    await Neo4jConnection.query(query, {"nrp": nrp, "embedding": embedding})
+
+
+async def clear_student_topic_embedding(nrp: str):
+    query = f"""
+        MATCH (s:Student {{nrp: $nrp}})
+        REMOVE s.{TOPIC_EMBEDDING_PROPERTY}
+    """
+    await Neo4jConnection.query(query, {"nrp": nrp})
     
     
 async def read_student_indicators(nrp: str):
@@ -182,16 +200,16 @@ async def has_indicators(nrp: str):
     response = await Neo4jConnection.query(query, params)
     return response[0]['has_indicators'] if response else False
 
-async def get_student_recommendations(nrp: str, label: str):
+async def get_student_recommendations(nrp: str, label: str, top_k: int):
     query = f"""
         MATCH (s:Student {{nrp: $nrp}})
         MATCH (st:Config:StudentTarget)
         MATCH (cf:Config:RecommendationWeight)
         CALL (s, st) {{
             OPTIONAL MATCH (s)-[rl:HAS]->(:Indicator)
-            RETURN sum(CASE 
-                WHEN rl IS NOT NULL AND (st.target_score - rl.weight) > 0 
-                THEN (st.target_score - rl.weight) 
+            RETURN sum(CASE
+                WHEN rl IS NOT NULL AND (st.target_score - rl.weight) > 0
+                THEN (st.target_score - rl.weight)
                 ELSE 0.0 END) AS total_lack_weight
         }}
         CALL (s) {{
@@ -203,15 +221,16 @@ async def get_student_recommendations(nrp: str, label: str):
         MATCH (r:UniResource:{label})
         WHERE r.is_active = true
           AND (NOT 'Event' IN labels(r) OR (r)-[:AVAILABLE_FOR]->(sl))
+
         CALL (s, r, st) {{
             OPTIONAL MATCH (s)-[rl:HAS]->(i:Indicator)<-[rp:SUPPORTS]-(r)
             WITH rl, rp, st,
-                 CASE 
-                    WHEN rl IS NOT NULL AND (st.target_score - rl.weight) > 0 
-                    THEN (st.target_score - rl.weight) 
+                 CASE
+                    WHEN rl IS NOT NULL AND (st.target_score - rl.weight) > 0
+                    THEN (st.target_score - rl.weight)
                     ELSE 0.0 END AS specific_lack_weight
-            
-            RETURN sum(CASE 
+
+            RETURN sum(CASE
                 WHEN rl IS NULL OR rp IS NULL THEN 0.0
                 WHEN specific_lack_weight < rp.weight THEN specific_lack_weight
                 ELSE rp.weight END) AS indicator_intersection
@@ -223,16 +242,23 @@ async def get_student_recommendations(nrp: str, label: str):
         }}
 
         WITH s, r, cf, total_lack_weight, total_interest_count, indicator_intersection, topic_intersection,
-             ((
-                cf.need_weight * (CASE WHEN total_lack_weight > 0 THEN indicator_intersection / total_lack_weight ELSE 0.0 END) 
-             ) + (
-                cf.interest_weight * (CASE WHEN total_interest_count > 0 THEN topic_intersection / total_interest_count ELSE 0.0 END)
-             )) * coalesce(r.internal_weight, 1.0) AS score
-             
+               (CASE WHEN total_lack_weight > 0 THEN indicator_intersection / total_lack_weight ELSE 0.0 END) AS need_score,
+               (CASE WHEN total_interest_count > 0 THEN topic_intersection / total_interest_count ELSE 0.0 END) AS topic_fuzzy_score
+
+           WITH s, r, cf, need_score, topic_fuzzy_score,
+               CASE
+                   WHEN s.{TOPIC_EMBEDDING_PROPERTY} IS NULL OR r.embedding_LazarusNLP_all_indo_e5_small_v4 IS NULL THEN 0.0
+                   ELSE vector.similarity.cosine(s.{TOPIC_EMBEDDING_PROPERTY}, r.embedding_LazarusNLP_all_indo_e5_small_v4)
+               END AS vector_similarity
+
+         WITH s, r, need_score, topic_fuzzy_score, vector_similarity,
+             ((cf.need_weight * need_score) + (cf.interest_weight * ((topic_fuzzy_score + vector_similarity) / 2.0)))
+             * coalesce(r.internal_weight, 1.0) AS score
+
         ORDER BY score DESC
-        LIMIT 4
+        LIMIT $top_k
         RETURN {{
-            resource_id: r.resource_id, 
+            resource_id: r.resource_id,
             type: tolower(head([l IN labels(r) WHERE l <> 'UniResource'])),
             title: r.title,
             is_active: r.is_active,
@@ -268,7 +294,7 @@ async def get_student_recommendations(nrp: str, label: str):
                 indicator_id: i.indicator_id
             }}],
             topics: [(r)-[rc:COVERS]->(t:Topic) | {{
-                topic_id: t.topic_id, 
+                topic_id: t.topic_id,
                 code: t.code,
                 name: t.name
             }}],
@@ -276,27 +302,73 @@ async def get_student_recommendations(nrp: str, label: str):
                 indicators: [(r)-[rsi:SUPPORTS]->(i:Indicator) | {{
                     indicator_id: i.indicator_id,
                     code: i.code,
-                    name: i.name, 
+                    name: i.name,
                     weight: toFloat(rsi.weight)
                 }}],
                 qualities: [(r)-[rsq:SUPPORTS]->(q:Quality) | {{
                     quality_id: q.quality_id,
                     code: q.code,
-                    name: q.name, 
+                    name: q.name,
                     weight: toFloat(rsq.weight)
                 }}],
                 subcpls: [(r)-[rss:SUPPORTS]->(sc:SubCpl) | {{
                     sub_cpl_id: sc.sub_cpl_id,
                     code: sc.code,
-                    name: sc.name, 
+                    name: sc.name,
                     weight: toFloat(rss.weight)
                 }}]
             }}
-        }} AS resource, score
+        }} AS resource,
+        score,
+        need_score,
+        topic_fuzzy_score,
+        vector_similarity
     """
-    params = {"nrp": nrp}
+
+    params = {
+        "nrp": nrp,
+        "top_k": top_k,
+    }
     response = await Neo4jConnection.query(query, params)
     return response
+
+
+async def create_student(nrp: str, email: str, name: str):
+    query = """
+        MATCH (acy:CurrentAcademicYear)
+        WITH acy,
+             toInteger(left(acy.value, 2)) AS current_academic_year,
+             toInteger(substring($nrp, 3, 2)) AS student_batch
+        WITH acy,
+             current_academic_year,
+             student_batch,
+             toString(current_academic_year - student_batch + 1) AS study_level_id,
+             "20" + substring($nrp, 3, 2) + "/20" + toString(toInteger(substring($nrp, 3, 2)) + 1) AS batch_id
+        MATCH (sl:StudyLevel {study_level_id: study_level_id})
+        MERGE (s:Student {nrp: $nrp})
+        ON CREATE SET s.email = $email,
+                      s.name = $name
+        ON MATCH SET s.email = $email,
+                     s.name = $name
+        MERGE (b:Batch {batch_id: batch_id})
+        MERGE (s)-[:CURRENTLY_IN]->(sl)
+        MERGE (s)-[:IS_FROM_BATCH]->(b)
+        RETURN s.nrp AS nrp,
+               s.email AS email,
+               s.name AS name,
+               sl.study_level_id AS study_level_id,
+               b.batch_id AS batch_id,
+               acy.value AS current_academic_year
+    """
+
+    params = {
+        "nrp": nrp,
+        "email": email,
+        "name": name,
+    }
+    response = await Neo4jConnection.query(query, params)
+    return response
+
 
 async def record_student_attendance(resource_id: str, nrps: list[str]):
     query = """

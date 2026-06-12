@@ -90,8 +90,8 @@ const StudentGuard = () => {
         return <Navigate to="/student/survey_assessment" replace />;
     }
 
-    if (status.hasSurvey && !status.hasTopics && location.pathname !== '/student/input_topics') {
-        return <Navigate to="/student/input_topics" replace />;
+    if (status.hasSurvey && !status.hasTopics && location.pathname !== '/student/topics') {
+        return <Navigate to="/student/topics" replace />;
     }
 
     return <Outlet />;

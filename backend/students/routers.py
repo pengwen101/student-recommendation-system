@@ -1,9 +1,10 @@
-from fastapi import APIRouter, status, UploadFile, File, HTTPException
+from fastapi import APIRouter, status, UploadFile, File, HTTPException, Depends, Query
 from backend.students.schemas import (TopicActionResponse, StudentRecommendationsResponse,\
                                     IndicatorActionResponse, StudentIndicatorsInputBatch, StudentTopicsInputBatch, SubCplActionResponse, CplActionResponse, AttendedStudents, StudentQuestionRelation)
 from backend.students import services
 from typing import List
 from backend.resources.schemas import ResourceType
+from backend.dependencies import get_embedding_model
 
 topics_router = APIRouter(prefix="/student/topics", tags=["student_topics"])
 recommendations_router = APIRouter(prefix="/student/recommendations", tags=["student_recommendations"])
@@ -19,8 +20,8 @@ async def read_student_topics(nrp: str):
     return {"message": "Student topic relations successfully retrieved.", "count": len(topics), "topics": topics}
 
 @topics_router.post("/{nrp}", response_model=TopicActionResponse)
-async def create_student_topics(nrp: str, data: StudentTopicsInputBatch):
-    topics = await services.create_student_topics(nrp, data.topics)
+async def create_student_topics(nrp: str, data: StudentTopicsInputBatch, embedding_model=Depends(get_embedding_model)):
+    topics = await services.create_student_topics(nrp, data.topics, embedding_model)
     return {"message": "Student topic relations successfully added.", "count": len(topics), "topics": topics}
 
 @questions_router.post("/{nrp}")
@@ -28,8 +29,8 @@ async def create_student_question_relation(nrp: str, data: List[StudentQuestionR
     await services.create_student_question_relation(nrp, data)
 
 @topics_router.put("/{nrp}", response_model=TopicActionResponse)
-async def update_student_topics(nrp: str, data: StudentTopicsInputBatch):
-    topics = await services.update_student_topics(nrp, data.topics)
+async def update_student_topics(nrp: str, data: StudentTopicsInputBatch, embedding_model=Depends(get_embedding_model)):
+    topics = await services.update_student_topics(nrp, data.topics, embedding_model)
     return {"message": "Student topic relations successfully updated.", "count": len(topics), "topics": topics}
 
 @indicators_router.get("/lack/{nrp}", response_model=IndicatorActionResponse)
@@ -76,8 +77,8 @@ async def has_student_indicators(nrp: str):
     return await services.has_indicators(nrp)
 
 @recommendations_router.get("/{nrp}", response_model=StudentRecommendationsResponse)
-async def get_student_recommendations(nrp: str, type: ResourceType):
-    recommendations = await services.get_student_recommendations(nrp, type)
+async def get_student_recommendations(nrp: str, type: ResourceType, top_k: int = Query(default=4, ge=1)):
+    recommendations = await services.get_student_recommendations(nrp, type, top_k)
     return {"message": "Student recommendations successfully retrieved.", "count": len(recommendations), "recommendations": recommendations}
 
 @attendance_router.post("/{resource_id}")

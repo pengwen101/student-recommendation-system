@@ -424,17 +424,27 @@ async def set_resource_weight(resource_id: str | None = None):
     
     await Neo4jConnection.query(query, {"resource_id": resource_id})
     
-async def search_similar_resources(label, property_name, query_vector):
+# async def search_similar_resources(label, property_name, query_vector):
+#     query = f"""
+#     MATCH (r:UniResource:{label})
+#     WHERE r['{property_name}'] IS NOT NULL
+#     WITH r, vector.similarity.cosine(r['{property_name}'], $queryEmbedding) AS similarityScore
+#     RETURN r.title AS title,
+#         r.description AS description,
+#         similarityScore,
+#         apoc.text.join([(r)-[]->(t:Topic) | t.name], ", ") AS topics
+#     ORDER BY similarityScore DESC
+#     LIMIT 5
+#     """
+#     return await Neo4jConnection.query(query, {"queryEmbedding": query_vector})
+
+async def get_resources_similarity(label, query_vector):
     query = f"""
     MATCH (r:UniResource:{label})
-    WHERE r['{property_name}'] IS NOT NULL
-    WITH r, vector.similarity.cosine(r['{property_name}'], $queryEmbedding) AS similarityScore
-    RETURN r.title AS title,
-        r.description AS description,
-        similarityScore,
-        apoc.text.join([(r)-[]->(t:Topic) | t.name], ", ") AS topics
-    ORDER BY similarityScore DESC
-    LIMIT 5
+    WHERE r['embedding_LazarusNLP_all_indo_e5_small_v4'] IS NOT NULL
+    WITH r, vector.similarity.cosine(r['embedding_LazarusNLP_all_indo_e5_small_v4'], $queryEmbedding) AS similarityScore
+    RETURN r.resource_id AS resource_id,
+        similarityScore AS similarity_score
     """
     return await Neo4jConnection.query(query, {"queryEmbedding": query_vector})
 

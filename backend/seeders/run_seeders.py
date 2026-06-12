@@ -26,6 +26,7 @@ async def seed_years_and_versions():
         MERGE (:StudyLevel {study_level_id: "2"})
         MERGE (:StudyLevel {study_level_id: "3"})
         MERGE (:StudyLevel {study_level_id: "4"})
+        MERGE (:CurrentAcademicYear {value: "25/26"})
         
         MERGE (:CurriculumVersion {curriculum_version_id: "1"})
     """

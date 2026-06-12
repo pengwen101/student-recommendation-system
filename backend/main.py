@@ -10,6 +10,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from backend.dependencies import get_current_user, create_access_token
 from backend.students.cypher import record_all_students_history
+from backend.students import services as student_services
 
 from backend.database import Neo4jConnection
 from backend.students import routers as student_routers
@@ -25,6 +26,7 @@ from backend.organizers import routers as organizer_routers
 from backend.configs import routers as config_routers
 from backend.admins import services as admin_services
 from backend.admins import schemas as admin_schemas
+from backend import states
 
 load_dotenv()
 scheduler = AsyncIOScheduler()
@@ -42,6 +44,7 @@ async def lifespan(app: FastAPI):
     )
     scheduler.start()
     print("Monthly snapshot scheduler started.")
+    states.load_state()
     yield
     await Neo4jConnection.close_driver()
     
@@ -99,11 +102,7 @@ async def auth(request: Request):
                 return RedirectResponse(url='http://localhost:5173/login?error=invalid_domain')
             
             nrp = email.split("@")[0]
-            await Neo4jConnection.query("MERGE (s:Student {email: $email}) ON CREATE SET s.nrp = $nrp, s.name = $name", {
-                "email": email,
-                "nrp": nrp,
-                "name": name
-            })
+            await student_services.create_student(nrp, email, name)
   
             jwt_payload = {"sub": nrp, "role": "student", "email": email, "name": name}
             token = create_access_token(jwt_payload)

@@ -6,6 +6,7 @@ class StudentTopicsResponse(BaseModel):
     topic_id: str
     code: str
     name: str
+    eng_text: str | None = None
     
 class StudentQuestionRelation(BaseModel):
     question_id: str
@@ -17,7 +18,9 @@ class TopicActionResponse(BaseModel):
     topics: List[StudentTopicsResponse]
     
 class StudentTopicsInput(BaseModel):
-    topic_id: str
+    topic_id: str | None = None
+    name: str | None = None
+    code: str | None = None
     
 class StudentTopicsInputBatch(BaseModel):
     topics: List[StudentTopicsInput]
@@ -28,6 +31,9 @@ class StudentRecommendation(BaseModel):
         Field(discriminator="type")
     ]
     score: float
+    need_score: float
+    topic_fuzzy_score: float
+    vector_similarity: float
 
 class StudentRecommendationsResponse(BaseModel):
     message: str

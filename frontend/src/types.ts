@@ -326,6 +326,7 @@ export interface Topic {
     topic_id: string;
     code: string;
     name: string;
+    eng_text?: string;
 }
 
 export interface StudyLevel {
