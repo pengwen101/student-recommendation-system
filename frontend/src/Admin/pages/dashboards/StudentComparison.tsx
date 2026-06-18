@@ -7,12 +7,16 @@ import { DropdownFilter } from '../../../components/DropDownFilter';
 import { NestedDropdown, type DropdownGroup } from '../../../components/NestedDropdown';
 
 // --- Types ---
-export interface StudentComparisonRaw {
+export interface StudentComparisonDetail {
   follow_rec: boolean;
   code: string;
   name: string;
   avg_score: number;
-  pct_followed_rec: number; // Added from backend
+}
+
+export interface StudentComparisonRaw {
+  pct_followed_rec: number;
+  details: StudentComparisonDetail[];
 }
 
 export interface ProcessedComparison {
@@ -42,15 +46,17 @@ function processComparisonData(rawData: StudentComparisonRaw[]): ProcessedCompar
   const map = new Map<string, ProcessedComparison>();
   
   rawData.forEach(item => {
-    if (!map.has(item.code)) {
-      map.set(item.code, { code: item.code, name: item.name, followedScore: 0, ignoredScore: 0 });
-    }
-    const entry = map.get(item.code)!;
-    if (item.follow_rec) {
-      entry.followedScore = item.avg_score;
-    } else {
-      entry.ignoredScore = item.avg_score;
-    }
+    item.details.forEach(detail => {
+      if (!map.has(detail.code)) {
+        map.set(detail.code, { code: detail.code, name: detail.name, followedScore: 0, ignoredScore: 0 });
+      }
+      const entry = map.get(detail.code)!;
+      if (detail.follow_rec) {
+        entry.followedScore = detail.avg_score;
+      } else {
+        entry.ignoredScore = detail.avg_score;
+      }
+    });
   });
 
   return Array.from(map.values()).sort((a, b) => a.code.localeCompare(b.code));

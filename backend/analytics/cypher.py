@@ -288,12 +288,16 @@ async def student_comparison(curriculum_type: str, major_ids: list | None = None
     WITH follow_rec, code, name, student_avg_score, pct_followed_rec
     WHERE student_avg_score IS NOT NULL
     
+    WITH follow_rec, code, name, pct_followed_rec, avg(student_avg_score) AS avg_score
+    
     RETURN 
-        follow_rec, 
-        code,
-        name,
-        avg(student_avg_score) AS avg_score,
-        pct_followed_rec
+        pct_followed_rec,
+        collect({{
+            follow_rec: follow_rec,
+            code: code,
+            name: name,
+            avg_score: avg_score
+        }}) as details
     """
     
     params = {
@@ -330,5 +334,3 @@ async def student_history(academic_year: str | None = None, nrp: str | None = No
     
     result = await Neo4jConnection.query(query, params)
     return result
-    
-    

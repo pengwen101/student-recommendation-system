@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, Query
 from backend.analytics.schemas import (SupportLackGap, ResourceSupportingX, ResourceCharacteristic, OrganizerSupport, StudentMastery, CurriculumType, StudentComparison, StudentHistory)
 from backend.analytics import services
 from typing import List
@@ -60,5 +60,3 @@ async def student_history(academic_year: str | None = Query(default=None),
                           study_level_ids: list | None = Query(default=None)):
     result = await services.student_history(academic_year, nrp, major_ids, study_level_ids)
     return result
-
-

@@ -1,6 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Dict, Set
-from datetime import date
+from typing import List
 from backend.resources.schemas import ResourceType
 from enum import Enum
 
@@ -56,12 +55,15 @@ class CurriculumType(str, Enum):
     QUALITY = "quality"
     INDICATOR = "indicator"
     
-class StudentComparison(BaseModel):
+class StudentComparisonDetail(BaseModel):
     follow_rec: bool
     code: str
     name: str
     avg_score: float
+    
+class StudentComparison(BaseModel):
     pct_followed_rec: float
+    details: List[StudentComparisonDetail]
     
 class StudentHistory(BaseModel):
     year: int
