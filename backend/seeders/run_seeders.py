@@ -10,6 +10,9 @@ import re
 from sentence_transformers import SentenceTransformer
 from keybert import KeyBERT
 import textwrap
+from backend.students.services import _sync_student_topic_embedding
+from backend import states
+from backend.dependencies import get_embedding_model
 
 nlp = spacy.load("en_core_web_sm")
 if "entityLinker" not in nlp.pipe_names:
@@ -137,17 +140,25 @@ async def seed_student_questions_relation(path):
     
     await Neo4jConnection.query(query)
     
-async def seed_student_topics_relation(path):
+async def seed_student_topics_relation(path, embedding_model):
     df = pd.read_parquet(path)
     data = df.to_dict(orient="records")
     
     query = """
     UNWIND $batch as row
-    MATCH (t:Topic {name: row.topic})
+    MERGE (t:Topic {lower_name: lower(row.topic)})
+    ON CREATE SET t.name = row.topic, 
+                t.topic_id = randomUUID(),
+                t.code = "custom"
+    WITH row, t
     MATCH (s:Student {nrp: row.nrp})
-    MERGE (s)-[ri:INTERESTED_IN]-(t)
+    MERGE (s)-[:INTERESTED_IN]->(t)
     """
     await Neo4jConnection.query(query, {"batch": data})
+    
+    nrps = list(df['nrp'].unique())
+    for nrp in nrps:
+        await _sync_student_topic_embedding(nrp, embedding_model)
     
     
 async def seed_configs():
@@ -243,9 +254,9 @@ async def create_vector_embedding(model_name):
     text_batch = []
     for resource in resources:
         body_text = textwrap.dedent(f"""\
-            Title: {resource['title']}
-            Description: {resource['description']}
-            Topics: {resource['topics']}""").strip()
+            Judul: {resource['title']}
+            Deskripsi: {resource['description']}
+            Topik: {resource['topics']}""").strip()
         structured_text = f"{prefix}{body_text}"
         text_batch.append(structured_text)
 
@@ -770,11 +781,14 @@ async def run_all_seeders():
     # print("Seeding Configuration...")
     # await seed_configs()
     
-    # print("Seeding Student Questions Relations...")
-    # await seed_student_questions_relation("data/hasil_survei.parquet")
+    print("Seeding Student Questions Relations...")
+    await seed_student_questions_relation("data/hasil_survei.parquet")
+    
+    # states.load_state()
+    # model = get_embedding_model()
     
     # print("Seeding Student Topics Relations...")
-    # await seed_student_topics_relation("data/hasil_topik.parquet")
+    # await seed_student_topics_relation("data/hasil_topik.parquet", model)
     
     # print("Seeding Resource Embedding (all-MiniLM-L6-v2)...")
     # await create_vector_embedding("all-MiniLM-L6-v2")
@@ -782,8 +796,8 @@ async def run_all_seeders():
     # print("Seeding Resource Embedding (BAAI/bge-m3)...")
     # await create_vector_embedding("BAAI/bge-m3")
     
-    print("Seeding Resource Embedding (LazarusNLP/all-indo-e5-small-v4)...")
-    await create_vector_embedding("LazarusNLP/all-indo-e5-small-v4")
+    # print("Seeding Resource Embedding (LazarusNLP/all-indo-e5-small-v4)...")
+    # await create_vector_embedding("LazarusNLP/all-indo-e5-small-v4")
     
     # print("Seeding Wikidata from Topic...")
     # await seed_topic_wikidata_id()

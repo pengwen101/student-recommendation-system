@@ -68,12 +68,10 @@ async def _prepare_student_topics(topics: List[StudentTopicsInput]) -> list[dict
 def _compose_topic_text(topic_rows: list[dict]) -> str:
     return ", ".join(
         (
-            f"{topic['name']}, {topic['eng_text']}"
-            if topic.get("eng_text")
-            else topic["name"]
+            topic['name']
         )
         for topic in topic_rows
-        if topic.get("name") or topic.get("eng_text")
+        if topic.get("name")
     )
 
 

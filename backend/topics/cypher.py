@@ -36,7 +36,7 @@ async def read_topic_details(topic_id: str):
 async def create_topic(topic_id: str, data: dict):
     query = """
     MERGE (t:Topic {topic_id: $topic_id})
-    SET t.name = $name, t.code = $code
+    SET t.name = $name, t.code = $code, t.lower_name = lower($name)
     """
     
     params = {"topic_id": topic_id, "name": data['name'], "code": data['code']}
@@ -46,7 +46,7 @@ async def update_topic(topic_id: str, data: dict):
     
     query = """
     MATCH (t:Topic {topic_id: $topic_id})
-    SET t.name = $name, t.code = $code
+    SET t.name = $name, t.code = $code, t.lower_name = lower($name)
     """
     
     params = {"topic_id": topic_id, "name": data['name'], "code": data['code']}
