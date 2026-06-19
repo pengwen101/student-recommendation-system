@@ -4,13 +4,11 @@ from typing import List, Dict, Set
 
 class QualityIndicatorsInput(BaseModel):
     quality_id: str
-    weight: float
 
 class QualityIndicatorsResponse(BaseModel):
     quality_id: str
     code: str
     name: str
-    weight: float
     
 class IndicatorDetails(BaseModel):
     indicator_id: str
@@ -22,7 +20,8 @@ class IndicatorDetailsResponse(BaseModel):
     indicator_details: IndicatorDetails
     
 class IndicatorDetailsInput(BaseModel):
-    indicator_description: str
+    code: str
+    name: str
     qualities: List[QualityIndicatorsInput]
     
 class AllIndicatorsResponse(BaseModel):

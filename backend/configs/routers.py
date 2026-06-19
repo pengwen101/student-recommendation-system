@@ -38,7 +38,6 @@ async def update_resource_assessments(resource_assessment_id: str, data: Resourc
 async def delete_resource_assessments(resource_assessment_id: str):
     await services.delete_resource_assessments(resource_assessment_id)
     
-    
 @configs_router.get("/add_score_constant", response_model=AddScoreConstant)
 async def get_add_score_constant():
     return await services.get_add_score_constant()

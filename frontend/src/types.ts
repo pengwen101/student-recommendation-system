@@ -257,11 +257,19 @@ export interface ResourceSupportCalculations{
 
 // Curriculum
 
+export interface SubCplQualityLink {
+    sub_cpl_id: string;
+    code: string;
+    name: string;
+    weight: number;
+}
+
 export interface Quality {
     quality_id: string;
     code: string;
     name: string;
-    weight: number;
+    weight?: number;
+    subcpls?: SubCplQualityLink[];
     indicators?: Indicator[]
 }
 
@@ -280,6 +288,7 @@ export interface Question {
     upper_bound: string;
     lower_text?: string;
     upper_text?: string;
+    flipped?: boolean;
 }
 
 export interface IndicatorSupport {

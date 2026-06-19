@@ -9,6 +9,10 @@ demography_router = APIRouter(prefix="/demography", tags=["demography"])
 async def get_majors():
     return await services.get_majors()
 
+@demography_router.get("/batch/available")
+async def get_available_batches():
+    return await services.get_available_batches()
+
 @demography_router.get("/batch", response_model=List[Batch])
 async def get_batches():
     return await services.get_batches()

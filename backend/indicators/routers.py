@@ -17,10 +17,10 @@ async def read_indicator_details(indicator_id: str):
 
 @indicators_router.post("", response_model=IndicatorDetailsResponse)
 async def create_indicator(data: IndicatorDetailsInput):
-    indicator_details = await services.create_indicator(data)
+    indicator_details = await services.create_indicator(data.model_dump())
     return {"message": "Indicator successfully created.", "indicator_details": indicator_details}
 
 @indicators_router.put("/{indicator_id}", response_model=IndicatorDetailsResponse)
 async def update_indicator(indicator_id: str, data: IndicatorDetailsInput):
-    indicator_details = await services.update_indicator(indicator_id, data)
+    indicator_details = await services.update_indicator(indicator_id, data.model_dump())
     return {"message": "Indicator successfully updated.", "indicator_details": indicator_details}

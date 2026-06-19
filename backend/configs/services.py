@@ -21,7 +21,6 @@ async def get_recommendation_weight() -> dict:
 async def update_recommendation_weight(data: dict):
     await cypher.update_recommendation_weight(data.need_weight, data.interest_weight)
     
-
 async def get_resource_assessments(type: str):
     return await cypher.get_resource_assessments(type)
 

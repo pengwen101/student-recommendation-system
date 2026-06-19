@@ -15,5 +15,23 @@ async def get_batches():
     """
     
     return await Neo4jConnection.query(query)
+
+
+async def get_available_batches():
+    query = """
+        MATCH (b:Batch)
+        WHERE NOT EXISTS { MATCH (b)-[:USES]->(:CurriculumVersion) }
+        RETURN b.batch_id AS batch_id
+        ORDER BY b.batch_id
+    """
+    return await Neo4jConnection.query(query)
+
+
+async def get_all_batch_ids():
+    query = """
+        MATCH (b:Batch)
+        RETURN b.batch_id AS batch_id
+    """
+    return await Neo4jConnection.query(query)
     
     

@@ -23,7 +23,11 @@ from backend.demography import routers as demography_routers
 from backend.analytics import routers as analytic_routers
 from backend.admins import routers as admin_routers
 from backend.organizers import routers as organizer_routers
+from backend.questions import routers as question_routers
+from backend.cpls import routers as cpl_routers
 from backend.configs import routers as config_routers
+from backend.indicators import routers as indicator_routers
+from backend.questions import routers as question_routers
 from backend.admins import services as admin_services
 from backend.admins import schemas as admin_schemas
 from backend import states
@@ -171,6 +175,10 @@ app.include_router(topic_routers.topics_router)
 app.include_router(subcpl_routers.subcpls_router)
 app.include_router(admin_routers.admins_router)
 app.include_router(organizer_routers.organizers_router)
+app.include_router(question_routers.questions_update_router)
+app.include_router(cpl_routers.cpls_router)
+app.include_router(indicator_routers.indicators_router)
+app.include_router(question_routers.questions_update_router)
 app.include_router(curriculum_routers.curriculums_router)
 app.include_router(curriculum_routers.curriculums_q_router)
 app.include_router(curriculum_routers.curriculum_versions_router)

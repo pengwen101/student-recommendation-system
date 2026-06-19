@@ -591,6 +591,40 @@ async def record_all_students_history():
     """
     await Neo4jConnection.query(query)
     
+async def recalculate_all_student_scores():
+    query = """
+    MATCH (s:Student)
+
+    OPTIONAL MATCH (s)-[ra:ANSWERED]->(:Question)<-[:HAS_QUESTION]-(i:Indicator)
+    WITH s, i, (avg(ra.valid_score)-1.0)/9.0 AS ind_avg_score
+    WHERE i IS NOT NULL
+    MERGE (s)-[rli:HAS]->(i)
+    SET rli.weight = ind_avg_score
+
+    WITH s
+    MATCH (s)-[rli:HAS]->(i:Indicator)<-[:HAS_INDICATOR]-(q:Quality)
+    WITH s, q, avg(rli.weight) AS qual_avg_score
+    MERGE (s)-[rlq:HAS]->(q)
+    SET rlq.weight = qual_avg_score
+
+    WITH s
+    MATCH (s)-[rlq:HAS]->(q:Quality)<-[sq:HAS_QUALITY]-(sc:SubCpl)
+    WITH s, sc,
+         sum(rlq.weight * sq.weight) AS weighted_score_sum,
+         sum(sq.weight) AS total_weight
+    WITH s, sc, weighted_score_sum / total_weight AS subcpl_avg_score
+    MERGE (s)-[rls:HAS]->(sc)
+    SET rls.weight = subcpl_avg_score
+
+    WITH s
+    MATCH (s)-[rls:HAS]->(sc:SubCpl)<-[:HAS_SUB_CPL]-(c:Cpl)
+    WITH s, c, avg(rls.weight) AS cpl_avg_score
+    MERGE (s)-[rlc:HAS]->(c)
+    SET rlc.weight = cpl_avg_score
+    """
+    await Neo4jConnection.query(query)
+
+
 async def get_attended_students(resource_id: str):
     query = """
     MATCH (r:UniResource {resource_id: $resource_id})<-[:ATTENDED]-(s:Student)

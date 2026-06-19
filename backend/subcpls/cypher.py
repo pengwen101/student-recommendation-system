@@ -42,6 +42,40 @@ async def read_subcpl_indicators(version_id: str):
     response = await Neo4jConnection.query(query, {"version_id": version_id})
     return response
 
+async def update_subcpl(sub_cpl_id: str, data: dict):
+    query = """
+    MATCH (sc:SubCpl {sub_cpl_id: $sub_cpl_id})
+    SET sc.code = $code, sc.name = $name
+    WITH sc
+    OPTIONAL MATCH (sc)<-[old_r:HAS_SUB_CPL]-(:Cpl)
+    DELETE old_r
+    WITH sc
+    MATCH (c:Cpl {cpl_id: $cpl_id})
+    MERGE (c)-[:HAS_SUB_CPL]->(sc)
+    """
+    await Neo4jConnection.query(query, {
+        "sub_cpl_id": sub_cpl_id,
+        "code": data["code"],
+        "name": data["name"],
+        "cpl_id": data["cpl_id"],
+    })
+
+
+async def read_subcpl_details_with_parent(sub_cpl_id: str):
+    query = """
+    MATCH (sc:SubCpl {sub_cpl_id: $sub_cpl_id})
+    OPTIONAL MATCH (c:Cpl)-[:HAS_SUB_CPL]->(sc)
+    RETURN sc.sub_cpl_id AS sub_cpl_id,
+           sc.code AS code,
+           sc.name AS name,
+           c.cpl_id AS cpl_id,
+           c.code AS cpl_code,
+           c.name AS cpl_name
+    """
+    response = await Neo4jConnection.query(query, {"sub_cpl_id": sub_cpl_id})
+    return response[0] if response else None
+
+
 async def read_subcpl_details(sub_cpl_id: str):
     query = """
     MATCH (s:SubCpl {sub_cpl_id: $sub_cpl_id})

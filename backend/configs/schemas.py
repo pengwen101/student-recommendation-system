@@ -10,7 +10,6 @@ class ResourceAssessment(BaseModel):
     display_name: str
     resource_type: ResourceType
     
-    
 class ResourceAssessmentInput(BaseModel):
     weight: float
     display_name: str
