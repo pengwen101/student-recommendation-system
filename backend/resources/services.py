@@ -5,27 +5,17 @@ from backend.curriculums import cypher as curriculum_cypher
 from backend.topics import cypher as topic_cypher
 from backend.admins import cypher as admin_cypher
 from fastapi import HTTPException, Depends
-from backend.resources.schemas import ResourceDetailsResponse, AllResourcesResponse, ResourceEventInput, ResourceBookInput, ResourceVideoInput, ResourceArticleInput, ActorType
+from backend.resources.schemas import ResourceEventInput, ResourceBookInput, ResourceVideoInput, ResourceArticleInput
+from backend.dependencies import get_embedding_model
 from typing import List
 import uuid
 import json
-import spacy
-from backend.topics import cypher as topics_cypher
 from deep_translator import GoogleTranslator
 import asyncio
 import hashlib
-import time
-from sentence_transformers import SentenceTransformer
-import re
-from backend.dependencies import get_embedding_model
+from langdetect import detect, DetectorFactory
 
-nlp = spacy.load("en_core_web_sm")
-if "entityLinker" not in nlp.pipe_names:
-    nlp.add_pipe("entityLinker", last=True)
-    
-MODEL_CACHE = {}
-
-additional_stop_words = ["student", "students", "people"]
+DetectorFactory.seed = 0
 
 type_label_dict = {
     "book": "Book",
@@ -46,7 +36,7 @@ async def read_resources(type: str):
         raise HTTPException(status_code=404, detail="Type not exist")
     return await resource_cypher.read_resources(label)
 
-async def create_resource(type: str, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict):
+async def create_resource(type: str, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict, model):
     new_resource_id = str(uuid.uuid4())
     data_dict = data.model_dump(mode='json')
     label = type_label_dict.get(type, None)
@@ -80,22 +70,25 @@ async def create_resource(type: str, data: ResourceEventInput | ResourceBookInpu
             if not await curriculum_cypher.study_level_exists(study_level_id):
                 raise HTTPException(status_code=404, detail=f"Study Level ID {study_level_id} not found")
     
-    generate_new_hash = True
-    if "text_hash" in data_dict:       
-        text_to_hash = f"{data_dict.get('title', '')} {data_dict.get('description', '')}"
-        new_text_hash = await asyncio.to_thread(lambda: hashlib.sha256(text_to_hash.encode('utf-8')).hexdigest())
-        if new_text_hash == data_dict['text_hash']:
-            generate_new_hash = False
-    if generate_new_hash:
-        target_words, eng_text, text_hash = await get_text_hash_eng_text_target_words((data_dict['title'] + " " + data_dict.get('description')))
-        data_dict['text_hash'] = text_hash
-        data_dict['eng_text'] = eng_text
-        data_dict['target_words'] = target_words
+    title = data_dict.get('title', '')
+    description = data_dict.get('description', '')
+    if description and description.strip():
+        lang = detect(description)
+        if lang != 'id':
+            description = await asyncio.to_thread(GoogleTranslator(source=lang, target='id').translate, description)
     
     await resource_cypher.create_resource(new_resource_id, label, data_dict, current_user)
+    topic_names = await resource_cypher.get_resource_topic_names(new_resource_id)
+    topik_str = ", ".join(topic_names) if topic_names else ""
+    body = f"Judul: {title}\nDeskripsi: {description}\nTopik: {topik_str}"
+    text_to_encode = f"passage: {body}"
+    data_dict['text_hash'] = await asyncio.to_thread(lambda: hashlib.sha256(text_to_encode.encode('utf-8')).hexdigest())
+    embedding = model.encode(text_to_encode)
+    await resource_cypher.set_node_vector_property(new_resource_id, embedding)
+    await resource_cypher.ensure_vector_index()
     return await read_resource_details(new_resource_id)
 
-async def update_resource(resource_id: str, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict):
+async def update_resource(resource_id: str, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict, model):
     resource_exists = await resource_cypher.resource_exists(resource_id)
     if not resource_exists:
         raise HTTPException(status_code=404, detail="Resource not found")
@@ -138,22 +131,31 @@ async def update_resource(resource_id: str, data: ResourceEventInput | ResourceB
             if not await curriculum_cypher.study_level_exists(study_level_id):
                 raise HTTPException(status_code=404, detail=f"Study Level ID {study_level_id} not found")
     
-    generate_new_hash = True
-    if "text_hash" in data_dict:       
-        text_to_hash = f"{data_dict.get('title', '')} {data_dict.get('description', '')}"
-        new_text_hash = await asyncio.to_thread(lambda: hashlib.sha256(text_to_hash.encode('utf-8')).hexdigest())
-        if new_text_hash == data_dict['text_hash']:
-            generate_new_hash = False
-
-    if generate_new_hash:
-        target_words, eng_text, text_hash = await get_text_hash_eng_text_target_words((data_dict['title'] + " " + data_dict.get('description')))
-        data_dict['text_hash'] = text_hash
-        data_dict['eng_text'] = eng_text
-        data_dict['target_words'] = target_words
+    title = data_dict.get('title', '')
+    description = data_dict.get('description', '')
+    if description and description.strip():
+        lang = detect(description)
+        if lang != 'id':
+            description = await asyncio.to_thread(GoogleTranslator(source=lang, target='id').translate, description)
+    
+    topic_names = await resource_cypher.get_resource_topic_names(resource_id)
+    topik_str = ", ".join(topic_names) if topic_names else ""
+    body = f"Judul: {title}\nDeskripsi: {description}\nTopik: {topik_str}"
+    text_to_encode = f"passage: {body}"
+    new_hash = await asyncio.to_thread(lambda: hashlib.sha256(text_to_encode.encode('utf-8')).hexdigest())
+    
+    needs_reencode = "text_hash" not in data_dict or new_hash != data_dict['text_hash']
+    
+    if needs_reencode:
+        data_dict['text_hash'] = new_hash
+        embedding = model.encode(text_to_encode)
+    
     await resource_cypher.update_resource(resource_id, data_dict, current_user)
-    if generate_new_hash:
-        await resource_cypher.create_vector_embedding(resource_id, "BAAI/bge-m3")
-        await resource_cypher.create_vector_embedding(resource_id, "all-MiniLM-L6-v2")
+    
+    if needs_reencode:
+        await resource_cypher.set_node_vector_property(resource_id, embedding)
+        await resource_cypher.ensure_vector_index()
+    
     return await read_resource_details(resource_id)
 
 async def archive_resource(resource_id: str):
@@ -176,31 +178,17 @@ async def delete_resource(resource_id: str):
         raise HTTPException(status_code=404, detail="Resource not found")
     await resource_cypher.delete_resource(resource_id)
     
-async def get_text_hash_eng_text_target_words(text: str):
-    start_time = time.perf_counter()
-    eng_text = await asyncio.to_thread(GoogleTranslator(target='en').translate, text)
-    print(f"[TIME] Translate to english: {time.perf_counter() - start_time:.4f} seconds")
-    text_hash = await asyncio.to_thread(lambda: hashlib.sha256(text.encode('utf-8')).hexdigest())
-    start_time = time.perf_counter()
-    doc = nlp(eng_text)
-    noun_phrases = []
-    for entity in doc._.linkedEntities:
-        span_text = entity.get_span().text
-        if span_text.lower() not in additional_stop_words and span_text.lower() not in noun_phrases:
-            noun_phrases.append(span_text.lower())
-    print(f"[TIME] Find entities: {time.perf_counter() - start_time:.4f} seconds")
-    start_time = time.perf_counter()
-    # target_words = await topics_cypher.get_valid_noun_lemmas(noun_phrases)
-    # print(f"[TIME] Find valid entities in WordNet: {time.perf_counter() - start_time:.4f} seconds")
-    return noun_phrases, eng_text, text_hash
-    
-async def get_indicator_recommendation(text: str):
-    target_words, eng_text, text_hash = await get_text_hash_eng_text_target_words(text)
-    result = await resource_cypher.get_indicator_recommendation(target_words)   
-    if result:
-        result["eng_text"] = eng_text
-        result["text_hash"] = text_hash
-        result["target_words"] = target_words
+async def get_indicator_recommendation(title: str, description: str, model):
+    if description and description.strip():
+        lang = detect(description)
+        if lang != 'id':
+            description = await asyncio.to_thread(GoogleTranslator(source=lang, target='id').translate, description)
+    body = f"Judul: {title}\nDeskripsi: {description}"
+    text_to_encode = f"passage: {body}"
+    query_embedding = model.encode(text_to_encode)
+    result = await resource_cypher.get_indicator_recommendation(query_embedding)
+    if not result:
+        raise HTTPException(status_code=404, detail="No similar resource found")
     return result
 
 async def get_resources_similarity(type: str, user_query: str, model=Depends(get_embedding_model)):

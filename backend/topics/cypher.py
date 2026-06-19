@@ -42,6 +42,16 @@ async def create_topic(topic_id: str, data: dict):
     params = {"topic_id": topic_id, "name": data['name'], "code": data['code']}
     await Neo4jConnection.query(query, params)
 
+
+async def create_custom_topic(topic_id: str, data: dict):
+    query = """
+    MERGE (t:Topic:CustomTopic {topic_id: $topic_id})
+    SET t.name = $name, t.code = 'custom', t.lower_name = lower($name)
+    """
+    
+    params = {"topic_id": topic_id, "name": data['name']}
+    await Neo4jConnection.query(query, params)
+
 async def update_topic(topic_id: str, data: dict):
     
     query = """

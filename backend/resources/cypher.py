@@ -1,10 +1,13 @@
 from backend.database import Neo4jConnection
 import time
-import re
-from sentence_transformers import SentenceTransformer
+
+
+VECTOR_PROPERTY = "embedding_LazarusNLP_all_indo_e5_small_v4"
+VECTOR_INDEX_NAME = "resource_embedding_LazarusNLP_all_indo_e5_small_v4"
+VECTOR_DIM = 384
 
 update_cleanup_query = """
-    OPTIONAL MATCH (r)-[old_rel:ORGANIZES|COVERS|SUPPORTS|HAS_SESSION|AVAILABLE_FOR|HAS|LINKED_TO]-()
+    OPTIONAL MATCH (r)-[old_rel:ORGANIZES|COVERS|SUPPORTS|HAS_SESSION|AVAILABLE_FOR|HAS]-()
     DELETE old_rel
 """
 
@@ -60,6 +63,36 @@ create_update_base_query = """
 """
 
 
+async def set_node_vector_property(resource_id: str, embedding: list):
+    query = """
+    MATCH (r:UniResource {resource_id: $resource_id})
+    CALL db.create.setNodeVectorProperty(r, $property_name, $embedding)
+    """
+    await Neo4jConnection.query(query, {
+        "resource_id": resource_id,
+        "property_name": VECTOR_PROPERTY,
+        "embedding": embedding
+    })
+
+
+async def ensure_vector_index():
+    query = f"""
+    CREATE VECTOR INDEX {VECTOR_INDEX_NAME} IF NOT EXISTS
+    FOR (r:UniResource) ON (r.{VECTOR_PROPERTY})
+    OPTIONS {{ indexConfig: {{ `vector.dimensions`: {VECTOR_DIM} }} }}
+    """
+    await Neo4jConnection.query(query)
+
+
+async def get_resource_topic_names(resource_id: str):
+    query = """
+    MATCH (r:UniResource {resource_id: $resource_id})-[:COVERS]->(t:Topic)
+    RETURN t.name AS name
+    """
+    result = await Neo4jConnection.query(query, {"resource_id": resource_id})
+    return [row["name"] for row in result]
+
+
 async def resource_exists(resource_id: str):
     query = """
     MATCH (r:UniResource {resource_id: $resource_id})
@@ -83,8 +116,6 @@ async def read_resources(label: str | None = None, resource_id: str | None = Non
     r.is_active as is_active,
     r.description as description,
     r.content_link as content_link,
-    r.target_words as target_words,
-    r.eng_text as eng_text,
     r.text_hash as text_hash,
     r.article_text as article_text,
     r.isbn as isbn,
@@ -147,21 +178,6 @@ async def read_resources(label: str | None = None, resource_id: str | None = Non
     
     return response[0] if resource_id else response
 
-async def link_resource_keywords(resource_id, target_words):
-    if not target_words:
-        return
-        
-    query = """
-    MATCH (r:UniResource {resource_id: $resource_id})
-    UNWIND $target_words as target_word
-    MERGE (w:Keyword {lemma: target_word})
-    MERGE (r)-[rl:LINKED_TO]->(w)
-    """
-    await Neo4jConnection.query(query, {
-        "resource_id": resource_id, 
-        "target_words": target_words
-    })
-
 async def create_resource(resource_id: str, label: str, data: dict, current_user: dict):
     query = f"""
     MERGE (r:UniResource:{label} {{resource_id: $resource_id}})
@@ -182,7 +198,7 @@ async def create_resource(resource_id: str, label: str, data: dict, current_user
     WITH r
     {create_update_base_query}
     """
-    resource_properties = {k: v for k, v in data.items() if k not in {"study_levels", "organizers", "sessions", "topics", "resource_assessments", "indicators", "published_date"}}
+    resource_properties = {k: v for k, v in data.items() if k not in {"study_levels", "organizers", "sessions", "topics", "resource_assessments", "indicators", "published_date", VECTOR_PROPERTY}}
     
     
     params = {"resource_id": resource_id, 
@@ -199,9 +215,6 @@ async def create_resource(resource_id: str, label: str, data: dict, current_user
     
     await Neo4jConnection.query(query, params)
     await calculate_support_weights(resource_id, data['indicators'])
-    await link_resource_keywords(resource_id, data["target_words"])
-    await create_vector_embedding(resource_id, "BAAI/bge_m3")
-    await create_vector_embedding(resource_id, "all-MiniLM-L6-v2")
     
 async def update_resource(resource_id: str, data: dict, current_user: dict):
     query = f"""
@@ -219,7 +232,7 @@ async def update_resource(resource_id: str, data: dict, current_user: dict):
     WITH r
     {create_update_base_query}
     """
-    resource_properties = {k: v for k, v in data.items() if k not in {"study_levels", "organizers", "sessions", "topics", "resource_assessments", "indicators", "published_date"}}
+    resource_properties = {k: v for k, v in data.items() if k not in {"study_levels", "organizers", "sessions", "topics", "resource_assessments", "indicators", "published_date", VECTOR_PROPERTY}}
     params = {"resource_id": resource_id, 
               "resource_properties": resource_properties,
               "published_date": data.get("published_date"),
@@ -233,12 +246,7 @@ async def update_resource(resource_id: str, data: dict, current_user: dict):
     start_time = time.perf_counter()
     await Neo4jConnection.query(query, params)
     print(f"[TIME] Neo4j Connection Query took: {time.perf_counter() - start_time:.4f} seconds")
-    start_time = time.perf_counter()
     await calculate_support_weights(resource_id, data['indicators'])
-    print(f"[TIME] Calculate Support Weights took: {time.perf_counter() - start_time:.4f} seconds")
-    start_time = time.perf_counter()
-    await link_resource_keywords(resource_id, data["target_words"])
-    print(f"[TIME] Link Resource Keywords took: {time.perf_counter() - start_time:.4f} seconds")
         
     
 async def check_organizer_update_authorization(resource_id, organizer_id):
@@ -311,40 +319,24 @@ async def calculate_support_weights(resource_id: str, indicators: list[dict]):
    
     await Neo4jConnection.query(query, {"resource_id": resource_id, "indicators": indicators})
     
-async def get_indicator_recommendation(target_words: list[str]):
+async def get_indicator_recommendation(query_embedding: list):
     query = """
-    WITH $target_words AS target_words
-    WITH target_words, size(target_words) AS target_word_count
-    UNWIND target_words AS word
-    MATCH (w:Keyword) WHERE w.lemma = word
-    CALL (w) {
-        MATCH (other:UniResource)-[r:LINKED_TO]->(w)
-        RETURN other
-        UNION
-        WITH w
-        MATCH (other:UniResource)-[:COVERS]->(t:Topic)
-        WHERE lower(t.name) = w.lemma
-        RETURN other
-    }
-    WITH other, 
-        target_word_count, 
-        target_words,
-        count(DISTINCT w) AS overlap_count
-
-    MATCH (other)-[:SUPPORTS]->(suggested_indicator:Indicator)
-    RETURN other.resource_id AS similar_resource_id,
-        tolower(head([l IN labels(other) WHERE l <> 'UniResource'])) AS similar_resource_type,
-        other.title AS similar_resource_title,
-        overlap_count AS word_overlap_count,
-        target_words AS target_words,
-        collect(DISTINCT suggested_indicator.indicator_id) AS suggested_indicator_ids
-    ORDER BY overlap_count DESC
+    MATCH (r:UniResource)
+    WHERE r.embedding_LazarusNLP_all_indo_e5_small_v4 IS NOT NULL
+    WITH r, vector.similarity.cosine(r.embedding_LazarusNLP_all_indo_e5_small_v4, $query_embedding) AS similarity
+    WHERE similarity >= 0.6
+    ORDER BY similarity DESC
     LIMIT 1
+    OPTIONAL MATCH (r)-[:SUPPORTS]->(suggested_indicator:Indicator)
+    RETURN r.resource_id AS similar_resource_id,
+           tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) AS similar_resource_type,
+           r.title AS similar_resource_title,
+           collect(DISTINCT suggested_indicator.indicator_id) AS suggested_indicator_ids
     """
-    result = await Neo4jConnection.query(query, {"target_words": target_words})
-    return result[0] if result else {}
-    
-    
+    result = await Neo4jConnection.query(query, {"query_embedding": query_embedding})
+    return result[0] if result else None
+
+
 async def get_resources_similarity(label, query_vector):
     query = f"""
     MATCH (r:UniResource:{label})
@@ -354,51 +346,3 @@ async def get_resources_similarity(label, query_vector):
         similarityScore AS similarity_score
     """
     return await Neo4jConnection.query(query, {"queryEmbedding": query_vector})
-
-async def create_vector_embedding(resource_id, model_name):
-    clean_property_name = f"embedding_{re.sub(r'[^a-zA-Z0-9_]', '_', model_name)}"
-    model = SentenceTransformer(model_name)
-    query = """
-    MATCH (r:UniResource {resource_id: $resource_id})-[]->(t:Topic)
-    RETURN r.resource_id AS resource_id, 
-           r.title AS title, 
-           r.description AS description, 
-           apoc.text.join(collect(t.name), ", ") AS topics
-    """
-    resources = await Neo4jConnection.query(query, {"resource_id": resource_id})
-    text_batch = []
-    for resource in resources:
-        structured_text = f"""
-        Title: {resource['title']}
-        Description: {resource['description']}
-        Topics: {resource['topics']}
-        """
-        text_batch.append(structured_text)
-
-    print(f"Generating embeddings for {len(text_batch)} resources...")
-    embeddings = model.encode(text_batch).tolist()
-    payload = []
-    for idx, resource in enumerate(resources):
-        payload.append({
-            "resource_id": resource['resource_id'],
-            "embedding": embeddings[idx]
-        })
-        
-    write_query = f"""
-    UNWIND $resources as resource
-    MATCH (r:UniResource {{resource_id: resource.resource_id}})
-    CALL db.create.setNodeVectorProperty(r, '{clean_property_name}', resource.embedding)
-    """
-    await Neo4jConnection.query(write_query, {"resources": payload})
-    print(f"Successfully updated embeddings using property key: {clean_property_name}")
-    embedding_dim = model.get_sentence_embedding_dimension()
-    index_query = f"""
-    CREATE VECTOR INDEX resource_{clean_property_name} IF NOT EXISTS
-        FOR (r:UniResource) ON (r.{clean_property_name})
-        OPTIONS {{
-        indexConfig: {{
-            `vector.dimensions`: {embedding_dim}
-        }}
-        }};
-    """
-    await Neo4jConnection.query(index_query)

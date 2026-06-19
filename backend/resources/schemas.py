@@ -103,9 +103,7 @@ class ResourceBase(BaseModel):
     resource_id: str
     title: str
     is_active: bool
-    target_words: List[str] | None = None
     text_hash: str | None = None
-    eng_text: str | None = None
     internal_weight: float
     resource_assessments: List[ResourceAssessment] | None = None
     topics: List[ResourceTopicsResponse]
@@ -115,9 +113,7 @@ class ResourceBase(BaseModel):
 class ResourceBaseInput(BaseModel):
     title: str
     is_active: bool
-    target_words: List[str] | None = None
     text_hash: str | None = None
-    eng_text: str | None = None
     resource_assessments: List[ResourceAssessmentInput] | None = None
     topics: List[ResourceTopicsInput]
     indicators: List[ResourceIndicatorsInput]
@@ -278,7 +274,3 @@ class IndicatorRecommendation(BaseModel):
     similar_resource_type: ResourceType
     similar_resource_title: str
     suggested_indicator_ids: List[str]
-    word_overlap_count: int
-    target_words: List[str]
-    eng_text: str
-    text_hash: str

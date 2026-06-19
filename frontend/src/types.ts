@@ -126,7 +126,6 @@ export type Resource = ResourceEvent | ResourceBook | ResourceVideo | ResourceAr
 // For edit / create
 export interface ResourceInput {
     resource_id: string;
-    //type: typeof ResourceType[keyof typeof ResourceType];
     title: string;
     description?: string;
     authors?: string[];
@@ -139,14 +138,7 @@ export interface ResourceInput {
     sessions?: SessionInput[],
     organizers?: ResourceOrganizerInput[],
     status?: typeof ResourceStatus[keyof typeof ResourceStatus];
-    target_words?: string[];
-    eng_text?: string;
     text_hash?: string;
-    // scale?: typeof ResourceScale[keyof typeof ResourceScale];
-    // speaker_degree?: typeof SpeakerDegree[keyof typeof SpeakerDegree];
-    // author_type?: typeof AuthorType[keyof typeof AuthorType];
-    // impact_scale?: typeof ImpactScale[keyof typeof ImpactScale];
-    // thematic_weight?: typeof ThematicWeight[keyof typeof ThematicWeight];
     resource_assessments?: ResourceAssessmentInput[];
     is_active: boolean;
     indicators: ResourceIndicator[];
@@ -196,8 +188,6 @@ export interface ResourceBaseInput {
     title: string;
     is_active: boolean;
     resource_assessments?: ResourceAssessmentInput[];
-    target_words?: string[];
-    eng_text?: string;
     text_hash?: string;
     topics: ResourceTopic[];
     indicators: ResourceIndicator[];

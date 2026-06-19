@@ -1,14 +1,14 @@
 from fastapi import APIRouter, HTTPException, Depends
 from backend.resources.schemas import (AllResourcesResponse, ResourceDetailsResponse, ResourceEventInput, ResourceBookInput, ResourceVideoInput, ResourceArticleInput, ResourceType, IndicatorRecommendation)
 from backend.resources import services
-from backend.dependencies import get_current_user
+from backend.dependencies import get_current_user, get_embedding_model
 
 resources_router = APIRouter(prefix="/resource", tags=["resource"])
 recommendation_configs_router = APIRouter(prefix="/recommendation-config", tags=["config"])
 
 @resources_router.get("/indicator_recommendation", response_model=IndicatorRecommendation)
-async def get_indicator_recommendation(text: str):
-    result = await services.get_indicator_recommendation(text)
+async def get_indicator_recommendation(title: str, description: str, model = Depends(get_embedding_model)):
+    result = await services.get_indicator_recommendation(title, description, model)
     return result
 
 @resources_router.get("", response_model=AllResourcesResponse)
@@ -22,13 +22,13 @@ async def read_resource_details(resource_id: str):
     return {"message": "Resource details successfully retrieved.", "resource_details": resource_details}
 
 @resources_router.post("/{type}", response_model=ResourceDetailsResponse)
-async def create_resource(type: ResourceType, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict = Depends(get_current_user)):
-    resource_details = await services.create_resource(type, data, current_user)
+async def create_resource(type: ResourceType, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict = Depends(get_current_user), model = Depends(get_embedding_model)):
+    resource_details = await services.create_resource(type, data, current_user, model)
     return {"message": "Resource successfully created.", "resource_details": resource_details}
 
 @resources_router.put("/{resource_id}", response_model=ResourceDetailsResponse)
-async def update_resource(resource_id: str, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict = Depends(get_current_user)):
-    resource_details = await services.update_resource(resource_id, data, current_user)
+async def update_resource(resource_id: str, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict = Depends(get_current_user), model = Depends(get_embedding_model)):
+    resource_details = await services.update_resource(resource_id, data, current_user, model)
     return {"message": "Resource successfully updated.", "resource_details": resource_details}
 
 @resources_router.put("/activate/{resource_id}", response_model=ResourceDetailsResponse)

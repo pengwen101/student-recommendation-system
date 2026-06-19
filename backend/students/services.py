@@ -58,8 +58,7 @@ async def _prepare_student_topics(topics: List[StudentTopicsInput]) -> list[dict
             raise HTTPException(status_code=400, detail="Topic name is required when topic_id is not provided")
 
         new_topic_id = str(uuid.uuid4())
-        topic_code = topic_dict.get("code") or _normalize_topic_code(topic_name)
-        await topic_cypher.create_topic(new_topic_id, {"name": topic_name.strip(), "code": topic_code})
+        await topic_cypher.create_custom_topic(new_topic_id, {"name": topic_name.strip()})
         prepared_topics.append({"topic_id": new_topic_id})
 
     return prepared_topics
