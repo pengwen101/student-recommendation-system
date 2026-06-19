@@ -18,7 +18,7 @@ async def update_cpl(cpl_id: str, data: dict):
     OPTIONAL MATCH (cv:CurriculumVersion)-[old_r:HAS_CPL]->(c)
     DELETE old_r
     WITH c
-    MATCH (cv:CurriculumVersion {curriculum_version_id: toInteger($curriculum_version_id)})
+    MATCH (cv:CurriculumVersion {curriculum_version_id: $curriculum_version_id})
     MERGE (cv)-[:HAS_CPL]->(c)
     """
     await Neo4jConnection.query(query, {
@@ -36,7 +36,7 @@ async def read_cpl_details(cpl_id: str):
     RETURN c.cpl_id AS cpl_id,
            c.code AS code,
            c.name AS name,
-           toString(cv.curriculum_version_id) AS curriculum_version_id
+           cv.curriculum_version_id AS curriculum_version_id
     """
     response = await Neo4jConnection.query(query, {"cpl_id": cpl_id})
     return response[0] if response else None

@@ -2,7 +2,7 @@ from backend.database import Neo4jConnection
 
 async def read_curriculum(version_id: str):
     query = """
-        MATCH (v:CurriculumVersion {curriculum_version_id: toInteger($version_id)})-[:HAS_CPL]->(c:Cpl)
+        MATCH (v:CurriculumVersion {curriculum_version_id: $version_id})-[:HAS_CPL]->(c:Cpl)
         MATCH (c)-[:HAS_SUB_CPL]->(s:SubCpl)
         MATCH (s)-[rel_sq:HAS_QUALITY]->(q:Quality)
         MATCH (q)-[:HAS_INDICATOR]->(i:Indicator)
@@ -90,14 +90,14 @@ async def get_max_curriculum_version_id():
     return response[0]["max_id"] if response and response[0]["max_id"] is not None else 0
 
 
-async def create_curriculum_version(version_id: int):
+async def create_curriculum_version(version_id: str):
     query = """
         CREATE (cv:CurriculumVersion {curriculum_version_id: $version_id})
     """
     await Neo4jConnection.query(query, {"version_id": version_id})
 
 
-async def batch_create_cpls(version_id: int, cpls: list[dict]):
+async def batch_create_cpls(version_id: str, cpls: list[dict]):
     query = """
         UNWIND $cpls AS row
         MATCH (cv:CurriculumVersion {curriculum_version_id: $version_id})
@@ -164,7 +164,7 @@ async def batch_create_questions(questions: list[dict]):
 
 async def get_batch_info_for_version(version_id: str):
     query = """
-        MATCH (b:Batch)-[:USES]->(cv:CurriculumVersion {curriculum_version_id: toInteger($version_id)})
+        MATCH (b:Batch)-[:USES]->(cv:CurriculumVersion {curriculum_version_id: $version_id})
         OPTIONAL MATCH (s:Student)-[:IS_FROM_BATCH]->(b)
         RETURN b.batch_id AS batch_id, count(DISTINCT s) AS student_count
         ORDER BY b.batch_id
@@ -172,7 +172,7 @@ async def get_batch_info_for_version(version_id: str):
     return await Neo4jConnection.query(query, {"version_id": version_id})
 
 
-async def link_version_to_batch(version_id: int, batch_id: str):
+async def link_version_to_batch(version_id: str, batch_id: str):
     query = """
         MATCH (cv:CurriculumVersion {curriculum_version_id: $version_id})
         MERGE (b:Batch {batch_id: $batch_id})

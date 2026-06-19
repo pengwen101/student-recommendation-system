@@ -24,7 +24,7 @@ function Curriculum() {
     const [dirtyChanges, setDirtyChanges] = useState<Record<string, any>>({});
     const [saving, setSaving] = useState(false);
 
-    const [versions, setVersions] = useState<{ curriculum_version_id: number }[]>([]);
+    const [versions, setVersions] = useState<{ curriculum_version_id: string }[]>([]);
     const [batches, setBatches] = useState<{ batch_id: string }[]>([]);
     const [suggestedNext, setSuggestedNext] = useState<string | null>(null);
     const [showImportModal, setShowImportModal] = useState(false);
@@ -59,7 +59,7 @@ function Curriculum() {
         const versionsRes = await api.get('/curriculum_version');
         const vList = versionsRes.data.curriculum_versions || [];
         setVersions(vList);
-        const maxV = vList.reduce((m: number, v: { curriculum_version_id: number }) => Math.max(m, v.curriculum_version_id), 0);
+        const maxV = vList.reduce((m: number, v: { curriculum_version_id: string }) => Math.max(m, Number(v.curriculum_version_id)), 0);
         const newV = String(maxV);
         setVersionId(newV);
         const currRes = await api.get(`/curriculum/${newV}`);
@@ -217,7 +217,7 @@ function Curriculum() {
             <div className="p-4 bg-white border-b border-gray-200 flex items-center gap-4 z-10 shadow-sm">
                 <label className="font-semibold text-gray-700">Curriculum Version:</label>
                 <select value={versionId} onChange={e => setVersionId(e.target.value)} className="border border-gray-300 p-2 rounded text-gray-700 bg-white outline-none focus:border-blue-500 font-medium">
-                    {versions.map(v => <option key={v.curriculum_version_id} value={String(v.curriculum_version_id)}>{v.curriculum_version_id}</option>)}
+                    {versions.map(v => <option key={v.curriculum_version_id} value={v.curriculum_version_id}>{v.curriculum_version_id}</option>)}
                 </select>
                 <div className="flex items-center gap-3 text-xs text-slate-500">
                   {batchInfo.length > 0 ? batchInfo.map(b => (

@@ -346,7 +346,7 @@ export interface ResourceOrganizerInput {
 }
 
 export interface CurriculumVersion {
-    curriculum_version_id: number;
+    curriculum_version_id: string;
 }
 
 export interface SupportLackGap {

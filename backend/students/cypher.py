@@ -5,7 +5,7 @@ TOPIC_EMBEDDING_PROPERTY = "embedding_LazarusNLP_all_indo_e5_small_v4"
 async def read_student_topics(nrp: str):
     query = """
         MATCH (s:Student {nrp: $nrp})-[r:INTERESTED_IN]->(t:Topic)
-        RETURN t.topic_id as topic_id, t.code as code, t.name as name, t.eng_text as eng_text
+        RETURN t.topic_id as topic_id, t.code as code, t.name as name
     """
     params = {"nrp": nrp}
     response = await Neo4jConnection.query(query, params)

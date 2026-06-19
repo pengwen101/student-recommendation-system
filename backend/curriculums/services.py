@@ -164,7 +164,7 @@ async def create_curriculum(file: UploadFile, batch_id: str):
 
     # --- Create in Neo4j ---
     max_id = await curriculum_cypher.get_max_curriculum_version_id()
-    version_id = max_id + 1
+    version_id = str(int(max_id) + 1)
 
     await curriculum_cypher.create_curriculum_version(version_id)
     await curriculum_cypher.batch_create_cpls(version_id, list(cpl_map.values()))

@@ -34,11 +34,6 @@ async def read_student_topics(nrp: str):
     return await student_cypher.read_student_topics(nrp)
 
 
-def _normalize_topic_code(name: str) -> str:
-    cleaned = re.sub(r"[^a-zA-Z0-9]+", "_", name.strip())
-    return cleaned.strip("_").upper() or "CUSTOM_TOPIC"
-
-
 async def _prepare_student_topics(topics: List[StudentTopicsInput]) -> list[dict]:
     prepared_topics: list[dict] = []
 

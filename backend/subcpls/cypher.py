@@ -11,7 +11,7 @@ async def subcpl_exists(sub_cpl_id: str):
 
 async def read_subcpl_indicators(version_id: str):
     query = """
-    MATCH (:CurriculumVersion {curriculum_version_id: toInteger($version_id)})-[]->(:Cpl)-[]->(s:SubCpl)
+    MATCH (:CurriculumVersion {curriculum_version_id: $version_id})-[]->(:Cpl)-[]->(s:SubCpl)
     RETURN s.sub_cpl_id as sub_cpl_id, 
            s.code as code,
            s.name as name,

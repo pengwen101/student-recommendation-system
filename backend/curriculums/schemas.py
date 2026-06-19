@@ -49,7 +49,7 @@ class StudyLevel(BaseModel):
     study_level_id: str
     
 class CurriculumVersion(BaseModel):
-    curriculum_version_id: int
+    curriculum_version_id: str
 
 class CurriculumVersionResponse(BaseModel):
     message: str
