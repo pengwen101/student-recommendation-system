@@ -99,16 +99,6 @@ async def clear_student_topic_embedding(nrp: str):
     await Neo4jConnection.query(query, {"nrp": nrp})
     
     
-async def read_student_indicators(nrp: str):
-    query = """
-        MATCH (s:Student {nrp: $nrp})-[r:HAS]->(i:Indicator)
-        RETURN i.indicator_id as indicator_id, i.code as code, i.name as name, r.weight as weight
-    """
-    params = {"nrp": nrp}
-    response = await Neo4jConnection.query(query, params)
-    return response
-
-
 async def read_student_lack_indicators(nrp: str):
     query = """
     MATCH (cf:Config:StudentTarget)
@@ -118,21 +108,6 @@ async def read_student_lack_indicators(nrp: str):
     RETURN i.indicator_id as indicator_id, 
            i.code as code, 
            i.name as name, 
-           calculated_weight as weight
-    """
-    params = {"nrp": nrp}
-    response = await Neo4jConnection.query(query, params)
-    return response
-
-async def read_student_lack_subcpls(nrp: str):
-    query = """
-    MATCH (cf:Config:StudentTarget)
-    MATCH (s:Student {nrp: $nrp})-[r:HAS]->(sc:SubCpl)
-    WITH sc, cf.target_score - r.weight AS calculated_weight
-    WHERE calculated_weight > 0
-    RETURN sc.sub_cpl_id as sub_cpl_id, 
-           sc.code as code, 
-           sc.name as name, 
            calculated_weight as weight
     """
     params = {"nrp": nrp}
@@ -156,31 +131,6 @@ async def read_student_cpls(nrp: str):
     params = {"nrp": nrp}
     response = await Neo4jConnection.query(query, params)
     return response
-    
-async def create_student_indicators(nrp: str, indicator_list: list):
-    query = """
-        MATCH (s:Student {nrp: $nrp})
-        UNWIND $indicators as indicator
-        MATCH (i:Indicator {indicator_id: indicator.indicator_id})
-        MERGE (s)-[r:HAS]->(i)
-        SET r.weight = indicator.weight
-    """
-    params = {"nrp": nrp, "indicators": indicator_list}
-    await Neo4jConnection.query(query, params)
-
-async def update_student_indicators(nrp: str, indicator_list: list):
-    query = """
-        MATCH (s:Student {nrp: $nrp})
-        OPTIONAL MATCH (s)-[r:HAS]->(i:Indicator)
-        DELETE r
-        WITH s
-        UNWIND $indicators as indicator
-        MATCH (i:Indicator {indicator_id: indicator.indicator_id})
-        MERGE (s)-[r:HAS]->(i)
-        SET r.weight = indicator.weight
-    """
-    params = {"nrp": nrp, "indicators": indicator_list}
-    await Neo4jConnection.query(query, params)
     
 async def has_topics(nrp: str):
     query = """

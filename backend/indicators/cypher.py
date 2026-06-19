@@ -11,21 +11,6 @@ async def indicator_exists(indicator_id: str):
     return response[0]['exists'] if response else False
 
 
-async def read_indicators():
-    query = """
-    MATCH (i:Indicator)
-    RETURN i.indicator_id as indicator_id, 
-           i.name as name,
-    [(i)<-[r:HAS_INDICATOR]-(q:Quality) | {
-                 quality_id: q.quality_id,
-                 code: q.code,
-                 name: q.name
-            }] as qualities
-    """
-    response = await Neo4jConnection.query(query)
-    return response
-
-
 async def read_indicator_details(indicator_id: str):
     query = """
     MATCH (i:Indicator {indicator_id: $indicator_id})
@@ -41,19 +26,6 @@ async def read_indicator_details(indicator_id: str):
     params = {"indicator_id": indicator_id}
     response = await Neo4jConnection.query(query, params)
     return response[0] if response else None
-
-
-async def create_indicator(indicator_id: str, data: dict):
-    query = """
-    MERGE (i:Indicator {indicator_id: $indicator_id})
-    SET i.code = $code, i.name = $name
-    WITH i
-    UNWIND $qualities as quality
-    MATCH (q:Quality {quality_id: quality.quality_id})
-    MERGE (q)-[r:HAS_INDICATOR]->(i)
-    """
-    params = {"indicator_id": indicator_id, "code": data["code"], "name": data["name"], "qualities": data["qualities"]}
-    await Neo4jConnection.query(query, params)
 
 
 async def update_indicator(indicator_id: str, data: dict):
@@ -72,9 +44,4 @@ async def update_indicator(indicator_id: str, data: dict):
     await Neo4jConnection.query(query, params)
 
 
-async def delete_indicator(indicator_id: str):
-    query = """
-    MATCH (i:Indicator {indicator_id: $indicator_id})
-    DETACH DELETE i
-    """
-    await Neo4jConnection.query(query, {"indicator_id": indicator_id})
+

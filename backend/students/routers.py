@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status, UploadFile, File, HTTPException, Depends, Query
 from backend.students.schemas import (TopicActionResponse, StudentRecommendationsResponse,\
-                                    IndicatorActionResponse, StudentIndicatorsInputBatch, StudentTopicsInputBatch, SubCplActionResponse, CplActionResponse, AttendedStudents, StudentQuestionRelation)
+                                    IndicatorActionResponse, StudentTopicsInputBatch, SubCplActionResponse, CplActionResponse, AttendedStudents, StudentQuestionRelation)
 from backend.students import services
 from typing import List
 from backend.resources.schemas import ResourceType
@@ -38,16 +38,6 @@ async def read_student_lack_indicators(nrp: str):
     indicators = await services.read_student_lack_indicators(nrp)
     return {"message": "Student indicators relations successfully retrieved.", "count": len(indicators), "indicators": indicators}
 
-@indicators_router.get("/{nrp}", response_model=IndicatorActionResponse)
-async def read_student_indicators(nrp: str):
-    indicators = await services.read_student_indicators(nrp)
-    return {"message": "Student indicators relations successfully retrieved.", "count": len(indicators), "indicators": indicators}
-
-@subcpls_router.get("/lack/{nrp}", response_model=SubCplActionResponse)
-async def read_student_lack_subcpls(nrp: str):
-    subcpls = await services.read_student_lack_subcpls(nrp)
-    return {"message": "Student subcpls relations successfully retrieved.", "count": len(subcpls), "subcpls": subcpls}
-
 @subcpls_router.get("/{nrp}", response_model=SubCplActionResponse)
 async def read_student_subcpls(nrp: str):
     subcpls = await services.read_student_subcpls(nrp)
@@ -57,16 +47,6 @@ async def read_student_subcpls(nrp: str):
 async def read_student_cpls(nrp: str):
     cpls = await services.read_student_cpls(nrp)
     return {"message": "Student cpls relations successfully retrieved.", "count": len(cpls), "cpls": cpls}
-
-@indicators_router.post("/{nrp}", response_model=IndicatorActionResponse)
-async def create_student_indicators(nrp: str, data: StudentIndicatorsInputBatch):
-    indicators = await services.create_student_indicators(nrp, data.indicators)
-    return {"message": "Student indicators relations successfully added.", "count": len(indicators), "indicators": indicators}
-
-@indicators_router.put("/{nrp}", response_model=IndicatorActionResponse)
-async def update_student_indicators(nrp: str, data: StudentIndicatorsInputBatch):
-    indicators = await services.update_student_indicators(nrp, data.indicators)
-    return {"message": "Student indicators relations successfully updated.", "count": len(indicators), "indicators": indicators}
 
 @topics_router.get("/has_topics/{nrp}", response_model=bool)
 async def has_student_topics(nrp: str):

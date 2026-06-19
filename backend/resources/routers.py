@@ -1,16 +1,10 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends
 from backend.resources.schemas import (AllResourcesResponse, ResourceDetailsResponse, ResourceEventInput, ResourceBookInput, ResourceVideoInput, ResourceArticleInput, ResourceType, IndicatorRecommendation)
 from backend.resources import services
 from backend.dependencies import get_current_user
-from typing import List
 
 resources_router = APIRouter(prefix="/resource", tags=["resource"])
 recommendation_configs_router = APIRouter(prefix="/recommendation-config", tags=["config"])
-
-@resources_router.get("/search/{type}/{model_name:path}")
-async def search_similar_resources(type: ResourceType, model_name: str, query: str):
-    result = await services.search_similar_resources(type, model_name, query)
-    return result
 
 @resources_router.get("/indicator_recommendation", response_model=IndicatorRecommendation)
 async def get_indicator_recommendation(text: str):
@@ -31,11 +25,6 @@ async def read_resource_details(resource_id: str):
 async def create_resource(type: ResourceType, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict = Depends(get_current_user)):
     resource_details = await services.create_resource(type, data, current_user)
     return {"message": "Resource successfully created.", "resource_details": resource_details}
-
-@resources_router.put("/set-resource-weight")
-async def set_resource_weight(resource_id: str | None = None):
-    await services.set_resource_weight(resource_id)
-    return {"message": "Resource weight successfully updated."}
 
 @resources_router.put("/{resource_id}", response_model=ResourceDetailsResponse)
 async def update_resource(resource_id: str, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict = Depends(get_current_user)):

@@ -311,45 +311,6 @@ async def calculate_support_weights(resource_id: str, indicators: list[dict]):
    
     await Neo4jConnection.query(query, {"resource_id": resource_id, "indicators": indicators})
     
-async def calculate_support_weights_old(resource_id: str, indicators: list[dict]):
-    query = """
-    MATCH (r:UniResource {resource_id: $resource_id})
-    MATCH (i:Indicator)
-    WHERE i.indicator_id IN [ind IN $indicators | ind.indicator_id]
-    MATCH (c:Cpl)-[:HAS_SUB_CPL]->(s:SubCpl)-[sq:HAS_QUALITY]->(q:Quality)-[:HAS_INDICATOR]->(i)
-
-    WITH r, i, q, s, c, max(sq.weight) AS calculated_weight
-    MERGE (r)-[rsi:SUPPORTS]->(i)
-    SET rsi.weight = calculated_weight
-
-    WITH r, q, s, c, calculated_weight, count(i) AS resource_indicator_count
-    WITH r, q, s, c, calculated_weight, resource_indicator_count, COUNT { (q)-[:HAS_INDICATOR]->() } AS quality_indicator_count
-
-    WITH r, q, s, c, calculated_weight * ((resource_indicator_count * 1.0) / quality_indicator_count) AS r_q_weight
-    MERGE (r)-[rsq:SUPPORTS]->(q)
-    SET rsq.weight = r_q_weight
-
-    WITH r, s, c, sum(r_q_weight) AS resource_quality_weight
-    CALL (s) {
-        MATCH (s)-[sq_all:HAS_QUALITY]->()
-        RETURN sum(sq_all.weight) AS subcpl_quality_weight
-    }
-    
-    WITH r, s, c, resource_quality_weight, (resource_quality_weight * 1.0) / subcpl_quality_weight as r_s_weight
-
-    MERGE (r)-[rss:SUPPORTS]->(s)
-    SET rss.weight = r_s_weight
-    
-    WITH r, c, sum(r_s_weight) as total_subcpl_weight, COUNT { (c)-[:HAS_SUB_CPL]->() } AS cpl_subcpl_count
-    WITH r, c, total_subcpl_weight / cpl_subcpl_count as r_c_weight
-    
-    MERGE (r)-[rsc:SUPPORTS]->(c)
-    SET rsc.weight = r_c_weight
-    """
-   
-    await Neo4jConnection.query(query, {"resource_id": resource_id, "indicators": indicators})
-    
-
 async def get_indicator_recommendation(target_words: list[str]):
     query = """
     WITH $target_words AS target_words
@@ -384,60 +345,6 @@ async def get_indicator_recommendation(target_words: list[str]):
     return result[0] if result else {}
     
     
-async def set_resource_weight(resource_id: str | None = None):
-    query = """ 
-    MATCH (r:UniResource) WHERE $resource_id IS NULL OR r.resource_id = $resource_id
-
-    OPTIONAL MATCH (r)-[:HAS_SESSION]->(s:Session)
-    WITH r, sum(duration.inSeconds(s.start_datetime, s.end_datetime).minutes) as minute_duration
-
-    MATCH (ew:Config:EventWeight)
-    MATCH (bvw:Config:BookVideoWeight)
-    OPTIONAL MATCH (sr:Config:ScaleRule) WHERE sr.scale = r.scale
-    OPTIONAL MATCH (spr:Config:SpeakerDegreeRule) WHERE spr.speaker_degree = r.speaker_degree
-    OPTIONAL MATCH (dr:Config:DurationRule)
-    
-    
-    OPTIONAL MATCH (at:Config:AuthorTypeRule) WHERE at.author_type = r.author_type
-    OPTIONAL MATCH (is:Config:ImpactScaleRule) WHERE is.impact_scale = r.impact_scale
-    OPTIONAL MATCH (tw:Config:ThematicWeightRule) WHERE tw.thematic_weight = r.thematic_weight
-
-    WITH r, minute_duration, ew, sr, spr, dr, at, is, tw, bvw
-
-    SET r.internal_weight = 
-        CASE
-            WHEN r.type = "event"
-            THEN COALESCE((ew.speaker_degree_weight * spr.weight), 0) +
-                    COALESCE((ew.scale_weight * sr.weight), 0) + 
-                    COALESCE((ew.duration_weight *
-                    CASE WHEN minute_duration < 720.0 THEN (((minute_duration/60.0) - dr.a)/(dr.b-dr.a))
-                    ELSE 1.0
-                    END
-                    ), 0)
-            WHEN r.type = "book" OR r.type = "video"
-            THEN COALESCE((bvw.author_type_weight * at.weight), 0) +
-                 COALESCE((bvw.impact_scale_weight * is.weight), 0) + 
-                 COALESCE((bvw.thematic_weight_weight * tw.weight), 0)
-            ELSE 1.0
-        END
-    """
-    
-    await Neo4jConnection.query(query, {"resource_id": resource_id})
-    
-# async def search_similar_resources(label, property_name, query_vector):
-#     query = f"""
-#     MATCH (r:UniResource:{label})
-#     WHERE r['{property_name}'] IS NOT NULL
-#     WITH r, vector.similarity.cosine(r['{property_name}'], $queryEmbedding) AS similarityScore
-#     RETURN r.title AS title,
-#         r.description AS description,
-#         similarityScore,
-#         apoc.text.join([(r)-[]->(t:Topic) | t.name], ", ") AS topics
-#     ORDER BY similarityScore DESC
-#     LIMIT 5
-#     """
-#     return await Neo4jConnection.query(query, {"queryEmbedding": query_vector})
-
 async def get_resources_similarity(label, query_vector):
     query = f"""
     MATCH (r:UniResource:{label})

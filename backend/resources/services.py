@@ -176,14 +176,6 @@ async def delete_resource(resource_id: str):
         raise HTTPException(status_code=404, detail="Resource not found")
     await resource_cypher.delete_resource(resource_id)
     
-async def set_resource_weight(resource_id: str | None):
-    if resource_id:
-        resource_exists = await resource_cypher.resource_exists(resource_id)
-        if not resource_exists:
-            raise HTTPException(status_code=404, detail="Resource not found")
-    await resource_cypher.set_resource_weight(resource_id)
-    
-    
 async def get_text_hash_eng_text_target_words(text: str):
     start_time = time.perf_counter()
     eng_text = await asyncio.to_thread(GoogleTranslator(target='en').translate, text)
@@ -210,20 +202,6 @@ async def get_indicator_recommendation(text: str):
         result["text_hash"] = text_hash
         result["target_words"] = target_words
     return result
-
-# async def get_embedding_model(model_name: str) -> SentenceTransformer:
-#     if model_name not in MODEL_CACHE:
-#         MODEL_CACHE[model_name] = SentenceTransformer(model_name)
-#     return MODEL_CACHE[model_name]
-
-# async def search_similar_resources(type: str, model_name: str, user_query: str):
-#     if model_name=="LazarusNLP/all-indo-e5-small-v4":
-#         user_query = "query: " + user_query
-#     label = type_label_dict[type]
-#     model=await get_embedding_model(model_name)
-#     property_name = f"embedding_{re.sub(r'[^a-zA-Z0-9_]', '_', model_name)}"
-#     query_vector = model.encode(user_query).tolist()
-#     return await resource_cypher.search_similar_resources(label, property_name, query_vector)
 
 async def get_resources_similarity(type: str, user_query: str, model=Depends(get_embedding_model)):
     user_query = "query: " + user_query
