@@ -1,29 +1,25 @@
-import api from '../api/axios.tsx';
-import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Pane } from '../components/Pane.tsx';
 import { Button } from '../components/Button.tsx';
 
 const Login = () => {
+    const location = useLocation();
+    const params = new URLSearchParams(location.search);
+    const error = params.get('error');
+
+    const errorMap: Record<string, string> = {
+        invalid_domain: "Only @john.petra.ac.id emails are allowed for student login.",
+        pending_approval: "Your admin account is awaiting approval.",
+    };
+
     const handleAdminLogin = () => {
         window.location.href = "http://localhost:8000/admin/login";
     };
 
-    const [isPending, setIsPending] = useState(false);
-
-    useEffect(() => {
-        const checkAdminStatus = async () => {
-            const userRes = await api.get('/users/me');
-            setIsPending((userRes.data.role == "pending_admin"));
-            console.log(userRes.data);
-        };
-        
-        checkAdminStatus();
-    }, [isPending]);
-
     const handleStudentLogin = () => {
         window.location.href = "http://localhost:8000/student/login";
     }
- 
+
     return (
         <div className="min-h-screen flex justify-center items-center bg-slate-50 p-4">
             <Pane variant="shadow" className="max-w-md flex flex-col items-center gap-8 text-center">
@@ -37,10 +33,9 @@ const Login = () => {
                 </div>
 
                 <div className="w-full space-y-4">
-                    {/* Primary Button for the main user base */}
-                    <Button 
+                    <Button
                         variant="solid"
-                        size="lg" 
+                        size="lg"
                         className="w-full text-base"
                         onClick={handleStudentLogin}
                     >
@@ -53,10 +48,9 @@ const Login = () => {
                         Sign in as Student
                     </Button>
 
-                    {/* Outline Button for Admins (least visual weight) */}
-                    <Button 
+                    <Button
                         variant="outline"
-                        size="lg" 
+                        size="lg"
                         className="w-full text-base"
                         onClick={handleAdminLogin}
                     >
@@ -69,9 +63,9 @@ const Login = () => {
                         Sign in as Admin
                     </Button>
 
-                    {isPending && (
+                    {error && (
                         <div className="w-full px-4 py-3 bg-danger-50 border border-danger-100 rounded-lg text-sm text-danger-700 font-medium mt-4">
-                            Your account is currently pending admin approval.
+                            {errorMap[error] || error}
                         </div>
                     )}
                 </div>

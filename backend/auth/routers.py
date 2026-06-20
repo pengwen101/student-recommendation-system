@@ -55,7 +55,8 @@ async def auth(request: Request):
 
             if admin_exists:
                 is_approved = (await admin_services.read_admin_details(admin_id))["approved"]
-                role = "admin" if is_approved else "pending_admin"
+                if not is_approved:
+                    return RedirectResponse(url='http://localhost:5173/login?error=pending_approval')
             else:
                 admin_details = await admin_services.create_admin(admin_schemas.AdminCreateInput(email=email, name=name))
                 admin_id = admin_details['admin_id']
@@ -63,17 +64,12 @@ async def auth(request: Request):
 
                 if is_root_admin:
                     await admin_services.approve_admin(admin_id)
-                    role = "admin"
                 else:
-                    role = "pending_admin"
+                    return RedirectResponse(url='http://localhost:5173/login?error=pending_approval')
 
-            jwt_payload = {"sub": str(admin_id), "role": role, "email": email, "name": name}
+            jwt_payload = {"sub": str(admin_id), "role": "admin", "email": email, "name": name}
             token = create_access_token(jwt_payload)
-
-            if role == 'admin':
-                redirect_url = f'http://localhost:5173/admin?token={token}'
-            else:
-                redirect_url = f'http://localhost:5173/login?token={token}'
+            redirect_url = f'http://localhost:5173/admin?token={token}'
 
         return RedirectResponse(url=redirect_url)
 
@@ -90,9 +86,3 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         "email": current_user.get("email"),
         "name": current_user.get("name")
     }
-
-
-@auth_router.get("/logout")
-async def logout(request: Request):
-    request.session.pop('user', None)
-    return {"message": "Logged out"}
