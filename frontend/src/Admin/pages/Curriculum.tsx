@@ -293,7 +293,7 @@ function Curriculum() {
                 <Group orientation="horizontal" className="h-full">
 
                     {/* LEFT PANE */}
-                    <Panel defaultSize={30} minSize={20}>
+                    <Panel defaultSize={50} minSize={20}>
                         <div className="h-full overflow-y-auto bg-white flex flex-col">
                             <div className="p-4 border-b bg-slate-50 font-bold text-slate-800">Curriculum Structure</div>
                             <div className="flex-1 p-4 space-y-3">
@@ -342,7 +342,7 @@ function Curriculum() {
                     <Separator className="w-1.5 bg-slate-200 hover:bg-blue-400 transition-colors cursor-col-resize" />
 
                     {/* RIGHT PANE */}
-                    <Panel minSize={30}>
+                    <Panel defaultSize={50} minSize={30}>
                         <div className="h-full overflow-y-auto bg-slate-50 p-6 md:p-8">
                             {!selectedSubCpl ? (
                                 <div className="h-full flex items-center justify-center text-slate-400">
