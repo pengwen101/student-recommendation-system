@@ -30,6 +30,7 @@ export default function EventRoster() {
   const [searchTerm, setSearchTerm] = useState("");
   const [students, setStudents] = useState<AttendedStudent[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(true);
+  const [resourceTitle, setResourceTitle] = useState<string>("");
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -57,6 +58,13 @@ export default function EventRoster() {
 
   useEffect(() => {
     fetchStudents();
+    if (resource_id) {
+      api.get(`/resource/${resource_id}`).then(res => {
+        setResourceTitle(res.data.resource_details?.title || resource_id);
+      }).catch(() => {
+        setResourceTitle(resource_id);
+      });
+    }
   }, [resource_id]);
 
   // --- HANDLERS: Bulk Import ---
@@ -195,7 +203,7 @@ export default function EventRoster() {
       <div className="mb-8 flex justify-between items-end">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Event Roster</h1>
-          <p className="text-sm text-slate-500 mt-1">Resource ID: {resource_id}</p>
+          <p className="text-sm text-slate-500 mt-1">{resourceTitle}</p>
         </div>
         <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg font-bold shadow-sm border border-blue-100">
           {students.length} Registered

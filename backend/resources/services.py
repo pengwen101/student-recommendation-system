@@ -7,7 +7,6 @@ from backend.admins import cypher as admin_cypher
 from fastapi import HTTPException, Depends
 from backend.resources.schemas import ResourceEventInput, ResourceBookInput, ResourceVideoInput, ResourceArticleInput
 from backend.dependencies import get_embedding_model
-from typing import List
 import uuid
 import json
 from deep_translator import GoogleTranslator
@@ -77,12 +76,13 @@ async def create_resource(type: str, data: ResourceEventInput | ResourceBookInpu
         if lang != 'id':
             description = await asyncio.to_thread(GoogleTranslator(source=lang, target='id').translate, description)
     
-    await resource_cypher.create_resource(new_resource_id, label, data_dict, current_user)
     topic_names = await resource_cypher.get_resource_topic_names(new_resource_id)
     topik_str = ", ".join(topic_names) if topic_names else ""
     body = f"Judul: {title}\nDeskripsi: {description}\nTopik: {topik_str}"
     text_to_encode = f"passage: {body}"
     data_dict['text_hash'] = await asyncio.to_thread(lambda: hashlib.sha256(text_to_encode.encode('utf-8')).hexdigest())
+    
+    await resource_cypher.create_resource(new_resource_id, label, data_dict, current_user)
     embedding = model.encode(text_to_encode)
     await resource_cypher.set_node_vector_property(new_resource_id, embedding)
     await resource_cypher.ensure_vector_index()

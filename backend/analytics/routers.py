@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
+from backend.auth.dependencies import require_admin
 from backend.analytics.schemas import (SupportLackGap, ResourceSupportingX, ResourceCharacteristic, OrganizerSupport, StudentMastery, CurriculumType, StudentComparison, StudentHistory)
 from backend.analytics import services
 from typing import List
 
-analytic_router = APIRouter(prefix="/analytic", tags=["analytic"])
+analytic_router = APIRouter(prefix="/analytic", tags=["analytic"], dependencies=[Depends(require_admin())])
 
 @analytic_router.get("/support_lack_gap/{curriculum_type}", response_model=List[SupportLackGap])
 async def support_lack_gap(curriculum_type: CurriculumType, 

@@ -44,13 +44,6 @@ function ResourceForm() {
    useEffect(() => {
     const fetchData = async () => {
       try {
-        const userRes = await api.get("/users/me");
-
-        if (!userRes.data.authenticated) {
-          window.location.href = "/admin/login";
-          return;
-        }
-
         const [subcplsRes, topicsRes, organizersRes, versionsRes, resourceAssessmentsRes] = await Promise.all([
             api.get(`/subcpl/indicators/${versionId}`),
             api.get("/topic"),
@@ -802,7 +795,11 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
     }
   }
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return (
+    <div className="flex justify-center items-center h-screen">
+      <div className="text-slate-500 animate-pulse font-medium">Loading resource form...</div>
+    </div>
+  );
 
   return (
   <div className="max-w-4xl mx-auto pb-12">

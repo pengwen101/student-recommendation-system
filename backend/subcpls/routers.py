@@ -1,8 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from backend.auth.dependencies import require_admin
 from backend.subcpls.schemas import AllSubCplIndicatorsResponse, SubCplUpdateInput, SubCplUpdateResponse
 from backend.subcpls import services
 
-subcpls_router = APIRouter(prefix="/subcpl", tags=["subcpl"])
+subcpls_router = APIRouter(prefix="/subcpl", tags=["subcpl"], dependencies=[Depends(require_admin())])
 
 @subcpls_router.get("/indicators/{version_id}", response_model=AllSubCplIndicatorsResponse)
 async def read_subcpl_indicators(version_id: str):

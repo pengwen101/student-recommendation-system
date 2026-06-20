@@ -154,6 +154,7 @@ async def record_student_attendance(resource_id: str, file_contents: bytes, file
     if missing_nrps:
         raise ValueError(f"The following NRPs do not exist in the database: {', '.join(missing_nrps)}")
     await student_cypher.record_student_attendance(resource_id, nrps)
+    return {"message": "Attendance recorded successfully."}
     
 async def recalculate_all_student_scores():
     await student_cypher.recalculate_all_student_scores()

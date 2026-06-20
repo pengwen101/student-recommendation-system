@@ -23,13 +23,6 @@ function OrganizerForm() {
    useEffect(() => {
     const fetchData = async () => {
       try {
-        const userRes = await api.get("/users/me");
-
-        if (!userRes.data.authenticated) {
-          window.location.href = "/admin/login";
-          return;
-        }
-
         if (isEdit && organizer_id) {
           const res = await api.get(`/organizer/${organizer_id}`);
           setOrganizer(res.data.organizer_details || null);

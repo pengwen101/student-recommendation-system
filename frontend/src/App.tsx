@@ -8,6 +8,7 @@ import RecommendationPageStudent from './Student/pages/RecommendationPageStudent
 import StudentTopics from './Student/pages/StudentTopics';
 import SurveyAssessment from './Student/pages/SurveyAssessment';
 import StudentGuard from './Student/pages/StudentGuard';
+import AdminGuard from './Admin/pages/AdminGuard';
 import ResourceDetails from './Student/pages/ResourceDetails';
 //import Profile from './Student/pages/Profile';
 import Resources from './Admin/pages/Resources';
@@ -76,29 +77,31 @@ function App() {
           </Route>
         </Route>
 
-        <Route element={<AdminMainLayout />}>
-          <Route path="/admin" element={<Navigate to="/resource" replace />} />
-          <Route path="/resource" element={<Resources/>}></Route>
-          <Route path="/resource/edit/:resource_id" element={<ResourceForm/>}></Route>
-          <Route path="/resource/create" element={<ResourceForm/>}></Route>
-          <Route path="/resource/roster/:resource_id" element={<EventRoster/>}></Route>
-          <Route path="/organizer" element={<Organizers/>}></Route>
-          <Route path="/organizer/edit/:organizer_id" element={<OrganizerForm/>}></Route>
-          <Route path="/organizer/create" element={<OrganizerForm/>}></Route>
-          <Route path="/topic" element={<Topics/>}></Route>
-          <Route path="/topic/edit/:topic_id" element={<TopicForm/>}></Route>
-          <Route path="/topic/create" element={<TopicForm/>}></Route>
-          <Route path="/manage-admins" element={<ManageAdmins/>}></Route>
-          <Route path="/curriculum" element={<Curriculum/>}></Route>
-          <Route path="/dashboard" element={<Dashboard/>}></Route>
-          <Route path="/configuration" element={<Configuration/>}></Route>
+        <Route element={<AdminGuard />}>
+          <Route element={<AdminMainLayout />}>
+            <Route path="/admin" element={<Navigate to="/resource" replace />} />
+            <Route path="/resource" element={<Resources/>}></Route>
+            <Route path="/resource/edit/:resource_id" element={<ResourceForm/>}></Route>
+            <Route path="/resource/create" element={<ResourceForm/>}></Route>
+            <Route path="/resource/roster/:resource_id" element={<EventRoster/>}></Route>
+            <Route path="/organizer" element={<Organizers/>}></Route>
+            <Route path="/organizer/edit/:organizer_id" element={<OrganizerForm/>}></Route>
+            <Route path="/organizer/create" element={<OrganizerForm/>}></Route>
+            <Route path="/topic" element={<Topics/>}></Route>
+            <Route path="/topic/edit/:topic_id" element={<TopicForm/>}></Route>
+            <Route path="/topic/create" element={<TopicForm/>}></Route>
+            <Route path="/manage-admins" element={<ManageAdmins/>}></Route>
+            <Route path="/curriculum" element={<Curriculum/>}></Route>
+            <Route path="/dashboard" element={<Dashboard/>}></Route>
+            <Route path="/configuration" element={<Configuration/>}></Route>
 
-          <Route path="/support_lack_gap" element={<SupportLackGap/>}></Route>
-          <Route path="/resource_characteristic" element={<ResourceCharacteristic/>}></Route>
-          <Route path="/organizer_support" element={<OrganizerSupport/>}></Route>
-          <Route path="/student_performance" element={<StudentPerformance/>}></Route>
-          <Route path="/student_comparison" element={<StudentComparison/>}></Route>
-          <Route path="/student_history" element={<StudentHistory/>}></Route>
+            <Route path="/support_lack_gap" element={<SupportLackGap/>}></Route>
+            <Route path="/resource_characteristic" element={<ResourceCharacteristic/>}></Route>
+            <Route path="/organizer_support" element={<OrganizerSupport/>}></Route>
+            <Route path="/student_performance" element={<StudentPerformance/>}></Route>
+            <Route path="/student_comparison" element={<StudentComparison/>}></Route>
+            <Route path="/student_history" element={<StudentHistory/>}></Route>
+          </Route>
         </Route>
       </Routes>
     </BrowserRouter>

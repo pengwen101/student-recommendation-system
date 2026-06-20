@@ -1,47 +1,48 @@
 from fastapi import APIRouter, HTTPException, Depends
 from backend.resources.schemas import (AllResourcesResponse, ResourceDetailsResponse, ResourceEventInput, ResourceBookInput, ResourceVideoInput, ResourceArticleInput, ResourceType, IndicatorRecommendation)
 from backend.resources import services
-from backend.dependencies import get_current_user, get_embedding_model
+from backend.dependencies import get_embedding_model
+from backend.auth.dependencies import require_admin, require_any
 
 resources_router = APIRouter(prefix="/resource", tags=["resource"])
-recommendation_configs_router = APIRouter(prefix="/recommendation-config", tags=["config"])
+recommendation_configs_router = APIRouter(prefix="/recommendation-config", tags=["config"], dependencies=[Depends(require_admin())])
 
-@resources_router.get("/indicator_recommendation", response_model=IndicatorRecommendation)
+@resources_router.get("/indicator_recommendation", response_model=IndicatorRecommendation, dependencies=[Depends(require_admin())])
 async def get_indicator_recommendation(title: str, description: str, model = Depends(get_embedding_model)):
     result = await services.get_indicator_recommendation(title, description, model)
     return result
 
-@resources_router.get("", response_model=AllResourcesResponse)
+@resources_router.get("", response_model=AllResourcesResponse, dependencies=[Depends(require_any())])
 async def read_resources(type: ResourceType):
     resources = await services.read_resources(type)
     return {"message": "Resources successfully retrieved.", "count": len(resources), "resources": resources}
 
-@resources_router.get("/{resource_id}", response_model=ResourceDetailsResponse)
+@resources_router.get("/{resource_id}", response_model=ResourceDetailsResponse, dependencies=[Depends(require_any())])
 async def read_resource_details(resource_id: str):
     resource_details = await services.read_resource_details(resource_id)
     return {"message": "Resource details successfully retrieved.", "resource_details": resource_details}
 
 @resources_router.post("/{type}", response_model=ResourceDetailsResponse)
-async def create_resource(type: ResourceType, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict = Depends(get_current_user), model = Depends(get_embedding_model)):
+async def create_resource(type: ResourceType, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict = Depends(require_admin()), model = Depends(get_embedding_model)):
     resource_details = await services.create_resource(type, data, current_user, model)
     return {"message": "Resource successfully created.", "resource_details": resource_details}
 
 @resources_router.put("/{resource_id}", response_model=ResourceDetailsResponse)
-async def update_resource(resource_id: str, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict = Depends(get_current_user), model = Depends(get_embedding_model)):
+async def update_resource(resource_id: str, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict = Depends(require_admin()), model = Depends(get_embedding_model)):
     resource_details = await services.update_resource(resource_id, data, current_user, model)
     return {"message": "Resource successfully updated.", "resource_details": resource_details}
 
-@resources_router.put("/activate/{resource_id}", response_model=ResourceDetailsResponse)
+@resources_router.put("/activate/{resource_id}", response_model=ResourceDetailsResponse, dependencies=[Depends(require_admin())])
 async def activate_resource(resource_id: str):
     resource_details = await services.activate_resource(resource_id)
     return {"message": "Resource successfully activated.", "resource_details": resource_details}
 
-@resources_router.put("/archive/{resource_id}", response_model=ResourceDetailsResponse)
+@resources_router.put("/archive/{resource_id}", response_model=ResourceDetailsResponse, dependencies=[Depends(require_admin())])
 async def archive_resource(resource_id: str):
     resource_details = await services.archive_resource(resource_id)
     return {"message": "Resource successfully archived.", "resource_details": resource_details}
 
-@resources_router.delete("/{resource_id}")
+@resources_router.delete("/{resource_id}", dependencies=[Depends(require_admin())])
 async def delete_resource(resource_id: str):
     await services.delete_resource(resource_id)
     return {"message": "Resource successfully deleted."}

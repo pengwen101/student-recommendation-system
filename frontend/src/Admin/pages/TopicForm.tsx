@@ -23,13 +23,6 @@ function TopicForm() {
    useEffect(() => {
     const fetchData = async () => {
       try {
-        const userRes = await api.get("/users/me");
-
-        if (!userRes.data.authenticated) {
-          window.location.href = "/admin/login";
-          return;
-        }
-
         if (isEdit && topic_id) {
           const res = await api.get(`/topic/${topic_id}`);
           setTopic(res.data.topic_details || null);

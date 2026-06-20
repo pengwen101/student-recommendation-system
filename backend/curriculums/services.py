@@ -178,6 +178,21 @@ async def create_curriculum(file: UploadFile, batch_id: str):
     return await curriculum_cypher.read_curriculum(str(version_id))
 
 
+async def delete_curriculum_version(version_id: str):
+    version_exists = await curriculum_cypher.read_curriculum_versions()
+    if not any(v.get("curriculum_version_id") == version_id for v in version_exists):
+        raise HTTPException(status_code=404, detail=f"Curriculum version {version_id} not found")
+
+    batch_info = await curriculum_cypher.get_batch_info_for_version(version_id)
+    total_students = sum(b.get("student_count", 0) for b in batch_info)
+    if total_students > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete curriculum version {version_id}: used by {total_students} student(s)"
+        )
+    await curriculum_cypher.delete_curriculum_version(version_id)
+
+
 def _parse_flipped(val):
     if isinstance(val, bool):
         return val

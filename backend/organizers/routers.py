@@ -1,8 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from backend.auth.dependencies import require_admin
 from backend.organizers.schemas import AllOrganizerDetailsResponse, OrganizerDetailsResponse, OrganizerDetailsInput
 from backend.organizers import services
 
-organizers_router = APIRouter(prefix="/organizer", tags=["organizer"])
+organizers_router = APIRouter(prefix="/organizer", tags=["organizer"], dependencies=[Depends(require_admin())])
 
 @organizers_router.get("", response_model=AllOrganizerDetailsResponse)
 async def read_organizers():

@@ -1,11 +1,12 @@
-from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form, Depends
+from backend.auth.dependencies import require_admin, require_any
 from fastapi.responses import StreamingResponse
 from backend.curriculums.schemas import (CurriculumResponse, CurriculumQuestionResponse, CurriculumVersionResponse, QuestionResponse)
 from backend.curriculums import services
 from typing import List
 
-curriculums_router = APIRouter(prefix="/curriculum", tags=["curriculum"])
-curriculum_versions_router = APIRouter(prefix="/curriculum_version", tags=["curriculum_version"])
+curriculums_router = APIRouter(prefix="/curriculum", tags=["curriculum"], dependencies=[Depends(require_admin())])
+curriculum_versions_router = APIRouter(prefix="/curriculum_version", tags=["curriculum_version"], dependencies=[Depends(require_admin())])
 
 curriculums_q_router = APIRouter(prefix="/curriculum_q", tags=["curriculum_question"])
 
@@ -50,3 +51,9 @@ async def read_questions():
 async def read_curriculum_versions():
     curriculum_versions = await services.read_curriculum_versions()
     return {"message": "Curriculum versions successfully retrieved.", "curriculum_versions": curriculum_versions}
+
+
+@curriculum_versions_router.delete("/{version_id}")
+async def delete_curriculum_version_endpoint(version_id: str):
+    await services.delete_curriculum_version(version_id)
+    return {"message": f"Curriculum version {version_id} successfully deleted."}

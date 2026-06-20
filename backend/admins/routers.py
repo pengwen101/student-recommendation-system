@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
+from backend.auth.dependencies import require_admin
 from backend.admins.schemas import (AdminDetails, AdminCreateInput)
 from backend.admins import services
 from typing import List
 
-admins_router = APIRouter(prefix="/admin", tags=["admin"])
+admins_router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin())])
 
 @admins_router.get("", response_model=List[AdminDetails])
 async def read_admins():

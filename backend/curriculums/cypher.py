@@ -179,4 +179,19 @@ async def link_version_to_batch(version_id: str, batch_id: str):
         MERGE (b)-[:USES]->(cv)
     """
     await Neo4jConnection.query(query, {"version_id": version_id, "batch_id": batch_id})
+
+
+async def delete_curriculum_version(version_id: str):
+    query = """
+        MATCH (cv:CurriculumVersion {curriculum_version_id: $version_id})
+        OPTIONAL MATCH (cv)-[:HAS_CPL]->(c:Cpl)
+        OPTIONAL MATCH (c)-[:HAS_SUB_CPL]->(sc:SubCpl)
+        OPTIONAL MATCH (sc)-[rq:HAS_QUALITY]->(q:Quality)
+        OPTIONAL MATCH (q)-[:HAS_INDICATOR]->(i:Indicator)
+        OPTIONAL MATCH (i)-[:HAS_QUESTION]->(qs:Question)
+        OPTIONAL MATCH (b:Batch)-[u:USES]->(cv)
+        DELETE u
+        DETACH DELETE cv, c, sc, q, i, qs
+    """
+    await Neo4jConnection.query(query, {"version_id": version_id})
     

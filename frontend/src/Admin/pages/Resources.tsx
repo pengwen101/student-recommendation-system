@@ -6,6 +6,7 @@ import { DataTable, type ColumnDef } from '../components/DataTable';
 import api from '../../api/axios.tsx';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPenToSquare, faCalendar } from '@fortawesome/free-regular-svg-icons';
+import { faUsers } from '@fortawesome/free-solid-svg-icons';
 import toast from 'react-hot-toast';
 
 type AnyResource = ResourceEvent | ResourceArticle | ResourceBook | ResourceVideo;
@@ -157,7 +158,7 @@ const Resources = () => {
                         className="inline-flex items-center justify-center w-8 h-8 rounded-md text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
                         title="View Roster"
                     >
-                        <FontAwesomeIcon icon={faPenToSquare} />
+                        <FontAwesomeIcon icon={faUsers} />
                     </Link>
                 </div>
             )

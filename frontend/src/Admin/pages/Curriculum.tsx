@@ -227,6 +227,28 @@ function Curriculum() {
                 <div className="ml-auto flex items-center gap-2">
                   {!isEditing ? (
                     <>
+                      <button onClick={() => {
+                        const totalStudents = batchInfo.reduce((s, b) => s + b.student_count, 0);
+                        if (totalStudents > 0) {
+                          toast.error(`Cannot delete: used by ${totalStudents} student(s)`);
+                          return;
+                        }
+                        if (!window.confirm(`Delete curriculum version ${versionId} and all its data? This cannot be undone.`)) return;
+                        api.delete(`/curriculum_version/${versionId}`).then(() => {
+                          toast.success(`Curriculum version ${versionId} deleted.`);
+                          api.get('/curriculum_version').then(r => {
+                            const vList = r.data.curriculum_versions || [];
+                            setVersions(vList);
+                            if (vList.length > 0) {
+                              const newV = vList.reduce((a: string, b: { curriculum_version_id: string }) => String(Math.max(Number(a), Number(b.curriculum_version_id))), '0');
+                              setVersionId(newV);
+                            } else {
+                              setVersionId('');
+                              setCurriculum([]);
+                            }
+                          });
+                        }).catch(() => toast.error("Failed to delete curriculum version."));
+                      }} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors">Delete Version</button>
                       <button onClick={handleDownloadTemplate} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors">Create Curriculum</button>
                       <button onClick={() => setShowImportModal(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors">Import Curriculum</button>
                       <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">Edit Mode</button>

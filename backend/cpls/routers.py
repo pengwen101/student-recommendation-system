@@ -1,8 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from backend.auth.dependencies import require_admin
 from backend.cpls.schemas import CPLUpdateInput, CPLUpdateResponse
 from backend.cpls import services
 
-cpls_router = APIRouter(prefix="/cpl", tags=["cpl"])
+cpls_router = APIRouter(prefix="/cpl", tags=["cpl"], dependencies=[Depends(require_admin())])
 
 
 @cpls_router.put("/{cpl_id}", response_model=CPLUpdateResponse)

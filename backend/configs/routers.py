@@ -1,10 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from backend.auth.dependencies import require_admin
 from backend.resources.schemas import ResourceType
 from backend.configs.schemas import StudentTarget, ResourceAssessment, ResourceAssessmentInput, RecommendationWeight, AddScoreConstant
 from backend.configs import services
 from typing import List
 
-configs_router = APIRouter(prefix="/config", tags=["config"])
+configs_router = APIRouter(prefix="/config", tags=["config"], dependencies=[Depends(require_admin())])
 
 @configs_router.get("/student_target", response_model=StudentTarget)
 async def get_student_target():

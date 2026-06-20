@@ -1,9 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from backend.auth.dependencies import require_admin
 from backend.demography.schemas import Major, Batch
 from backend.demography import services
 from typing import List
 
-demography_router = APIRouter(prefix="/demography", tags=["demography"])
+demography_router = APIRouter(prefix="/demography", tags=["demography"], dependencies=[Depends(require_admin())])
 
 @demography_router.get("/major", response_model=List[Major])
 async def get_majors():

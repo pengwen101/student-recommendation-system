@@ -5,14 +5,15 @@ from backend.students import services
 from typing import List
 from backend.resources.schemas import ResourceType
 from backend.dependencies import get_embedding_model
+from backend.auth.dependencies import require_student, require_admin
 
-topics_router = APIRouter(prefix="/student/topics", tags=["student_topics"])
-recommendations_router = APIRouter(prefix="/student/recommendations", tags=["student_recommendations"])
-indicators_router = APIRouter(prefix="/student/indicators", tags=["student_indicators"])
-subcpls_router = APIRouter(prefix="/student/subcpls", tags=["student_subcpls"])
-cpls_router = APIRouter(prefix="/student/cpls", tags=["student_cpls"])
-attendance_router = APIRouter(prefix="/student/attendance", tags=["student_attendance"])
-questions_router = APIRouter(prefix="/student/questions", tags=["student_questions"])
+topics_router = APIRouter(prefix="/student/topics", tags=["student_topics"], dependencies=[Depends(require_student())])
+recommendations_router = APIRouter(prefix="/student/recommendations", tags=["student_recommendations"], dependencies=[Depends(require_student())])
+indicators_router = APIRouter(prefix="/student/indicators", tags=["student_indicators"], dependencies=[Depends(require_student())])
+subcpls_router = APIRouter(prefix="/student/subcpls", tags=["student_subcpls"], dependencies=[Depends(require_student())])
+cpls_router = APIRouter(prefix="/student/cpls", tags=["student_cpls"], dependencies=[Depends(require_student())])
+attendance_router = APIRouter(prefix="/student/attendance", tags=["student_attendance"], dependencies=[Depends(require_admin())])
+questions_router = APIRouter(prefix="/student/questions", tags=["student_questions"], dependencies=[Depends(require_student())])
 
 @topics_router.get("/{nrp}", response_model=TopicActionResponse)
 async def read_student_topics(nrp: str):
