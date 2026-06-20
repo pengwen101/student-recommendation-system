@@ -171,6 +171,7 @@ function StudentTopics() {
       const savedTopics: Topic[] = response.data.topics || [];
       setSelectedTopics(savedTopics.map(mapTopicToSelected));
       toast.success('Topics updated successfully.');
+      navigate('/home');
     } catch (error) {
       console.error('Failed to save student topics', error);
       toast.error('Failed to save topics.');

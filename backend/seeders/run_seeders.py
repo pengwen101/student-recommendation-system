@@ -13,11 +13,12 @@ DetectorFactory.seed = 0
 
 async def seed_years_and_versions():
     query = """
-        MERGE (:StudyLevel {study_level_id: "1"})
-        MERGE (:StudyLevel {study_level_id: "2"})
-        MERGE (:StudyLevel {study_level_id: "3"})
-        MERGE (:StudyLevel {study_level_id: "4"})
-        MERGE (:CurrentAcademicYear {value: "25/26"})
+        MERGE (:CurrentAcademicYear {current_academic_year_id: "2026/2027"})
+        
+        WITH toInteger(right(split("2026/2027", '/')[0], 2)) AS current_year
+        WITH current_year, range(1, current_year - 18) AS levels
+        UNWIND levels AS level
+        MERGE (:StudyLevel {study_level_id: toString(level)})
         
         MERGE (:CurriculumVersion {curriculum_version_id: "1"})
     """
@@ -62,8 +63,15 @@ async def seed_students(path):
     df = pd.read_parquet(path)
     data = df.to_dict(orient="records")
     query = """
-        MATCH (sl:StudyLevel {study_level_id: "1"})
+        MATCH (acy:CurrentAcademicYear)
         UNWIND $batch as row
+        WITH acy, row,
+             toInteger(right(split(acy.current_academic_year_id, '/')[0], 2)) AS current_academic_year,
+             toInteger(substring(row.nrp, 3, 2)) AS student_batch
+        WITH row,
+             toString(current_academic_year - student_batch + 1) AS study_level_id,
+             "20" + substring(row.nrp, 3, 2) + "/20" + toString(toInteger(substring(row.nrp, 3, 2)) + 1) AS calculated_batch_id
+        MERGE (sl:StudyLevel {study_level_id: study_level_id})
         MERGE (s:Student {nrp: row.nrp})
         SET s.gender = row.gender,
             s.major = row.major,
@@ -75,8 +83,6 @@ async def seed_students(path):
         ON CREATE SET f.faculty_id = randomUUID()
         MERGE (s)-[:MAJORS_IN]->(m)
         MERGE (m)-[:BELONGS_TO]->(f)
-        WITH s, sl, row, 
-            "20" + substring(row.nrp, 3, 2) + "/20" + toString(toInteger(substring(row.nrp, 3, 2)) + 1) AS calculated_batch_id
         MERGE (b:Batch {batch_id: calculated_batch_id})
         MERGE (s)-[:IS_FROM_BATCH]->(b)
         MERGE (s)-[:CURRENTLY_IN]->(sl)

@@ -287,14 +287,14 @@ async def create_student(nrp: str, email: str, name: str):
     query = """
         MATCH (acy:CurrentAcademicYear)
         WITH acy,
-             toInteger(left(acy.value, 2)) AS current_academic_year,
+             toInteger(right(split(acy.current_academic_year_id, '/')[0], 2)) AS current_academic_year,
              toInteger(substring($nrp, 3, 2)) AS student_batch
         WITH acy,
              current_academic_year,
              student_batch,
              toString(current_academic_year - student_batch + 1) AS study_level_id,
              "20" + substring($nrp, 3, 2) + "/20" + toString(toInteger(substring($nrp, 3, 2)) + 1) AS batch_id
-        MATCH (sl:StudyLevel {study_level_id: study_level_id})
+        MERGE (sl:StudyLevel {study_level_id: study_level_id})
         MERGE (s:Student {nrp: $nrp})
         ON CREATE SET s.email = $email,
                       s.name = $name
@@ -308,7 +308,7 @@ async def create_student(nrp: str, email: str, name: str):
                s.name AS name,
                sl.study_level_id AS study_level_id,
                b.batch_id AS batch_id,
-               acy.value AS current_academic_year
+               acy.current_academic_year_id AS current_academic_year
     """
 
     params = {
