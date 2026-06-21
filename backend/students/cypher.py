@@ -292,7 +292,7 @@ async def create_student(nrp: str, email: str, name: str):
         WITH acy,
              current_academic_year,
              student_batch,
-             toString(current_academic_year - student_batch + 1) AS study_level_id,
+             toString(CASE WHEN current_academic_year - student_batch + 1 > 4 THEN 4 ELSE current_academic_year - student_batch + 1 END) AS study_level_id,
              "20" + substring($nrp, 3, 2) + "/20" + toString(toInteger(substring($nrp, 3, 2)) + 1) AS batch_id
         MERGE (sl:StudyLevel {study_level_id: study_level_id})
         MERGE (s:Student {nrp: $nrp})

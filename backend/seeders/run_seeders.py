@@ -70,7 +70,7 @@ async def seed_students(path):
              toInteger(right(split(acy.current_academic_year_id, '/')[0], 2)) AS current_academic_year,
              toInteger(substring(row.nrp, 3, 2)) AS student_batch
         WITH row,
-             toString(current_academic_year - student_batch + 1) AS study_level_id,
+             toString(CASE WHEN current_academic_year - student_batch + 1 > 4 THEN 4 ELSE current_academic_year - student_batch + 1 END) AS study_level_id,
              "20" + substring(row.nrp, 3, 2) + "/20" + toString(toInteger(substring(row.nrp, 3, 2)) + 1) AS calculated_batch_id
         MERGE (sl:StudyLevel {study_level_id: study_level_id})
         MERGE (s:Student {nrp: row.nrp})
