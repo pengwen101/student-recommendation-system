@@ -6,16 +6,7 @@ import { faCheck, faPlus, faSearch, faTrash } from '@fortawesome/free-solid-svg-
 import api from '../../api/axios';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
-import type { Topic } from '../../types';
-
-interface SelectedTopic {
-  id: string;
-  topic_id?: string;
-  name: string;
-  code?: string;
-  eng_text?: string | null;
-  isCustom: boolean;
-}
+import type { Topic, SelectedTopic } from '../../types';
 
 const slugifyTopicCode = (value: string) => {
   const cleaned = value

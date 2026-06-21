@@ -69,7 +69,7 @@ def _compose_topic_text(topic_rows: list[dict]) -> str:
     )
 
 
-async def _sync_student_topic_embedding(nrp: str, embedding_model):
+async def sync_student_topic_embedding(nrp: str, embedding_model):
     topic_rows = await student_cypher.read_student_topics(nrp)
     topic_text = _compose_topic_text(topic_rows)
 
@@ -86,7 +86,7 @@ async def create_student_topics(nrp: str, topics: List[StudentTopicsInput], embe
         raise HTTPException(status_code=404, detail="Student not found")
     topics_list = await _prepare_student_topics(topics)
     await student_cypher.create_student_topics(nrp, topics_list)
-    await _sync_student_topic_embedding(nrp, embedding_model)
+    await sync_student_topic_embedding(nrp, embedding_model)
     return await student_cypher.read_student_topics(nrp)
 
 async def update_student_topics(nrp: str, topics: List[StudentTopicsInput], embedding_model):
@@ -95,7 +95,7 @@ async def update_student_topics(nrp: str, topics: List[StudentTopicsInput], embe
         raise HTTPException(status_code=404, detail="Student not found")
     topics_list = await _prepare_student_topics(topics)
     await student_cypher.update_student_topics(nrp, topics_list)
-    await _sync_student_topic_embedding(nrp, embedding_model)
+    await sync_student_topic_embedding(nrp, embedding_model)
     return await student_cypher.read_student_topics(nrp)
 
 async def read_student_lack_indicators(nrp: str):

@@ -40,6 +40,9 @@ REQUIRE o.organizer_id IS UNIQUE;
 CREATE CONSTRAINT admin_id IF NOT EXISTS
 FOR (a:Admin)
 REQUIRE a.admin_id IS UNIQUE;
+CREATE CONSTRAINT admin_email IF NOT EXISTS
+FOR (a:Admin)
+REQUIRE a.email IS UNIQUE;
 CREATE CONSTRAINT topic_id IF NOT EXISTS
 FOR (t:Topic)
 REQUIRE t.topic_id IS UNIQUE;
@@ -49,9 +52,9 @@ REQUIRE ra.resource_assessment_id IS UNIQUE;
 CREATE CONSTRAINT session_id IF NOT EXISTS
 FOR (ss:Session)
 REQUIRE ss.session_id IS UNIQUE;
-CREATE score_transaction_id IF NOT EXISTS
+CREATE CONSTRAINT score_transaction_id IF NOT EXISTS
 FOR (st:ScoreTransaction)
 REQUIRE st.score_transaction_id IS UNIQUE;
-CREATE cpl_history_id IF NOT EXISTS
+CREATE CONSTRAINT cpl_history_id IF NOT EXISTS
 FOR (ch:CplHistory)
-REQUIRE cpl_history_id IS UNIQUE;
+REQUIRE ch.cpl_history_id IS UNIQUE;

@@ -207,10 +207,6 @@ class ResourceDetailsResponse(BaseModel):
     ]
 
 
-class ActorInput(BaseModel):
-    actor_id: str
-    actor_type: ActorType
-    
 class ResourceEventInput(ResourceBaseInput):
     description: str
     sessions: List[SessionInput]
@@ -231,35 +227,6 @@ class ResourceVideoInput(ResourceBaseInput):
     
 class ResourceArticleInput(ResourceBaseInput):
     article_text: EditorData
-    
-class ResourceDetailsInput(BaseModel):
-    type: ResourceType
-    name: str
-    description: str | None = None
-    authors: List[str] | None = None
-    publisher: str | None = None
-    published_date: datetime | None = None
-    isbn: str | None = None
-    content_link: str | None = None
-    article_text: Optional[EditorData] = None
-    study_levels: List[StudyLevel] | None = None
-    sessions: List[SessionInput] | None = None
-    organizers: List[dict] | None = None
-    status: ResourceStatus | None = None
-    scale: ResourceScale | None = None
-    speaker_degree: SpeakerDegree | None = None
-    thematic_weight: ThematicWeight | None = None
-    author_type: AuthorType | None = None
-    impact_scale: ImpactScale | None = None
-    indicators: List[ResourceIndicatorsInput]
-    topics: List[ResourceTopicsInput]
-    @model_validator(mode="after")
-    def check_sessions(self):
-        if self.type == 'event' and not self.sessions:
-            raise ValueError("Sessions must be provided when resource type is event.")
-        if self.type != 'event' and self.sessions:
-            raise ValueError(f"Sessions cannot be provided for resource type '{self.type}'.")
-        return self
     
 class AllResourcesResponse(BaseModel):
     message: str

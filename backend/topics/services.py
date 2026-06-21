@@ -14,10 +14,14 @@ async def read_topic_details(topic_id: str):
     return await topic_cypher.read_topic_details(topic_id)
 
 async def create_topic(data: TopicDetailsInput):
-    new_topic_id = str(uuid.uuid4())
-    data_dict = data.model_dump()
-    await topic_cypher.create_topic(new_topic_id, data_dict)
-    return await topic_cypher.read_topic_details(new_topic_id)
+    existing = await topic_cypher.find_custom_topic_by_name(data.name)
+    if existing:
+        topic_id = existing['topic_id']
+        await topic_cypher.convert_custom_topic(topic_id, data.model_dump())
+    else:
+        topic_id = str(uuid.uuid4())
+        await topic_cypher.create_topic(topic_id, data.model_dump())
+    return await topic_cypher.read_topic_details(topic_id)
 
 async def update_topic(topic_id: str, data: TopicDetailsInput):
     topic_exists = await topic_cypher.topic_exists(topic_id)

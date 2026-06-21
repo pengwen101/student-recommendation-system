@@ -1,19 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import api from "../../api/axios";
 import toast from "react-hot-toast";
-
-// --- Types ---
-interface RecommendationWeight {
-  need_weight: number;
-  interest_weight: number;
-}
-
-interface ResourceAssessment {
-  resource_assessment_id: string;
-  resource_type: string;
-  display_name: string;
-  weight: number;
-}
+import type { RecommendationWeight, ResourceAssessment } from "../../types";
 
 const RESOURCE_TYPES = ["event", "book", "article", "video"];
 

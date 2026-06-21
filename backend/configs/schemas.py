@@ -15,12 +15,6 @@ class ResourceAssessmentInput(BaseModel):
     display_name: str
     resource_type: ResourceType
     
-class ResourceAssessmentUpdate(BaseModel):
-    resource_assessment_id: str
-    weight: float
-    display_name: str
-    resource_type: ResourceType
-    
 class RecommendationWeight(BaseModel):
     need_weight: float
     interest_weight: float

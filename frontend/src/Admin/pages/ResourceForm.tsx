@@ -1,5 +1,5 @@
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import toast from "react-hot-toast";
 
 import type { ResourceInput, SubCpl, Topic, Organizer, ResourceSubCpl, CurriculumVersion, ResourceAssessment } from "../../types";
@@ -39,6 +39,23 @@ function ResourceForm() {
   const [archiving, setArchiving] = useState(false);
   const [activating, setActivating] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [newOrganizerIndex, setNewOrganizerIndex] = useState<number | null>(null);
+  const [newOrganizerName, setNewOrganizerName] = useState("");
+  const [creatingOrganizer, setCreatingOrganizer] = useState(false);
+  const [showNewTopic, setShowNewTopic] = useState(false);
+  const [newTopicCode, setNewTopicCode] = useState("");
+  const [newTopicName, setNewTopicName] = useState("");
+  const [creatingTopic, setCreatingTopic] = useState(false);
+
+  const assessmentTotal = useMemo(() => {
+    if (!resourceAssessments || !resource?.resource_assessments) return 0;
+    return resourceAssessments.reduce((sum, ra) => {
+      const rw = resource.resource_assessments!.find(
+        a => a.resource_assessment_id === ra.resource_assessment_id
+      )?.resource_weight || 0;
+      return sum + ra.weight * rw;
+    }, 0);
+  }, [resourceAssessments, resource?.resource_assessments]);
   const isEdit = location.pathname.includes("/edit");
 
    useEffect(() => {
@@ -330,6 +347,41 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
       }
 
       setErrors(newErrors);
+  };
+
+  const handleCreateOrganizer = async (index: number) => {
+    if (!newOrganizerName.trim()) return;
+    setCreatingOrganizer(true);
+    try {
+      const res = await api.post("/organizer", { name: newOrganizerName.trim() });
+      const newOrg = res.data.organizer_details;
+      setOrganizers(prev => [...(prev || []), newOrg]);
+      handleOrganizerChange(index, newOrg.organizer_id);
+      setNewOrganizerIndex(null);
+      setNewOrganizerName("");
+    } catch {
+      toast.error("Failed to create organizer");
+    } finally {
+      setCreatingOrganizer(false);
+    }
+  };
+
+  const handleCreateTopic = async () => {
+    if (!newTopicCode.trim() || !newTopicName.trim()) return;
+    setCreatingTopic(true);
+    try {
+      const res = await api.post("/topic", { code: newTopicCode.trim(), name: newTopicName.trim() });
+      const newTopic = res.data.topic_details;
+      setTopics(prev => [...(prev || []), newTopic]);
+      handleTopicToggle(newTopic.topic_id);
+      setShowNewTopic(false);
+      setNewTopicCode("");
+      setNewTopicName("");
+    } catch {
+      toast.error("Failed to create topic");
+    } finally {
+      setCreatingTopic(false);
+    }
   };
 
   const handleAuthorChange = (index: number, value: string) => {
@@ -1196,6 +1248,39 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
                   </option>
                 ))}
               </Select>
+              {newOrganizerIndex === index ? (
+                <div className="flex gap-2 items-center mt-1">
+                  <Input
+                    value={newOrganizerName}
+                    onChange={(e) => setNewOrganizerName(e.target.value)}
+                    placeholder="Enter new organizer name..."
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => handleCreateOrganizer(index)}
+                    disabled={creatingOrganizer || !newOrganizerName.trim()}
+                    size="sm"
+                  >
+                    {creatingOrganizer ? "Saving..." : "Save"}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => { setNewOrganizerIndex(null); setNewOrganizerName(""); }}
+                    className="text-xs text-slate-500 hover:text-slate-700 font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setNewOrganizerIndex(index)}
+                  className="text-xs text-primary-600 hover:text-primary-800 font-medium mt-1 text-left"
+                >
+                  + Create New
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -1300,7 +1385,12 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
 
 {/* Resource Assessments Section */}
 <Pane variant="shadow" className="p-6 mt-6">
-  <h3 className="text-lg font-bold text-slate-900 mb-6 border-b border-slate-100 pb-2">Assessments</h3>
+  <h3 className="text-lg font-bold text-slate-900 mb-6 border-b border-slate-100 pb-2">
+  Assessments
+  <span className="ml-3 text-sm font-semibold text-slate-500">
+    (Total: <span className="text-blue-600">{assessmentTotal.toFixed(3)}</span>)
+  </span>
+</h3>
   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
     {resourceAssessments?.map((resourceAssessment, index) => {
       const currentVal = resource?.resource_assessments?.find(
@@ -1486,6 +1576,56 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
             );
           })}
         </div>
+
+        {showNewTopic ? (
+          <div className="flex flex-col gap-3 mt-4 p-4 border border-primary-200 rounded-xl bg-primary-50/30">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-slate-700">Code</label>
+                <Input
+                  value={newTopicCode}
+                  onChange={(e) => setNewTopicCode(e.target.value)}
+                  placeholder="e.g. AI"
+                  className="bg-white"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-slate-700">Name</label>
+                <Input
+                  value={newTopicName}
+                  onChange={(e) => setNewTopicName(e.target.value)}
+                  placeholder="e.g. Artificial Intelligence"
+                  className="bg-white"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => { setShowNewTopic(false); setNewTopicCode(""); setNewTopicName(""); }}
+                className="text-xs text-slate-500 hover:text-slate-700 font-medium px-3 py-1.5"
+              >
+                Cancel
+              </button>
+              <Button
+                type="button"
+                onClick={handleCreateTopic}
+                disabled={creatingTopic || !newTopicCode.trim() || !newTopicName.trim()}
+                size="sm"
+              >
+                {creatingTopic ? "Saving..." : "Save Topic"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowNewTopic(true)}
+            className="mt-4 text-sm text-primary-600 hover:text-primary-800 font-medium"
+          >
+            + Create New Topic
+          </button>
+        )}
       </Pane>
 
       {/* Actions */}

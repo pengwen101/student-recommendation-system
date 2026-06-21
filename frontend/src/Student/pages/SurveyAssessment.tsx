@@ -1,22 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios'; // Adjust path to your axios instance
-
-// --- Types mapping to FastAPI Schemas ---
-interface QuestionResponse {
-    question_id: string;
-    code: string;
-    name: string;
-    lower_bound: string;
-    upper_bound: string;
-    lower_text?: string | null;
-    upper_text?: string | null;
-}
-
-interface StudentQuestionRelation {
-    question_id: string;
-    answer: number;
-}
+import type { QuestionResponse, StudentQuestionRelation } from '../../types';
 
 const SurveyAssessment = () => {
     const navigate = useNavigate();

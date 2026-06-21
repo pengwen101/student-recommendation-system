@@ -24,8 +24,9 @@ create_update_base_query = """
     
     CALL (r) {
         UNWIND $sessions AS session
-        MERGE (r)-[hs:HAS_SESSION]->(ss:Session {session_id: session.session_id})
+        MERGE (ss:Session {session_id: session.session_id})
         SET ss.start_datetime = datetime(session.start_datetime + '[Asia/Jakarta]'), ss.end_datetime = datetime(session.end_datetime + '[Asia/Jakarta]')
+        MERGE (r)-[hs:HAS_SESSION]->(ss)
     }
     
     CALL (r) {

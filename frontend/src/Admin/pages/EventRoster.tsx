@@ -15,13 +15,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import api from "../../api/axios"; 
 import toast from "react-hot-toast";
-
-// --- Types ---
-interface AttendedStudent {
-  nrp: string;
-  full_name: string;
-  major: string;
-}
+import type { AttendedStudent } from "../../types";
 
 export default function EventRoster() {
   const { resource_id } = useParams<{ resource_id: string }>();

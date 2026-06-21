@@ -33,6 +33,27 @@ async def read_topic_details(topic_id: str):
     response = await Neo4jConnection.query(query, params)
     return response[0] if response else None
 
+async def find_custom_topic_by_name(name: str):
+    query = """
+    MATCH (t:Topic:CustomTopic)
+    WHERE t.lower_name = lower($name)
+    RETURN t.topic_id as topic_id
+    """
+    params = {"name": name}
+    response = await Neo4jConnection.query(query, params)
+    return response[0] if response else None
+
+
+async def convert_custom_topic(topic_id: str, data: dict):
+    query = """
+    MATCH (t:Topic:CustomTopic {topic_id: $topic_id})
+    REMOVE t:CustomTopic
+    SET t.code = $code, t.name = $name, t.lower_name = lower($name)
+    """
+    params = {"topic_id": topic_id, "code": data['code'], "name": data['name']}
+    await Neo4jConnection.query(query, params)
+
+
 async def create_topic(topic_id: str, data: dict):
     query = """
     MERGE (t:Topic {topic_id: $topic_id})

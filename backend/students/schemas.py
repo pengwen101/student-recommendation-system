@@ -78,9 +78,6 @@ class StudentIndicatorsInput(BaseModel):
     indicator_id: str
     weight: float
     
-class StudentIndicatorsInputBatch(BaseModel):
-    indicators: List[StudentIndicatorsInput]
-    
 class AttendedStudents(BaseModel):
     nrp: str
     full_name: str

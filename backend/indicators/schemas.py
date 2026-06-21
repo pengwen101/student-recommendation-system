@@ -24,7 +24,3 @@ class IndicatorDetailsInput(BaseModel):
     name: str
     qualities: List[QualityIndicatorsInput]
     
-class AllIndicatorsResponse(BaseModel):
-    message: str
-    count: int
-    indicators: List[IndicatorDetails]

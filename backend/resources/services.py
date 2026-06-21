@@ -95,7 +95,7 @@ async def update_resource(resource_id: str, data: ResourceEventInput | ResourceB
     data_dict = data.model_dump(mode='json')
     if data_dict.get('sessions', None) is not None:
         for idx, session in enumerate(data_dict['sessions']):
-            if data_dict['sessions'][idx]['session_id'] is None:
+            if not data_dict['sessions'][idx]['session_id']:
                 data_dict['sessions'][idx]['session_id'] = str(uuid.uuid4())
                 
     for indicator in data_dict['indicators']:

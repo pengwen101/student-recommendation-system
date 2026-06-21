@@ -19,25 +19,6 @@ export interface Admin {
 
 // Resource
 
-export const AuthorType = {
-    PersonalBlog: "personal_blog",
-    Practitioner: "practitioner",
-    Academic: "academic"
-}
-
-export const ThematicWeight = {
-    PersonalOpinion: "personal_opinion",
-    AcademicJournal: "academic_journal",
-    Critique: "critique",
-    Philosophy: "philosophy"
-}
-
-export const ImpactScale = {
-    Local: "local",
-    International: "international",
-    Worldwide: "worldwide"
-}
-
 export const ResourceType = {
   Book: "book",
   Video: "video",
@@ -45,29 +26,10 @@ export const ResourceType = {
   Article: "article",
 }
 
-export const ActorType = {
-    Admin: "admin",
-    Organizer: "organizer"
-}
-
 export const ResourceStatus = {
     Open: "open",
     Ongoing: "ongoing",
     Ended: "ended"
-}
-
-export const ResourceScale = {
-    University: "university",
-    Regional: "regional",
-    National: "national",
-    International: "international"
-}
-
-export const SpeakerDegree = {
-    UniStudent: "university_student",
-    Bachelor: "bachelor",
-    Master: "master",
-    Phd: "phd"
 }
 
 export interface Session {
@@ -82,17 +44,12 @@ export interface SessionInput {
     end_datetime: string;
 }
 
-export interface ActorInput {
-    actor_id: string;
-    actor_type: typeof ActorType[keyof typeof ActorType]
-}
-
 export interface ResourceAssessment {
     resource_assessment_id: string;
     weight: number;
     display_name: string;
     resource_type: typeof ResourceType[keyof typeof ResourceType];
-    resource_weight: number;
+    resource_weight?: number;
 }
 
 // export interface Resource {
@@ -150,6 +107,11 @@ export interface ResourceAssessmentInput {
     resource_weight: number;
 }
 
+export interface RecommendationWeight {
+    need_weight: number;
+    interest_weight: number;
+}
+
 export interface ResourceBase {
     resource_id: string;
     title: string;
@@ -181,38 +143,6 @@ export interface ResourceVideo extends ResourceBase {
 }
 
 export interface ResourceArticle extends ResourceBase {
-    article_text: OutputData;
-}
-
-export interface ResourceBaseInput {
-    title: string;
-    is_active: boolean;
-    resource_assessments?: ResourceAssessmentInput[];
-    text_hash?: string;
-    topics: ResourceTopic[];
-    indicators: ResourceIndicator[];
-}
-
-export interface ResourceEventInput extends ResourceBaseInput {
-    description: string;
-    sessions: SessionInput[];
-    organizers: ResourceOrganizerInput[];
-    status: typeof ResourceStatus[keyof typeof ResourceStatus];
-}
-
-export interface ResourceBookInput extends ResourceBaseInput {
-    description: string;
-    authors: string[];
-    publisher: string;
-    published_date: string;
-}
-
-export interface ResourceVideoInput extends ResourceBaseInput {
-    description: string;
-    content_link: string;
-}
-
-export interface ResourceArticleInput extends ResourceBaseInput {
     article_text: OutputData;
 }
 
@@ -281,6 +211,21 @@ export interface Question {
     flipped?: boolean;
 }
 
+export interface QuestionResponse {
+    question_id: string;
+    code: string;
+    name: string;
+    lower_bound: string;
+    upper_bound: string;
+    lower_text?: string | null;
+    upper_text?: string | null;
+}
+
+export interface StudentQuestionRelation {
+    question_id: string;
+    answer: number;
+}
+
 export interface IndicatorSupport {
     indicator_id: string;
     code: string;
@@ -328,6 +273,15 @@ export interface Topic {
     eng_text?: string;
 }
 
+export interface SelectedTopic {
+    id: string;
+    topic_id?: string;
+    name: string;
+    code?: string;
+    eng_text?: string | null;
+    isCustom: boolean;
+}
+
 export interface StudyLevel {
     study_level_id: string;
 }
@@ -337,16 +291,18 @@ export interface Organizer {
     name: string;
 }
 
-export interface OrganizerInput {
-    name: string;
-}
-
 export interface ResourceOrganizerInput {
     organizer_id: string;
 }
 
 export interface CurriculumVersion {
     curriculum_version_id: string;
+}
+
+export interface AttendedStudent {
+    nrp: string;
+    full_name: string;
+    major: string;
 }
 
 export interface SupportLackGap {

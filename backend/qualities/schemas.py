@@ -27,7 +27,3 @@ class QualityDetailsInput(BaseModel):
     name: str
     subcpls: List[SubCPLQualitiesInput]
     
-class AllQualitiesResponse(BaseModel):
-    message: str
-    count: int
-    qualities: List[QualityDetails]

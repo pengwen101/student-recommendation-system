@@ -4,7 +4,7 @@ from deep_translator import GoogleTranslator
 import asyncio
 import re
 import textwrap
-from backend.students.services import _sync_student_topic_embedding
+from backend.students.services import sync_student_topic_embedding
 from backend import states
 from backend.dependencies import get_embedding_model
 from langdetect import detect, DetectorFactory
@@ -13,10 +13,9 @@ DetectorFactory.seed = 0
 
 async def seed_years_and_versions():
     query = """
-        MERGE (:CurrentAcademicYear {current_academic_year_id: "2026/2027"})
-        
-        WITH toInteger(right(split("2026/2027", '/')[0], 2)) AS current_year
-        WITH current_year, range(1, current_year - 18) AS levels
+        MERGE (acy:CurrentAcademicYear {current_academic_year_id: "2026/2027"})
+        WITH acy, toInteger(right(split(acy.current_academic_year_id, '/')[0], 2)) AS current_year
+        WITH current_year, range(1, 4) AS levels
         UNWIND levels AS level
         MERGE (:StudyLevel {study_level_id: toString(level)})
         
@@ -24,14 +23,16 @@ async def seed_years_and_versions():
     """
     await Neo4jConnection.query(query)
     
-async def seed_curriculum(path):
+async def seed_curriculum(path, version_id="1"):
     df = pd.read_parquet(path)
     data = df.to_dict(orient="records")
     
     query = """
         UNWIND $batch as row
-        MATCH (cv:CurriculumVersion {curriculum_version_id: "1"})
-        MATCH (b: Batch {batch_id: "2025/2026"})
+        MATCH (acy:CurrentAcademicYear)
+        MATCH (cv:CurriculumVersion {curriculum_version_id: $version_id})
+        WITH row, cv, toString(toInteger(left(acy.current_academic_year_id, 4)) - 1) + "/" + left(acy.current_academic_year_id, 4) AS computed_batch_id
+        MERGE (b:Batch {batch_id: computed_batch_id})
         MERGE (c:Cpl {code: row.cpl_code})
         ON CREATE SET c.cpl_id = randomUUID()
         MERGE (sc:SubCpl {code: row.sub_cpl_code})
@@ -57,7 +58,7 @@ async def seed_curriculum(path):
         MERGE (q)-[:HAS_INDICATOR]->(i)
         MERGE (i)-[:HAS_QUESTION]->(qs)
         """
-    await Neo4jConnection.query(query, {"batch": data})
+    await Neo4jConnection.query(query, {"batch": data, "version_id": version_id})
     
 async def seed_students(path):
     df = pd.read_parquet(path)
@@ -153,25 +154,27 @@ async def seed_student_topics_relation(path, embedding_model):
     
     nrps = list(df['nrp'].unique())
     for nrp in nrps:
-        await _sync_student_topic_embedding(nrp, embedding_model)
+        await sync_student_topic_embedding(nrp, embedding_model)
     
     
 async def seed_configs():
     query = """
-    MERGE (cf:Config:StudentTarget {target_score: 0.7})
+    MERGE (cf:Config:StudentTarget)
+    SET cf.target_score = 0.7
     WITH cf
-    MERGE (b:Batch {batch_id: "2025/2026"})-[:USES]->(cf)
+    MATCH (acy:CurrentAcademicYear)
+    WITH cf, toString(toInteger(left(acy.current_academic_year_id, 4)) - 1) + "/" + left(acy.current_academic_year_id, 4) AS computed_batch_id
+    MERGE (b:Batch {batch_id: computed_batch_id})
+    MERGE (b)-[:USES]->(cf)
     MERGE (:Config:RecommendationWeight {need_weight: 0.6, interest_weight: 0.4})
-    MERGE (cf:Config:AddScoreConstant)
-    set cf.weight=1.0
+    MERGE (ac:Config:AddScoreConstant)
+    SET ac.weight=1.0
     """
     await Neo4jConnection.query(query)
     
-async def create_vector_embedding():
-    prefix=""
-    model = get_embedding_model()
+async def create_resource_vector_embedding(model):
+    prefix="passage: "
     model_name = model.tokenizer.name_or_path
-    prefix = "passage: " if "e5" in model_name.lower() else ""
     clean_property_name = f"embedding_{re.sub(r'[^a-zA-Z0-9_]', '_', model_name)}"
     query = """
     MATCH (r:UniResource)-[]->(t:Topic)
@@ -213,43 +216,32 @@ async def create_vector_embedding():
     """
     await Neo4jConnection.query(write_query, {"resources": payload})
     print(f"Successfully updated embeddings using property key: {clean_property_name}")
-    embedding_dim = model.get_sentence_embedding_dimension()
-    index_query = f"""
-    CREATE VECTOR INDEX resource_{clean_property_name} IF NOT EXISTS
-        FOR (r:UniResource) ON (r.{clean_property_name})
-        OPTIONS {{
-        indexConfig: {{
-            `vector.dimensions`: {embedding_dim}
-        }}
-        }};
-    """
-    await Neo4jConnection.query(index_query)
     
         
 async def run_all_seeders():
-    # print("Seeding Batch Year and Versions...")
-    # await seed_years_and_versions()
+    print("Seeding Batch Year and Versions...")
+    await seed_years_and_versions()
     
-    # print("Seeding Students...")
-    # await seed_students("data/demografi.parquet")
+    print("Seeding Students...")
+    await seed_students("data/demografi.parquet")
     
-    # print("Seeding Curriculum...")
-    # await seed_curriculum("data/curriculum.parquet")
+    print("Seeding Curriculum...")
+    await seed_curriculum("data/curriculum.parquet")
     
-    # print("Seeding Configuration...")
-    # await seed_configs()
+    print("Seeding Configuration...")
+    await seed_configs()
     
     print("Seeding Student Questions Relations...")
     await seed_student_questions_relation("data/hasil_survei.parquet")
     
-    # states.load_state()
-    # model = get_embedding_model()
+    states.load_state()
+    model = get_embedding_model()
     
-    # print("Seeding Student Topics Relations...")
-    # await seed_student_topics_relation("data/hasil_topik.parquet", model)
+    print("Seeding Student Topics Relations...")
+    await seed_student_topics_relation("data/hasil_topik.parquet", model)
     
-    # print("Seeding Resource Embedding...")
-    # await create_vector_embedding()
+    print("Seeding Resource Embedding...")
+    await create_resource_vector_embedding(model)
     
     print("All seeding complete!")
     
