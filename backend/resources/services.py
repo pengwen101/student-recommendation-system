@@ -85,7 +85,6 @@ async def create_resource(type: str, data: ResourceEventInput | ResourceBookInpu
     await resource_cypher.create_resource(new_resource_id, label, data_dict, current_user)
     embedding = model.encode(text_to_encode)
     await resource_cypher.set_node_vector_property(new_resource_id, embedding)
-    await resource_cypher.ensure_vector_index()
     return await read_resource_details(new_resource_id)
 
 async def update_resource(resource_id: str, data: ResourceEventInput | ResourceBookInput | ResourceVideoInput | ResourceArticleInput, current_user: dict, model):
@@ -154,7 +153,6 @@ async def update_resource(resource_id: str, data: ResourceEventInput | ResourceB
     
     if needs_reencode:
         await resource_cypher.set_node_vector_property(resource_id, embedding)
-        await resource_cypher.ensure_vector_index()
     
     return await read_resource_details(resource_id)
 

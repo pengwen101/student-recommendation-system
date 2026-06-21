@@ -3,8 +3,6 @@ import time
 
 
 VECTOR_PROPERTY = "embedding_LazarusNLP_all_indo_e5_small_v4"
-VECTOR_INDEX_NAME = "resource_embedding_LazarusNLP_all_indo_e5_small_v4"
-VECTOR_DIM = 384
 
 update_cleanup_query = """
     OPTIONAL MATCH (r)-[old_rel:ORGANIZES|COVERS|SUPPORTS|HAS_SESSION|AVAILABLE_FOR|HAS]-()
@@ -73,15 +71,6 @@ async def set_node_vector_property(resource_id: str, embedding: list):
         "property_name": VECTOR_PROPERTY,
         "embedding": embedding
     })
-
-
-async def ensure_vector_index():
-    query = f"""
-    CREATE VECTOR INDEX {VECTOR_INDEX_NAME} IF NOT EXISTS
-    FOR (r:UniResource) ON (r.{VECTOR_PROPERTY})
-    OPTIONS {{ indexConfig: {{ `vector.dimensions`: {VECTOR_DIM} }} }}
-    """
-    await Neo4jConnection.query(query)
 
 
 async def get_resource_topic_names(resource_id: str):
