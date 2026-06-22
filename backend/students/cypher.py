@@ -1,6 +1,6 @@
 from backend.database import Neo4jConnection
 
-TOPIC_EMBEDDING_PROPERTY = "embedding_LazarusNLP_all_indo_e5_small_v4"
+TOPIC_EMBEDDING_PROPERTY = "embedding"
 
 async def read_student_topics(nrp: str):
     query = """
@@ -197,8 +197,8 @@ async def get_student_recommendations(nrp: str, label: str, top_k: int):
 
            WITH s, r, cf, need_score, topic_fuzzy_score,
                CASE
-                   WHEN s.{TOPIC_EMBEDDING_PROPERTY} IS NULL OR r.embedding_LazarusNLP_all_indo_e5_small_v4 IS NULL THEN 0.0
-                   ELSE vector.similarity.cosine(s.{TOPIC_EMBEDDING_PROPERTY}, r.embedding_LazarusNLP_all_indo_e5_small_v4)
+                   WHEN s.{TOPIC_EMBEDDING_PROPERTY} IS NULL OR r.embedding IS NULL THEN 0.0
+                   ELSE vector.similarity.cosine(s.{TOPIC_EMBEDDING_PROPERTY}, r.embedding)
                END AS vector_similarity
 
          WITH s, r, need_score, topic_fuzzy_score, vector_similarity,
@@ -287,7 +287,7 @@ async def create_student(nrp: str, email: str, name: str):
     query = """
         MATCH (acy:CurrentAcademicYear)
         WITH acy,
-             toInteger(right(split(acy.current_academic_year_id, '/')[0], 2)) AS current_academic_year,
+             toInteger(right(split(acy.value, '/')[0], 2)) AS current_academic_year,
              toInteger(substring($nrp, 3, 2)) AS student_batch
         WITH acy,
              current_academic_year,
@@ -308,7 +308,7 @@ async def create_student(nrp: str, email: str, name: str):
                s.name AS name,
                sl.study_level_id AS study_level_id,
                b.batch_id AS batch_id,
-               acy.current_academic_year_id AS current_academic_year
+               acy.value AS current_academic_year
     """
 
     params = {

@@ -9,11 +9,15 @@ class ResourceAssessment(BaseModel):
     weight: float
     display_name: str
     resource_type: ResourceType
+    lower_text: str
+    upper_text: str
     
 class ResourceAssessmentInput(BaseModel):
     weight: float
     display_name: str
     resource_type: ResourceType
+    lower_text: str
+    upper_text: str
     
 class RecommendationWeight(BaseModel):
     need_weight: float

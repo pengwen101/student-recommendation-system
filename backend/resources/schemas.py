@@ -94,6 +94,8 @@ class ResourceAssessment(BaseModel):
     resource_type: str
     weight: float
     resource_weight: float
+    lower_text: str
+    upper_text: str
     
 class ResourceAssessmentInput(BaseModel):
     resource_assessment_id: str

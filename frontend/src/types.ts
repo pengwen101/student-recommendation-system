@@ -50,6 +50,8 @@ export interface ResourceAssessment {
     display_name: string;
     resource_type: typeof ResourceType[keyof typeof ResourceType];
     resource_weight?: number;
+    lower_text: string;
+    upper_text: string;
 }
 
 // export interface Resource {

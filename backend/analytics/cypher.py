@@ -233,7 +233,7 @@ async def student_mastery(curriculum_type: str, curriculum_id: str | None = None
               MATCH (s)-[]->(m:Major)
               WHERE m.major_id IN $major_ids
           }})
-        OPTIONAL MATCH (s)-[]->(b:Batch)-[]->(cf:Config:StudentTarget)
+        OPTIONAL MATCH (cf:Config:StudentTarget)
         RETURN 
             avg(rh.weight) AS mastery_score, 
             avg(cf.target_score) AS target_score

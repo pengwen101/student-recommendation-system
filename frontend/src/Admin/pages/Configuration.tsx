@@ -20,10 +20,12 @@ export default function ConfigurationDashboard() {
   // Form States
   const [newDisplayName, setNewDisplayName] = useState("");
   const [newWeight, setNewWeight] = useState<number>(0);
+  const [newLowerText, setNewLowerText] = useState("");
+  const [newUpperText, setNewUpperText] = useState("");
   
   // Explicit Edit States
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editData, setEditData] = useState<{ display_name: string; weight: number }>({ display_name: "", weight: 0 });
+  const [editData, setEditData] = useState<{ display_name: string; weight: number; lower_text: string; upper_text: string }>({ display_name: "", weight: 0, lower_text: "", upper_text: "" });
 
   // --- Fetch Data ---
   useEffect(() => {
@@ -132,11 +134,15 @@ export default function ConfigurationDashboard() {
       await api.post("/config/resource_assessments", {
         resource_type: selectedType,
         display_name: newDisplayName,
-        weight: newWeight
+        weight: newWeight,
+        lower_text: newLowerText,
+        upper_text: newUpperText
       });
       toast.success("Assessment created.");
       setNewDisplayName("");
       setNewWeight(0);
+      setNewLowerText("");
+      setNewUpperText("");
       fetchAssessments(selectedType);
     } catch {
       toast.error("Failed to create assessment.");
@@ -147,7 +153,9 @@ export default function ConfigurationDashboard() {
     setEditingId(assessment.resource_assessment_id);
     setEditData({
       display_name: assessment.display_name,
-      weight: assessment.weight
+      weight: assessment.weight,
+      lower_text: assessment.lower_text,
+      upper_text: assessment.upper_text
     });
   };
 
@@ -157,14 +165,16 @@ export default function ConfigurationDashboard() {
     try {
       setAssessments(prev => prev.map(a => 
         a.resource_assessment_id === id 
-          ? { ...a, display_name: editData.display_name, weight: editData.weight } 
+          ? { ...a, display_name: editData.display_name, weight: editData.weight, lower_text: editData.lower_text, upper_text: editData.upper_text } 
           : a
       ));
       
       await api.put(`/config/resource_assessments/${id}`, {
         resource_type: selectedType,
         display_name: editData.display_name,
-        weight: editData.weight
+        weight: editData.weight,
+        lower_text: editData.lower_text,
+        upper_text: editData.upper_text
       });
       toast.success("Assessment updated.");
       setEditingId(null);
@@ -321,9 +331,11 @@ export default function ConfigurationDashboard() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-y border-gray-200">
-                  <th className="px-4 py-3 font-semibold text-gray-700 w-1/2">Display Name</th>
-                  <th className="px-4 py-3 font-semibold text-gray-700 w-1/4">Weight</th>
-                  <th className="px-4 py-3 font-semibold text-gray-700 text-right w-1/4">Actions</th>
+                  <th className="px-4 py-3 font-semibold text-gray-700 w-2/6">Display Name</th>
+                  <th className="px-4 py-3 font-semibold text-gray-700 w-1/6">Weight</th>
+                  <th className="px-4 py-3 font-semibold text-gray-700 w-1/6">Lower Text</th>
+                  <th className="px-4 py-3 font-semibold text-gray-700 w-1/6">Upper Text</th>
+                  <th className="px-4 py-3 font-semibold text-gray-700 text-right w-1/6">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -357,6 +369,30 @@ export default function ConfigurationDashboard() {
                           />
                         ) : (
                           <span className="font-medium text-gray-900 px-2 py-1.5">{Number(item.weight).toFixed(2)}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editData.lower_text}
+                            onChange={(e) => setEditData({ ...editData, lower_text: e.target.value })}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          />
+                        ) : (
+                          <span className="text-gray-600 px-2 py-1.5 text-sm">{item.lower_text}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editData.upper_text}
+                            onChange={(e) => setEditData({ ...editData, upper_text: e.target.value })}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          />
+                        ) : (
+                          <span className="text-gray-600 px-2 py-1.5 text-sm">{item.upper_text}</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -418,6 +454,24 @@ export default function ConfigurationDashboard() {
                         value={newWeight || ''}
                         onChange={(e) => setNewWeight(Number(e.target.value))}
                         className="w-24 px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="text"
+                        placeholder="Lower text..."
+                        value={newLowerText}
+                        onChange={(e) => setNewLowerText(e.target.value)}
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="text"
+                        placeholder="Upper text..."
+                        value={newUpperText}
+                        onChange={(e) => setNewUpperText(e.target.value)}
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
                       />
                     </td>
                     <td className="px-4 py-3 text-right">

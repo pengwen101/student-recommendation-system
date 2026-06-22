@@ -13,8 +13,8 @@ DetectorFactory.seed = 0
 
 async def seed_years_and_versions():
     query = """
-        MERGE (acy:CurrentAcademicYear {current_academic_year_id: "2026/2027"})
-        WITH acy, toInteger(right(split(acy.current_academic_year_id, '/')[0], 2)) AS current_year
+        MERGE (acy:CurrentAcademicYear {value: "2026/2027"})
+        WITH acy, toInteger(right(split(acy.value, '/')[0], 2)) AS current_year
         WITH current_year, range(1, 4) AS levels
         UNWIND levels AS level
         MERGE (:StudyLevel {study_level_id: toString(level)})
@@ -31,7 +31,7 @@ async def seed_curriculum(path, version_id="1"):
         UNWIND $batch as row
         MATCH (acy:CurrentAcademicYear)
         MATCH (cv:CurriculumVersion {curriculum_version_id: $version_id})
-        WITH row, cv, toString(toInteger(left(acy.current_academic_year_id, 4)) - 1) + "/" + left(acy.current_academic_year_id, 4) AS computed_batch_id
+        WITH row, cv, toString(toInteger(left(acy.value, 4)) - 1) + "/" + left(acy.value, 4) AS computed_batch_id
         MERGE (b:Batch {batch_id: computed_batch_id})
         MERGE (c:Cpl {code: row.cpl_code})
         ON CREATE SET c.cpl_id = randomUUID()
@@ -67,7 +67,7 @@ async def seed_students(path):
         MATCH (acy:CurrentAcademicYear)
         UNWIND $batch as row
         WITH acy, row,
-             toInteger(right(split(acy.current_academic_year_id, '/')[0], 2)) AS current_academic_year,
+             toInteger(right(split(acy.value, '/')[0], 2)) AS current_academic_year,
              toInteger(substring(row.nrp, 3, 2)) AS student_batch
         WITH row,
              toString(CASE WHEN current_academic_year - student_batch + 1 > 4 THEN 4 ELSE current_academic_year - student_batch + 1 END) AS study_level_id,
@@ -161,11 +161,6 @@ async def seed_configs():
     query = """
     MERGE (cf:Config:StudentTarget)
     SET cf.target_score = 0.7
-    WITH cf
-    MATCH (acy:CurrentAcademicYear)
-    WITH cf, toString(toInteger(left(acy.current_academic_year_id, 4)) - 1) + "/" + left(acy.current_academic_year_id, 4) AS computed_batch_id
-    MERGE (b:Batch {batch_id: computed_batch_id})
-    MERGE (b)-[:USES]->(cf)
     MERGE (:Config:RecommendationWeight {need_weight: 0.6, interest_weight: 0.4})
     MERGE (ac:Config:AddScoreConstant)
     SET ac.weight=1.0

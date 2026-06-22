@@ -1417,6 +1417,12 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
             onChange={(e) => handleAssessmentChange(resourceAssessment.resource_assessment_id, parseFloat(e.target.value))}
             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
           />
+          {(resourceAssessment.lower_text || resourceAssessment.upper_text) && (
+            <div className="flex justify-between text-xs text-slate-400 mt-0.5">
+              <span>{resourceAssessment.lower_text}</span>
+              <span>{resourceAssessment.upper_text}</span>
+            </div>
+          )}
           {errors[`resource_assessments_${index}`] && (
             <span className="text-xs font-medium text-red-600 mt-1">
               {errors[`resource_assessments_${index}`]}

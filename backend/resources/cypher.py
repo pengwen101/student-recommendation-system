@@ -2,7 +2,7 @@ from backend.database import Neo4jConnection
 import time
 
 
-VECTOR_PROPERTY = "embedding_LazarusNLP_all_indo_e5_small_v4"
+VECTOR_PROPERTY = "embedding"
 
 update_cleanup_query = """
     OPTIONAL MATCH (r)-[old_rel:ORGANIZES|COVERS|SUPPORTS|HAS_SESSION|AVAILABLE_FOR|HAS]-()
@@ -131,7 +131,9 @@ async def read_resources(label: str | None = None, resource_id: str | None = Non
         display_name: ra.display_name,
         resource_type: ra.resource_type,
         weight: toFloat(ra.weight),
-        resource_weight: toFloat(rh.weight)
+        resource_weight: toFloat(rh.weight),
+        lower_text: ra.lower_text,
+        upper_text: ra.upper_text
     }}] AS resource_assessments,
     [(r)-[rsi:SUPPORTS]->(i:Indicator) | {{
         indicator_id: i.indicator_id
@@ -312,8 +314,7 @@ async def calculate_support_weights(resource_id: str, indicators: list[dict]):
 async def get_indicator_recommendation(query_embedding: list):
     query = """
     MATCH (r:UniResource)
-    WHERE r.embedding_LazarusNLP_all_indo_e5_small_v4 IS NOT NULL
-    WITH r, vector.similarity.cosine(r.embedding_LazarusNLP_all_indo_e5_small_v4, $query_embedding) AS similarity
+    WITH r, vector.similarity.cosine(r.embedding, $query_embedding) AS similarity
     WHERE similarity >= 0.6
     ORDER BY similarity DESC
     LIMIT 1
@@ -330,8 +331,7 @@ async def get_indicator_recommendation(query_embedding: list):
 async def get_resources_similarity(label, query_vector):
     query = f"""
     MATCH (r:UniResource:{label})
-    WHERE r['embedding_LazarusNLP_all_indo_e5_small_v4'] IS NOT NULL
-    WITH r, vector.similarity.cosine(r['embedding_LazarusNLP_all_indo_e5_small_v4'], $queryEmbedding) AS similarityScore
+    WITH r, vector.similarity.cosine(r['embedding'], $queryEmbedding) AS similarityScore
     RETURN r.resource_id AS resource_id,
         similarityScore AS similarity_score
     """

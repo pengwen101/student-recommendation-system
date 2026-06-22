@@ -40,7 +40,9 @@ async def get_resource_assessments(type: str):
     RETURN ra.resource_assessment_id as resource_assessment_id,
     ra.display_name as display_name,
     ra.resource_type as resource_type,
-    ra.weight as weight
+    ra.weight as weight,
+    ra.lower_text as lower_text,
+    ra.upper_text as upper_text
     """
     params = {"type": type}
     return await Neo4jConnection.query(query, params)
@@ -51,25 +53,32 @@ async def create_resource_assessments(assessment: dict):
         resource_assessment_id: randomUUID(),
         resource_type: $resource_type,
         display_name: $display_name,
-        weight: toFloat($weight)
+        weight: toFloat($weight),
+        lower_text: $lower_text,
+        upper_text: $upper_text
     })
     """
     await Neo4jConnection.query(query, {
         "resource_type": assessment['resource_type'],
         "display_name": assessment['display_name'],
-        "weight": assessment['weight']
+        "weight": assessment['weight'],
+        "lower_text": assessment['lower_text'],
+        "upper_text": assessment['upper_text']
     })
 
 async def update_resource_assessments(resource_assessment_id: str, assessment: dict):
     query = """
     MATCH (ra:ResourceAssessment {resource_assessment_id: $resource_assessment_id})
-    SET ra.weight = $weight, ra.resource_type = $resource_type, ra.display_name = $display_name
+    SET ra.weight = $weight, ra.resource_type = $resource_type, ra.display_name = $display_name,
+        ra.lower_text = $lower_text, ra.upper_text = $upper_text
     """
     await Neo4jConnection.query(query, {
         "resource_assessment_id": resource_assessment_id,
         "weight": assessment['weight'],
         "resource_type": assessment['resource_type'],
-        'display_name': assessment['display_name']
+        'display_name': assessment['display_name'],
+        'lower_text': assessment['lower_text'],
+        'upper_text': assessment['upper_text']
     })
     
     await update_resources_internal_weight()
