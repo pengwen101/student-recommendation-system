@@ -51,7 +51,7 @@ const Home = () => {
                 const userData = userRes.data;
                 setUser(userData);
                 const nrp = userData.user_id;
-                const top_k = 5;
+                const top_k = 7;
 
                 // Fetch Profile Data, Topics, & Recommendations concurrently
                 const [cplsRes, subCplsRes, generalRecs, articleRecs, topicsRes] = await Promise.all([
@@ -112,7 +112,7 @@ const Home = () => {
     }, [cpls, subCpls, selectedCpl]);
 
     const topRecommendations = useMemo(() => {
-        return recommendations?.recommendations?.slice(0, 5) || [];
+        return recommendations?.recommendations?.slice(0, 10) || [];
     }, [recommendations]);
 
     const topArticles = useMemo(() => {

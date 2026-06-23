@@ -264,7 +264,7 @@ async def student_comparison(curriculum_type: str, major_ids: list | None = None
         WITH count(ra) AS total_attended, 
              sum(CASE WHEN ra.recommendation_score > 0 THEN 1.0 ELSE 0.0 END) AS rec_attended
         RETURN CASE 
-            WHEN total_attended > 0 AND (rec_attended / total_attended) > 0.5 THEN true 
+            WHEN total_attended > 0 AND (rec_attended / total_attended) >= 0.5 THEN true 
             ELSE false 
         END AS follow_rec,
         CASE WHEN total_attended > 0 THEN 1.0 ELSE 0.0 END AS joined_event

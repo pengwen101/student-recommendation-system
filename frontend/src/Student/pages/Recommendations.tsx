@@ -18,12 +18,13 @@ const Recommendation = () => {
                 const userRes = await api.get('/users/me');
                 if (!userRes.data.authenticated) return;
                 const nrp = userRes.data.user_id;
+                const top_k = 5;
 
                 // Fetch recommendations distinctly based on type
                 const [events, books, videos] = await Promise.all([
-                    api.get(`/student/recommendations/${nrp}?type=event`),
-                    api.get(`/student/recommendations/${nrp}?type=book`),
-                    api.get(`/student/recommendations/${nrp}?type=video`)
+                    api.get(`/student/recommendations/${nrp}?type=event&top_k=${top_k}`),
+                    api.get(`/student/recommendations/${nrp}?type=book&top_k=${top_k}`),
+                    api.get(`/student/recommendations/${nrp}?type=video&top_k=${top_k}`)
                 ]);
 
                 setEventRecs(events.data);

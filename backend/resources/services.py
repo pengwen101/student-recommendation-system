@@ -188,9 +188,3 @@ async def get_indicator_recommendation(title: str, description: str, model):
     if not result:
         raise HTTPException(status_code=404, detail="No similar resource found")
     return result
-
-async def get_resources_similarity(type: str, user_query: str, model=Depends(get_embedding_model)):
-    user_query = "query: " + user_query
-    label = type_label_dict[type]
-    query_vector = model.encode(user_query).tolist()
-    return await resource_cypher.get_resources_similarity(label, query_vector)

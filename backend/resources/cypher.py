@@ -318,7 +318,7 @@ async def get_indicator_recommendation(query_embedding: list):
     WHERE similarity >= 0.6
     ORDER BY similarity DESC
     LIMIT 1
-    OPTIONAL MATCH (r)-[:SUPPORTS]->(suggested_indicator:Indicator)
+    MATCH (r)-[:SUPPORTS]->(suggested_indicator:Indicator)
     RETURN r.resource_id AS similar_resource_id,
            tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) AS similar_resource_type,
            r.title AS similar_resource_title,
@@ -326,13 +326,3 @@ async def get_indicator_recommendation(query_embedding: list):
     """
     result = await Neo4jConnection.query(query, {"query_embedding": query_embedding})
     return result[0] if result else None
-
-
-async def get_resources_similarity(label, query_vector):
-    query = f"""
-    MATCH (r:UniResource:{label})
-    WITH r, vector.similarity.cosine(r['embedding'], $queryEmbedding) AS similarityScore
-    RETURN r.resource_id AS resource_id,
-        similarityScore AS similarity_score
-    """
-    return await Neo4jConnection.query(query, {"queryEmbedding": query_vector})

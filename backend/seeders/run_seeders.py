@@ -169,8 +169,7 @@ async def seed_configs():
     
 async def create_resource_vector_embedding(model):
     prefix="passage: "
-    model_name = model.tokenizer.name_or_path
-    clean_property_name = f"embedding_{re.sub(r'[^a-zA-Z0-9_]', '_', model_name)}"
+    property_name = "embedding"
     query = """
     MATCH (r:UniResource)-[]->(t:Topic)
     RETURN r.resource_id AS resource_id, 

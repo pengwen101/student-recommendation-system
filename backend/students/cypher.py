@@ -238,7 +238,9 @@ async def get_student_recommendations(nrp: str, label: str, top_k: int):
                 display_name: ra.display_name,
                 resource_type: ra.resource_type,
                 weight: toFloat(ra.weight),
-                resource_weight: toFloat(rh.weight)
+                resource_weight: toFloat(rh.weight),
+                lower_text: ra.lower_text,
+                upper_text: ra.upper_text
             }}],
             indicators: [(r)-[rsi:SUPPORTS]->(i:Indicator) | {{
                 indicator_id: i.indicator_id
@@ -321,24 +323,24 @@ async def create_student(nrp: str, email: str, name: str):
 
 
 async def record_student_attendance(resource_id: str, nrps: list[str]):
-    query = """
-        MATCH (r:UniResource {resource_id: $resource_id})
+    query = f"""
+        MATCH (r:UniResource {{resource_id: $resource_id}})
         MATCH (st:Config:StudentTarget)
         MATCH (cf:Config:RecommendationWeight)      
         UNWIND $nrps AS nrp
-        MATCH (s:Student {nrp: nrp})       
-        CALL (s, st) {
+        MATCH (s:Student {{nrp: nrp}})       
+        CALL (s, st) {{
             OPTIONAL MATCH (s)-[rl:HAS]->(:Indicator)
             RETURN sum(CASE 
                 WHEN rl IS NOT NULL AND (st.target_score - rl.weight) > 0 
                 THEN (st.target_score - rl.weight) 
                 ELSE 0.0 END) AS total_lack_weight
-        }       
-        CALL (s) {
+        }}       
+        CALL (s) {{
             OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(:Topic)
             RETURN count(ri) AS total_interest_count
-        }       
-        CALL (s, r, st) {
+        }}       
+        CALL (s, r, st) {{
             OPTIONAL MATCH (s)-[rl:HAS]->(i:Indicator)<-[rp:SUPPORTS]-(r)
             WITH rl, rp, st,
                  CASE 
@@ -350,21 +352,27 @@ async def record_student_attendance(resource_id: str, nrps: list[str]):
                 WHEN rl IS NULL OR rp IS NULL THEN 0.0
                 WHEN specific_lack_weight < rp.weight THEN specific_lack_weight
                 ELSE rp.weight END) AS indicator_intersection
-        }       
-        CALL (s, r) {
+        }}       
+        CALL (s, r) {{
             OPTIONAL MATCH (s)-[ri:INTERESTED_IN]->(t:Topic)<-[rt:COVERS]-(r)
             RETURN sum(CASE WHEN ri IS NULL OR rt IS NULL THEN 0.0 ELSE 1.0 END) AS topic_intersection
-        }        
-        WITH s, r, 
+        }}        
+        WITH s, r, cf, total_lack_weight, total_interest_count, indicator_intersection, topic_intersection,
+             CASE
+                 WHEN s.{TOPIC_EMBEDDING_PROPERTY} IS NULL OR r.embedding IS NULL THEN 0.0
+                 ELSE vector.similarity.cosine(s.{TOPIC_EMBEDDING_PROPERTY}, r.embedding)
+             END AS vector_similarity
+
+        WITH s, r,
              ((
-                cf.need_weight * (CASE WHEN total_lack_weight > 0 THEN indicator_intersection / total_lack_weight ELSE 0.0 END) 
+                cf.need_weight * (CASE WHEN total_lack_weight > 0 THEN indicator_intersection / total_lack_weight ELSE 0.0 END)
              ) + (
-                cf.interest_weight * (CASE WHEN total_interest_count > 0 THEN topic_intersection / total_interest_count ELSE 0.0 END)
+                cf.interest_weight * (((CASE WHEN total_interest_count > 0 THEN topic_intersection / total_interest_count ELSE 0.0 END) + vector_similarity) / 2.0)
              )) * coalesce(r.internal_weight, 1.0) AS final_score
     
         MERGE (s)-[att:ATTENDED]->(r)
         SET att.recommendation_score = final_score,
-            att.recorded_at = datetime({timezone: 'Asia/Jakarta'})
+            att.recorded_at = datetime({{timezone: 'Asia/Jakarta'}})
     """
     
     params = {

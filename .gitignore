@@ -4,7 +4,4 @@ credentials
 *__pycache__
 data
 .csv
-RecommendationPage.tsx
-RecommendationPageStudent.tsx
-evaluation.ipynb
 .opencode

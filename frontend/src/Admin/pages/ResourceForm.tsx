@@ -47,6 +47,8 @@ function ResourceForm() {
   const [newTopicName, setNewTopicName] = useState("");
   const [creatingTopic, setCreatingTopic] = useState(false);
 
+  const selectedIndicatorCount = useMemo(() => resource?.indicators?.length || 0, [resource?.indicators]);
+
   const assessmentTotal = useMemo(() => {
     if (!resourceAssessments || !resource?.resource_assessments) return 0;
     return resourceAssessments.reduce((sum, ra) => {
@@ -1438,45 +1440,53 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
       {/* SECTION 2: Sub-CPLs & Indicators */}
       {/* SECTION 2: Sub-CPLs & Indicators */}
       <Pane variant="shadow" className="p-6">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900 mb-1">Curriculum Mapping</h3>
-            <p className="text-sm text-slate-500">Select a Sub-CPL to reveal and assign its indicators.</p>
+        <div className="sticky top-0 z-10 bg-white -mx-6 px-6 pb-4 border-b border-slate-100">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 mb-1">Curriculum Mapping</h3>
+              <p className="text-sm text-slate-500">Select a Sub-CPL to reveal and assign its indicators.</p>
+              
+              {/* Similar Resource Display */}
+              {similarResourceTitle && similarResourceType && (
+                <div className="mt-3 inline-flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+                  <span className="font-semibold uppercase tracking-wider text-[11px] text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
+                    {similarResourceType}
+                  </span>
+                  Based on similarities with: <span className="font-bold italic">{similarResourceTitle}</span>
+                </div>
+              )}
+            </div>
             
-            {/* NEW: Similar Resource Display */}
-            {similarResourceTitle && similarResourceType && (
-              <div className="mt-3 inline-flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
-                <span className="font-semibold uppercase tracking-wider text-[11px] text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
-                  {similarResourceType}
-                </span>
-                Based on similarities with: <span className="font-bold italic">{similarResourceTitle}</span>
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="px-3 py-1.5 bg-primary-50 border border-primary-200 rounded-lg text-center">
+                <span className="text-xs font-semibold text-primary-600 uppercase tracking-wider">Indicators</span>
+                <div className="text-lg font-bold text-primary-800">{selectedIndicatorCount}</div>
               </div>
-            )}
+              <Button 
+                type="button" 
+                onClick={handleGetIndicatorRecommendation}
+                isLoading={recommending}
+                variant="outline"
+                size="sm"
+                className="text-amber-700 border-amber-200 hover:bg-amber-50 bg-amber-50/30"
+              >
+                ✨ Get Recommendations
+              </Button>
+            </div>
           </div>
-          
-          <Button 
-            type="button" 
-            onClick={handleGetIndicatorRecommendation}
-            isLoading={recommending}
-            variant="outline"
-            size="sm"
-            className="text-amber-700 border-amber-200 hover:bg-amber-50 bg-amber-50/30"
-          >
-            ✨ Get Recommendations
-          </Button>
+
+          <Select name="version_id" value={versionId || ""} onChange={ (e) => handleVersionChange(e.target.value)}>
+            {
+              versions?.map(version => (
+                <option key={version.curriculum_version_id} value={version.curriculum_version_id}>{version.curriculum_version_id}</option>
+              ))
+            }
+          </Select>
+
+          {errors.subcpls && (
+            <span className="text-xs font-medium text-red-600 mt-2">{errors.subcpls}</span>
+          )}
         </div>
-
-        <Select name="version_id" value={versionId || ""} onChange={ (e) => handleVersionChange(e.target.value)}>
-          {
-            versions?.map(version => (
-              <option key={version.curriculum_version_id} value={version.curriculum_version_id}>{version.curriculum_version_id}</option>
-            ))
-          }
-        </Select>
-
-        {errors.subcpls && (
-          <span className="text-xs font-medium text-red-600 mt-2">{errors.subcpls}</span>
-        )}
         
         <div className="space-y-3 mt-6">
           {subCpls?.map(subcpl => {

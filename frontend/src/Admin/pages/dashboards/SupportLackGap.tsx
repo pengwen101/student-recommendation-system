@@ -207,7 +207,7 @@ export function CountAverageChart({ data, selectedId, onSelect }: { data: Suppor
   return <ReactECharts option={option} onEvents={onEvents} style={{ height: '300px' }} />;
 }
 
-const ITEMS_PER_PAGE = 3;
+const ITEMS_PER_PAGE = 5;
 
 export function SupportLackGapList({ data, selectedId, onSelect }: { data: SupportLackGap[], selectedId: string | null, onSelect: (id: string) => void }) {
   const [currentPage, setCurrentPage] = useState(1);
