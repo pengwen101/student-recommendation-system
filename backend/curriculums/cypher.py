@@ -62,6 +62,16 @@ async def read_questions():
     RETURN question_id, code, name, splitted[0] as lower_bound, splitted[1] as upper_bound, splitted[2] as lower_text, splitted[3] as upper_text
     """
     return await Neo4jConnection.query(query)
+
+
+async def read_questions_by_batch(batch_id: str):
+    query = """
+    MATCH (b:Batch {batch_id: $batch_id})-[:USES]->(cv:CurriculumVersion)-[:HAS_CPL]->(:Cpl)-[:HAS_SUB_CPL]->(:SubCpl)-[:HAS_QUALITY]->(:Quality)-[:HAS_INDICATOR]->(:Indicator)-[:HAS_QUESTION]->(qs:Question)
+    WITH DISTINCT qs
+    WITH qs.question_id as question_id, qs.code as code, qs.name as name, split(qs.question_scale_label, ",") as splitted
+    RETURN question_id, code, name, splitted[0] as lower_bound, splitted[1] as upper_bound, splitted[2] as lower_text, splitted[3] as upper_text
+    """
+    return await Neo4jConnection.query(query, {"batch_id": batch_id})
     
 async def study_level_exists(study_level_id: str):
     query = """

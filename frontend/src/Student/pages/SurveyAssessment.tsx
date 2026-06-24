@@ -19,18 +19,24 @@ const SurveyAssessment = () => {
     useEffect(() => {
         const fetchSurveyData = async () => {
             try {
-                // Fetch user and questions concurrently
-                const [userRes, questionsRes] = await Promise.all([
-                    api.get('/users/me'),
-                    api.get('/curriculum_q')
-                ]);
+                const userRes = await api.get('/users/me');
 
                 if (!userRes.data.authenticated) {
                     navigate('/student/login');
                     return;
                 }
 
-                setNrp(userRes.data.user_id);
+                const nrpValue = userRes.data.user_id;
+                setNrp(nrpValue);
+
+                const yearDigits = nrpValue.substring(3, 5);
+                const year = parseInt(yearDigits, 10);
+                const batchId = `20${year}/20${year + 1}`;
+
+                const questionsRes = await api.get('/curriculum_q', {
+                    params: { batch_id: batchId }
+                });
+
                 setQuestions(questionsRes.data);
             } catch (err) {
                 console.error("Failed to load survey data", err);

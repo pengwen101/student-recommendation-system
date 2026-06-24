@@ -29,10 +29,7 @@ async def seed_curriculum(path, version_id="1"):
     
     query = """
         UNWIND $batch as row
-        MATCH (acy:CurrentAcademicYear)
         MATCH (cv:CurriculumVersion {curriculum_version_id: $version_id})
-        WITH row, cv, toString(toInteger(left(acy.value, 4)) - 1) + "/" + left(acy.value, 4) AS computed_batch_id
-        MERGE (b:Batch {batch_id: computed_batch_id})
         MERGE (c:Cpl {code: row.cpl_code})
         ON CREATE SET c.cpl_id = randomUUID()
         MERGE (sc:SubCpl {code: row.sub_cpl_code})
@@ -50,7 +47,6 @@ async def seed_curriculum(path, version_id="1"):
         SET qs.name = row.question_name
         SET qs.question_scale_label = row.question_scale_label
         SET qs.flipped = row.flipped
-        MERGE (b)-[:USES]->(cv)
         MERGE (cv)-[:HAS_CPL]->(c)
         MERGE (c)-[:HAS_SUB_CPL]->(sc)
         MERGE (sc)-[r:HAS_QUALITY]->(q)
@@ -59,6 +55,14 @@ async def seed_curriculum(path, version_id="1"):
         MERGE (i)-[:HAS_QUESTION]->(qs)
         """
     await Neo4jConnection.query(query, {"batch": data, "version_id": version_id})
+    
+    batch_query = """
+        UNWIND $batches AS batch_id
+        MATCH (cv:CurriculumVersion {curriculum_version_id: $version_id})
+        MERGE (b:Batch {batch_id: batch_id})
+        MERGE (b)-[:USES]->(cv)
+    """
+    await Neo4jConnection.query(batch_query, {"batches": [f"{yr}/{yr+1}" for yr in range(2022, 2026)], "version_id": version_id})
     
 async def seed_students(path):
     df = pd.read_parquet(path)

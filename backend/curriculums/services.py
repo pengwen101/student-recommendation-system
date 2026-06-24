@@ -18,8 +18,11 @@ async def read_curriculum_versions():
     return await curriculum_cypher.read_curriculum_versions()
 
 
-async def read_questions():
-    questions = await curriculum_cypher.read_questions()
+async def read_questions(batch_id: str | None = None):
+    if batch_id:
+        questions = await curriculum_cypher.read_questions_by_batch(batch_id)
+    else:
+        questions = await curriculum_cypher.read_questions()
     return questions
 
 

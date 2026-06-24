@@ -42,8 +42,8 @@ async def create_curriculum(file: UploadFile = File(...), batch_id: str = Form(.
 
 
 @curriculums_q_router.get("", response_model=List[QuestionResponse])
-async def read_questions():
-    questions = await services.read_questions()
+async def read_questions(batch_id: str | None = None):
+    questions = await services.read_questions(batch_id)
     return questions
 
 
