@@ -716,6 +716,10 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
       });
     }
 
+    if (assessmentTotal === 0) {
+      newErrors.assessment_total = "Assessment total cannot be 0. Assign at least one assessment with a weight.";
+    }
+
     if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
         console.log(newErrors);
@@ -1392,6 +1396,9 @@ const handleAssessmentChange = (resource_assessment_id: string, resource_weight:
   <span className="ml-3 text-sm font-semibold text-slate-500">
     (Total: <span className="text-blue-600">{assessmentTotal.toFixed(3)}</span>)
   </span>
+  {errors.assessment_total && (
+    <span className="text-xs font-medium text-red-600 ml-3">{errors.assessment_total}</span>
+  )}
 </h3>
   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
     {resourceAssessments?.map((resourceAssessment, index) => {
