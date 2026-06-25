@@ -93,7 +93,13 @@ async def resource_supporting_x(curriculum_id: str | None = None, study_level_id
     RETURN 
         r.title as resource_title, 
         tolower(head([l IN labels(r) WHERE l <> 'UniResource'])) as resource_type, 
-        coalesce(r.status, '-') as status, 
+        CASE WHEN 'Event' IN labels(r) THEN
+            CASE
+                WHEN size([(r)-[:HAS_SESSION]->(ss:Session) WHERE ss.end_datetime >= datetime() | ss]) = 0 THEN 'completed'
+                WHEN size([(r)-[:HAS_SESSION]->(ss:Session) WHERE ss.start_datetime <= datetime() | ss]) > 0 THEN 'ongoing'
+                ELSE 'open'
+            END
+        ELSE coalesce(r.status, '-') END as status, 
         [(r)<-[:ORGANIZES]-(o:Organizer) | o.name] AS organizers,
         [(r)-[:COVERS]->(t:Topic) | t.name] AS topics,
         COUNT {{ (s:Student)-[:ATTENDS]->(r) }} AS attendees

@@ -34,6 +34,7 @@ class StudentRecommendation(BaseModel):
     need_score: float
     topic_fuzzy_score: float
     vector_similarity: float
+    relative_score: float
 
 class StudentRecommendationsResponse(BaseModel):
     message: str

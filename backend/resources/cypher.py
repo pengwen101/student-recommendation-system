@@ -112,7 +112,13 @@ async def read_resources(label: str | None = None, resource_id: str | None = Non
     r.authors as authors,
     CASE WHEN r.published_date IS NOT NULL THEN apoc.temporal.format(r.published_date, "yyyy-MM-dd") ELSE null END as published_date,
     r.publisher as publisher,
-    r.status as status,
+    CASE WHEN 'Event' IN labels(r) THEN
+        CASE
+            WHEN size([(r)-[:HAS_SESSION]->(ss:Session) WHERE ss.end_datetime >= datetime() | ss]) = 0 THEN 'completed'
+            WHEN size([(r)-[:HAS_SESSION]->(ss:Session) WHERE ss.start_datetime <= datetime() | ss]) > 0 THEN 'ongoing'
+            ELSE 'open'
+        END
+    ELSE r.status END as status,
     r.internal_weight as internal_weight,
     [(r)-[:HAS_SESSION]->(ss:Session) | {{
         session_id: ss.session_id,

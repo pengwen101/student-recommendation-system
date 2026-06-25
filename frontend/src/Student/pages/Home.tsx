@@ -217,8 +217,8 @@ const Home = () => {
                         
                         <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-4 hide-scrollbar">
                             {topRecommendations.map((rec) => (
-                                <div key={rec.resource.resource_id} className="min-w-[280px] max-w-[280px] h-[260px] snap-start shrink-0">
-                                    <ResourceCard resource={rec.resource} />
+                                <div key={rec.resource.resource_id} className="min-w-[280px] max-w-[280px] min-h-[260px] snap-start shrink-0">
+                                    <ResourceCard resource={rec.resource} score={rec.score} relative_score={rec.relative_score} />
                                 </div>
                             ))}
                         </div>

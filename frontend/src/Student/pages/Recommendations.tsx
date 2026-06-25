@@ -56,7 +56,7 @@ const Recommendation = () => {
                             /* Removed absolute min-w/max-w definitions so the width automatically */
                             /* expands to natively track the top banners layout */
                             <div key={rec.resource.resource_id} className="w-full mb-6">
-                                <ResourceCard resource={rec.resource} probability_score={rec.probability_score} />
+                                <ResourceCard resource={rec.resource} score={rec.score} relative_score={rec.relative_score} />
                             </div>
                         ))}
                     </div>

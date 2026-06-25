@@ -23,7 +23,8 @@ interface Resource {
 
 interface Recommendation {
     resource: Resource;
-    score: number; // Score is kept in interface just in case it's needed elsewhere or returned by API
+    score: number;
+    relative_score?: number;
 }
 
 // New interfaces for Student Profile

@@ -162,7 +162,8 @@ export interface ResourceIndicator {
 
 export interface ResourceRecommendation{
     resource:  Resource;
-    probability_score?: number;
+    score?: number;
+    relative_score?: number;
 }
 
 export interface ResourceRecommendations{

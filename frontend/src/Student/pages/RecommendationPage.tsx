@@ -31,6 +31,7 @@ interface Resource {
 interface Recommendation {
     resource: Resource;
     score: number;
+    relative_score?: number;
 }
 
 // New interfaces for Student Profile

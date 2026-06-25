@@ -171,6 +171,8 @@ async def get_student_recommendations(nrp: str, label: str, top_k: int):
         MATCH (r:UniResource:{label})
         WHERE r.is_active = true
           AND (NOT 'Event' IN labels(r) OR (r)-[:AVAILABLE_FOR]->(sl))
+          AND (NOT 'Event' IN labels(r) OR
+               size([(r)-[:HAS_SESSION]->(ss:Session) WHERE ss.start_datetime <= datetime() | ss]) = 0)
 
         CALL (s, r, st) {{
             OPTIONAL MATCH (s)-[rl:HAS]->(i:Indicator)<-[rp:SUPPORTS]-(r)
@@ -207,74 +209,92 @@ async def get_student_recommendations(nrp: str, label: str, top_k: int):
 
         ORDER BY score DESC
         LIMIT $top_k
-        RETURN {{
-            resource_id: r.resource_id,
-            type: tolower(head([l IN labels(r) WHERE l <> 'UniResource'])),
-            title: r.title,
-            is_active: r.is_active,
-            description: r.description,
-            content_link: r.content_link,
-            article_text: r.article_text,
-            isbn: r.isbn,
-            authors: r.authors,
-            published_date: CASE WHEN r.published_date IS NOT NULL THEN apoc.temporal.format(r.published_date, "yyyy-MM-dd") ELSE null END,
-            publisher: r.publisher,
-            status: r.status,
-            internal_weight: r.internal_weight,
-            sessions: [(r)-[:HAS_SESSION]->(ss:Session) | {{
-                session_id: ss.session_id,
-                start_datetime: apoc.temporal.format(ss.start_datetime, "yyyy-MM-dd'T'HH:mm:ss"),
-                end_datetime: apoc.temporal.format(ss.end_datetime, "yyyy-MM-dd'T'HH:mm:ss")
-            }}],
-            organizers: [(r)<-[og:ORGANIZES]-(o:Organizer) | {{
-                organizer_id: o.organizer_id,
-                name: o.name
-            }}],
-            study_levels: [(r)-[af:AVAILABLE_FOR]->(sl:StudyLevel) | {{
-                study_level_id: sl.study_level_id
-            }}],
-            resource_assessments: [(r)-[rh:HAS]->(ra:ResourceAssessment) | {{
-                resource_assessment_id: ra.resource_assessment_id,
-                display_name: ra.display_name,
-                resource_type: ra.resource_type,
-                weight: toFloat(ra.weight),
-                resource_weight: toFloat(rh.weight),
-                lower_text: ra.lower_text,
-                upper_text: ra.upper_text
-            }}],
-            indicators: [(r)-[rsi:SUPPORTS]->(i:Indicator) | {{
-                indicator_id: i.indicator_id
-            }}],
-            topics: [(r)-[rc:COVERS]->(t:Topic) | {{
-                topic_id: t.topic_id,
-                code: t.code,
-                name: t.name
-            }}],
-            calculations: {{
+
+        WITH collect({{
+            resource: {{
+                resource_id: r.resource_id,
+                type: tolower(head([l IN labels(r) WHERE l <> 'UniResource'])),
+                title: r.title,
+                is_active: r.is_active,
+                description: r.description,
+                content_link: r.content_link,
+                article_text: r.article_text,
+                isbn: r.isbn,
+                authors: r.authors,
+                published_date: CASE WHEN r.published_date IS NOT NULL THEN apoc.temporal.format(r.published_date, "yyyy-MM-dd") ELSE null END,
+                publisher: r.publisher,
+                status: CASE WHEN 'Event' IN labels(r) THEN
+                    CASE
+                        WHEN size([(r)-[:HAS_SESSION]->(ss:Session) WHERE ss.end_datetime >= datetime() | ss]) = 0 THEN 'completed'
+                        WHEN size([(r)-[:HAS_SESSION]->(ss:Session) WHERE ss.start_datetime <= datetime() | ss]) > 0 THEN 'ongoing'
+                        ELSE 'open'
+                    END
+                ELSE r.status END,
+                internal_weight: r.internal_weight,
+                sessions: [(r)-[:HAS_SESSION]->(ss:Session) | {{
+                    session_id: ss.session_id,
+                    start_datetime: apoc.temporal.format(ss.start_datetime, "yyyy-MM-dd'T'HH:mm:ss"),
+                    end_datetime: apoc.temporal.format(ss.end_datetime, "yyyy-MM-dd'T'HH:mm:ss")
+                }}],
+                organizers: [(r)<-[og:ORGANIZES]-(o:Organizer) | {{
+                    organizer_id: o.organizer_id,
+                    name: o.name
+                }}],
+                study_levels: [(r)-[af:AVAILABLE_FOR]->(sl:StudyLevel) | {{
+                    study_level_id: sl.study_level_id
+                }}],
+                resource_assessments: [(r)-[rh:HAS]->(ra:ResourceAssessment) | {{
+                    resource_assessment_id: ra.resource_assessment_id,
+                    display_name: ra.display_name,
+                    resource_type: ra.resource_type,
+                    weight: toFloat(ra.weight),
+                    resource_weight: toFloat(rh.weight),
+                    lower_text: ra.lower_text,
+                    upper_text: ra.upper_text
+                }}],
                 indicators: [(r)-[rsi:SUPPORTS]->(i:Indicator) | {{
-                    indicator_id: i.indicator_id,
-                    code: i.code,
-                    name: i.name,
-                    weight: toFloat(rsi.weight)
+                    indicator_id: i.indicator_id
                 }}],
-                qualities: [(r)-[rsq:SUPPORTS]->(q:Quality) | {{
-                    quality_id: q.quality_id,
-                    code: q.code,
-                    name: q.name,
-                    weight: toFloat(rsq.weight)
+                topics: [(r)-[rc:COVERS]->(t:Topic) | {{
+                    topic_id: t.topic_id,
+                    code: t.code,
+                    name: t.name
                 }}],
-                subcpls: [(r)-[rss:SUPPORTS]->(sc:SubCpl) | {{
-                    sub_cpl_id: sc.sub_cpl_id,
-                    code: sc.code,
-                    name: sc.name,
-                    weight: toFloat(rss.weight)
-                }}]
-            }}
-        }} AS resource,
-        score,
-        need_score,
-        topic_fuzzy_score,
-        vector_similarity
+                calculations: {{
+                    indicators: [(r)-[rsi:SUPPORTS]->(i:Indicator) | {{
+                        indicator_id: i.indicator_id,
+                        code: i.code,
+                        name: i.name,
+                        weight: toFloat(rsi.weight)
+                    }}],
+                    qualities: [(r)-[rsq:SUPPORTS]->(q:Quality) | {{
+                        quality_id: q.quality_id,
+                        code: q.code,
+                        name: q.name,
+                        weight: toFloat(rsq.weight)
+                    }}],
+                    subcpls: [(r)-[rss:SUPPORTS]->(sc:SubCpl) | {{
+                        sub_cpl_id: sc.sub_cpl_id,
+                        code: sc.code,
+                        name: sc.name,
+                        weight: toFloat(rss.weight)
+                    }}]
+                }}
+            }},
+            score: score,
+            need_score: need_score,
+            topic_fuzzy_score: topic_fuzzy_score,
+            vector_similarity: vector_similarity
+        }}) AS results,
+        max(score) AS max_score
+
+        UNWIND results AS result
+        RETURN result.resource AS resource,
+               result.score AS score,
+               result.need_score AS need_score,
+               result.topic_fuzzy_score AS topic_fuzzy_score,
+               result.vector_similarity AS vector_similarity,
+               result.score / max_score AS relative_score
     """
 
     params = {
